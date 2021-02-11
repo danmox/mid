@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 import robust_routing.socp as socp
 from robust_routing.utils import parse_rate_graph, socp_info

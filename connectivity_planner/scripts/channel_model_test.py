@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from connectivity_planner.channel_model import PiecewisePathLossModel, PathLossModel, LinearModel
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -59,7 +61,6 @@ def channel_plot():
     ax.set_xlabel('distance (m)', fontsize='xx-large')
     ax.set_ylabel('Normalized Rate', fontsize='xx-large')
     ax.legend(prop={'size': 16})
-    plt.savefig('results/channel_model.pdf')
     plt.show()
 
 
