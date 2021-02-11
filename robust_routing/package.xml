@@ -1,0 +1,15 @@
+<package format="2">
+
+  <name>robust_routing</name>
+  <version>0.1.0</version>
+  <description>An implementation of the robust routing algorithm</description>
+  <maintainer email="mox@seas.upenn.edu">Daniel Mox</maintainer>
+  <author email="mox@seas.upenn.edu">Daniel Mox</author>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>routing_msgs</depend>
+
+</package>
