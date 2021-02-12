@@ -1,14 +1,8 @@
 import numpy as np
-from geometry_msgs.msg import Point
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import cm
 from matplotlib.colors import Normalize
-
-
-def numpy_to_ros(np_config, z=0.0):
-    """Convert numpy position arrays to a list of geometry_msgs.Points."""
-    return [Point(np_config[i,0], np_config[i,1], z) for i in range(np_config.shape[0])]
 
 
 def plot_config(config, ax=None, pause=None, clear_axes=False, show=True,
@@ -17,7 +11,7 @@ def plot_config(config, ax=None, pause=None, clear_axes=False, show=True,
     """Plot the 2D spatial configuration of the network.
 
     Input:
-      config : a list of geometry_msgs.Point msgs
+      config : a Nx2 list of x,y agent positions
       Optional Args:
         ax : axes to plot on
         pause : avoids blocking by continuing after a short pause
@@ -31,12 +25,8 @@ def plot_config(config, ax=None, pause=None, clear_axes=False, show=True,
         bbx : bounding box to use for figure area
 
     """
-    if type(config) is list:
-        x = np.asarray([pt.x for pt in config])
-        y = np.asarray([pt.y for pt in config])
-    else:
-        x = config[:,0]
-        y = config[:,1]
+    x = config[:,0]
+    y = config[:,1]
 
     if ax is None:
         fig, ax = plt.subplots()
