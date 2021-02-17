@@ -3,11 +3,11 @@ import numpy as np
 from scipy import stats
 
 
-def solve(QoS, rate_mean, rate_var, name2idx):
+def solve(flows, rate_mean, rate_var, name2idx):
     """Solve robust routing problem for the given network state and comm. reqs.
 
     Inputs:
-      QoS: a list of QoS messages
+      flows: a list of FlowSpec messages
       rate_mean: an NxN matrix of channel rates
       rate_var: an NxN matrix of channel rate variances
       name2idx: maps agent names to indices used in the optimization
@@ -19,10 +19,10 @@ def solve(QoS, rate_mean, rate_var, name2idx):
 
     """
     N = rate_mean.shape[0]  # number of agents
-    P = len(QoS)            # number of data flows
+    P = len(flows)          # number of data flows
 
     # socp constraint coefficient matrices
-    a_mat, b_mat, zero_vars, conf, m_ik = cone_constraints(QoS, rate_mean, rate_var, name2idx)
+    a_mat, b_mat, zero_vars, conf, m_ik = cone_constraints(flows, rate_mean, rate_var, name2idx)
 
     # optimization variables
     slack, routes = cp.Variable((1)), cp.Variable((N*N*P))
@@ -56,7 +56,7 @@ def solve(QoS, rate_mean, rate_var, name2idx):
     return None, None, socp.status
 
 
-def cone_constraints(QoS, rate_mean, rate_var, name2idx):
+def cone_constraints(flows, rate_mean, rate_var, name2idx):
     """Compute constraint coefficient matrices for the robust routing problem.
 
     2nd order cone constraints of the form:
@@ -67,10 +67,10 @@ def cone_constraints(QoS, rate_mean, rate_var, name2idx):
     inverse normal cumulative distribution function.
 
     Inputs:
-      QoS: a list of QoS messages defining communication constraints
+      flows: a list of FlowSpec messages defining communication constraints
       rate_mean: an NxN matrix of link rates
       rate_var: an NxN matrix of link rate variances
-      name2idx: mapping between names in QoS and 0-indexed vectors, matrices
+      name2idx: mapping between names in flows and 0-indexed vectors, matrices
 
     Outputs:
       a_mat: variance coefficient matrix
@@ -81,11 +81,13 @@ def cone_constraints(QoS, rate_mean, rate_var, name2idx):
 
     """
     N = rate_mean.shape[0]  # number of agents
-    P = len(QoS)            # number of data flows
+    P = len(flows)          # number of data flows
 
     # variables that should be zero
     zero_vars = np.reshape(np.eye(N, dtype=bool), (N,N,1), 'F')
     zero_vars = np.repeat(zero_vars, P, axis=2)
+    for k in range(P):
+        zero_vars[:, name2idx[flows[k].tx], k] = True
 
     # node margin constraints
 
@@ -96,11 +98,11 @@ def cone_constraints(QoS, rate_mean, rate_var, name2idx):
     idx = 0
     for k in range(P):
         for i in range(N):
-            if i == name2idx[QoS[k].rx]:
+            if i == name2idx[flows[k].rx]:
                 continue
 
-            if i == name2idx[QoS[k].tx]:
-                m_ik[idx] = QoS[k].rate
+            if i == name2idx[flows[k].tx]:
+                m_ik[idx] = flows[k].rate
 
             aki = np.zeros((N,N))
             bki = np.zeros((N,N))
@@ -120,6 +122,6 @@ def cone_constraints(QoS, rate_mean, rate_var, name2idx):
             idx += 1
 
     # probabilistic confidence requirements
-    conf = stats.norm.ppf(np.repeat([f.confidence for f in QoS], N-1))
+    conf = stats.norm.ppf(np.repeat([f.confidence for f in flows], N-1))
 
     return a_mat, b_mat, zero_vars, conf, m_ik

@@ -1,7 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
+import sys
 import numpy as np
 import robust_routing.socp as socp
+import rospy
 from robust_routing.utils import parse_rate_graph, socp_info
 from routing_msgs.msg import FlowSpec, CommSpec, RateGraph, RateEdge
 
@@ -37,5 +39,23 @@ def simple_routing_test():
     socp_info(routes, comm_spec.flows, idx2name, rate_mean, rate_var)
 
 
+def warthog_parade_test():
+
+    rospy.init_node('robust_routing_test')
+    comm_spec_pub = rospy.Publisher('robust_routing/comm_spec', CommSpec, queue_size=1)
+
+    comm_spec = CommSpec()
+    comm_spec.flows = [FlowSpec('control_station', f'warty{i}/radio', 10000, 0.8) for i in [1, 2, 3, 4, 5, 6]]
+
+    rate = rospy.Rate(1)  # 1Hz
+    while not rospy.is_shutdown():
+        comm_spec_pub.publish(comm_spec)
+        rate.sleep()
+
+
 if __name__ == '__main__':
-    simple_routing_test()
+    if len(sys.argv) == 2 and sys.argv[1] == 'simple_test':
+        simple_routing_test()
+    else:
+        print('running warthog_parade_test()')
+        warthog_parade_test()

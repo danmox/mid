@@ -1,4 +1,5 @@
 import numpy as np
+from math import floor, log10
 
 
 def parse_rate_graph(rate_graph_msg):
@@ -38,15 +39,16 @@ def fwstr(string, width):
     return (width-len(string))*' ' + string
 
 
-def socp_info(routes, QoS, idx2name, rate_mean=None, rate_var=None):
+def socp_info(routes, flows, idx2name, rate_mean=None, rate_var=None, threshold=1e-5):
     """Print information about the robust routing solution to the console.
 
     Input:
       routes: an NxNxK array of routing variables
-      QoS: an array of QoS requirements with length(QoS) == K
+      flows: an array of FlowSpec requirements with length(flows) == K
       idx2name: maps indices used in the optimization to agent names
       rate_mean: an NxN matrix of channel rates
       rate_var: an NxN matrix of channel rate variances
+      threshold: all routes below threshold are zeroed out
 
     """
     N = routes.shape[0]
@@ -54,15 +56,14 @@ def socp_info(routes, QoS, idx2name, rate_mean=None, rate_var=None):
 
     pad = 2
     tab = 2
-    num_str = '{:.2f}'
-    threshold = 0.01
+    num_str = '{:.' + str(abs(floor(log10(threshold)))+1) + 'f}'
 
     max_name_width = np.max([len(val) for val in list(idx2name.values())])
     max_val_width = len(num_str.format(np.max(routes)))
     cell_width = max(max_name_width, max_val_width) + pad
     node_names = [fwstr(idx2name[i], cell_width) for i in range(N)]
 
-    for k, flow in zip(range(K), QoS):
+    for k, flow in zip(range(K), flows):
 
         aij = routes[...,k]
 
