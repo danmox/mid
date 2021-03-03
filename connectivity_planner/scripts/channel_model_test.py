@@ -5,12 +5,16 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from math import pi
 import numpy as np
+import argparse
 
 # helps the figures to be readable on hidpi screens
 mpl.rcParams['figure.dpi'] = 150
 
 
-def derivative_test(cm=PiecewisePathLossModel()):
+def derivative_test():
+
+    cm=PiecewisePathLossModel(print_values=False)
+
     pts = 100
     xi = np.asarray([0, 0])
     xj = np.zeros((pts,2))
@@ -64,8 +68,48 @@ def channel_plot():
     plt.show()
 
 
+def power_plot():
+    pwr1 = -53.0
+    pwr2 = -52.0
+    pwr3 = -51.0
+    cm1 = PiecewisePathLossModel(print_values=False, l0=pwr1)
+    cm2 = PiecewisePathLossModel(print_values=False, l0=pwr2)
+    cm3 = PiecewisePathLossModel(print_values=False, l0=pwr3)
+
+    x = np.linspace(0.1, 40.0, num=100)
+    rate1 = np.zeros(x.shape)
+    rate2 = np.zeros(x.shape)
+    rate3 = np.zeros(x.shape)
+    xi = np.asarray([0.0, 0.0])
+    for i in range(x.shape[0]):
+        xj = np.asarray([0.0, x[i]])
+        rate1[i], _ = cm1.predict_link(xi, xj)
+        rate2[i], _ = cm2.predict_link(xi,xj)
+        rate3[i], _ = cm3.predict_link(xi, xj)
+
+    fig, ax = plt.subplots()
+    ax.plot(x, rate1, 'b--', lw=2, label=f'{pwr1} dBm')
+    ax.plot(x, rate2, 'r', lw=2, label=f'{pwr2} dBm')
+    ax.plot(x, rate3, 'g-.', lw=2, label=f'{pwr3} dBm')
+    ax.set_xlabel('distance (m)', fontsize='xx-large')
+    ax.set_ylabel('Normalized Rate', fontsize='xx-large')
+    ax.legend(prop={'size': 16})
+    plt.show()
+
+
 if __name__ == '__main__':
-    # print('running derivative_test()')
-    # derivative_test()
-    print('running channel_plot()')
-    channel_plot()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('test', type=str, help='test to run',
+                        choices=['derivative', 'plot', 'power'])
+
+    args = parser.parse_args()
+
+    if args.test == 'derivative':
+        print('running derivative_test()')
+        derivative_test()
+    elif args.test == 'plot':
+        print('running channel_plot()')
+        channel_plot()
+    elif args.test == 'power':
+        print('running power_plot()')
+        power_plot()
