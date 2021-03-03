@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import special, spatial, stats
+from scipy import special, spatial
 
 
 def dbm2mw(dbm):
@@ -71,6 +71,11 @@ class PathLossModel:
         var = (self.a * d / (self.b + d)) ** 2
         return rate, var
 
+    def derivative_coeff(self, d):
+        return - 10.0**(self.L0/20) * self.n * np.sqrt(d ** (-self.n) / self.PN0) \
+            * np.exp(-10.0**(self.L0 / 10.0) * d**(-self.n) / self.PN0) \
+            / (np.sqrt(np.pi) * d) / d
+
     def derivative(self, xi, xj):
         """Compute the derivative of the channel rate function w.r.t xi.
 
@@ -91,10 +96,7 @@ class PathLossModel:
         dist = np.linalg.norm(xi - xj)
         if dist < 1e-6:
             return np.zeros((2,1))
-        der = - 10.0**(self.L0/20) * self.n * np.sqrt(dist ** (-self.n) / self.PN0) \
-            * np.exp(-10.0**(self.L0 / 10.0) * dist**(-self.n) / self.PN0) \
-            / (np.sqrt(np.pi) * dist) * (xi - xj) / dist
-        return der
+        return self.derivative_coeff(dist) * (xi - xj)
 
 
 class PiecewisePathLossModel(PathLossModel):
@@ -114,18 +116,18 @@ class PiecewisePathLossModel(PathLossModel):
     """
 
     def __init__(self, print_values=True, n0=-70.0, n=2.52, l0=-53.0, a=0.2, b=6.0,
-                 transition_dist=16.4):
+                 transition_rate=0.2320007930054694):
         PathLossModel.__init__(self, print_values, n0, n, l0, a, b)
-        self.transition_dist = transition_dist
+
+        self.trans_dist = (self.PL0 / (self.PN0 * special.erfinv(transition_rate) ** 2)) ** (1/self.n)
 
         # find the slope of R(xi, xj) at the cuttoff distance; this will serve
         # as the slope of the linear section that decays to zero
-        dRdd = PathLossModel.derivative(self, np.asarray([transition_dist, 0.0]), np.zeros((2,)))
+        dRdd = PathLossModel.derivative(self, np.asarray([self.trans_dist, 0.0]), np.zeros((2,)))
         self.m = dRdd[0].item() # by construction dR/dy = 0; dR/dx = slope (change in distance)
 
         # find the y-intercept of the linear portion
-        trans_rate, _ = PathLossModel.predict_link(self, np.asarray([transition_dist, 0.0]), np.zeros((2,)))
-        self.b = trans_rate - self.m * transition_dist
+        self.b = transition_rate - self.m * self.trans_dist
 
         self.cutoff_dist = - self.b / self.m # when the rate drops to zero
 
@@ -143,7 +145,7 @@ class PiecewisePathLossModel(PathLossModel):
         rate, var = PathLossModel.predict(self, x)
 
         edm = spatial.distance_matrix(x, x)
-        dist_mask =  edm > self.transition_dist
+        dist_mask =  edm > self.trans_dist
         rate[dist_mask] = np.maximum(self.m * edm[dist_mask] + self.b, np.zeros(edm[dist_mask].size))
 
         # TODO zero out variance when rate is zero?
@@ -165,7 +167,7 @@ class PiecewisePathLossModel(PathLossModel):
         rate, var = PathLossModel.predict_link(self, xi, xj)
 
         dist = np.linalg.norm(xi - xj)
-        if dist > self.transition_dist:
+        if dist > self.trans_dist:
             rate = max(self.m * dist + self.b, 0.0)
 
         # TODO zero out variance when rate hits zero?
@@ -193,7 +195,7 @@ class PiecewisePathLossModel(PathLossModel):
 
         if dist > self.cutoff_dist:
             return np.zeros((2,1))
-        elif dist > self.transition_dist:
+        elif dist > self.trans_dist:
             return self.m / dist * diff
         else:
             return PathLossModel.derivative(self, xi, xj)
