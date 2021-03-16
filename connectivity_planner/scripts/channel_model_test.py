@@ -68,6 +68,28 @@ def channel_plot():
     plt.show()
 
 
+def dcist_channel_plot():
+    pwcm = PiecewisePathLossModel(print_values=False, n0=-90.0, n=2.5, l0=-40.0)
+    cm = PathLossModel(print_values=False, n0=-90.0, n=2.5, l0=-40.0)
+
+    x = np.linspace(0.1, 700.0, num=100)
+    pw_rate = np.zeros(x.shape)
+    cm_rate = np.zeros(x.shape)
+    xi = np.asarray([0.0, 0.0])
+    for i in range(x.shape[0]):
+        xj = np.asarray([0.0, x[i]])
+        pw_rate[i], _ = pwcm.predict_link(xi, xj)
+        cm_rate[i], _ = cm.predict_link(xi,xj)
+
+    fig, ax = plt.subplots()
+    ax.plot(x, cm_rate, 'r', lw=2, label='Log Normal')
+    ax.plot(x, pw_rate, 'b--', lw=2, label='PW Log Normal')
+    ax.set_xlabel('distance (m)', fontsize='xx-large')
+    ax.set_ylabel('Normalized Rate', fontsize='xx-large')
+    ax.legend(prop={'size': 16})
+    plt.show()
+
+
 def power_plot():
     pwr1 = -53.0
     pwr2 = -52.0
@@ -100,7 +122,7 @@ def power_plot():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('test', type=str, help='test to run',
-                        choices=['derivative', 'plot', 'power'])
+                        choices=['derivative', 'plot', 'power', 'dcist'])
 
     args = parser.parse_args()
 
@@ -113,3 +135,6 @@ if __name__ == '__main__':
     elif args.test == 'power':
         print('running power_plot()')
         power_plot()
+    elif args.test == 'dcist':
+        print('running dcist_channel_plot()')
+        dcist_channel_plot()
