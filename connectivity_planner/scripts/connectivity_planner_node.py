@@ -4,12 +4,13 @@ import numpy as np
 from connectivity_planner.channel_model import PiecewisePathLossModel
 from connectivity_planner.connectivity_optimization import ConnectivityOpt
 from connectivity_planner.feasibility import connect_graph
-from geometry_msgs.msg import PoseStamped, Pose, Point
+from geometry_msgs.msg import PoseStamped, Pose, Point, Vector3
+from std_msgs.msg import ColorRGBA, Header
+from visualization_msgs.msg import Marker
 from abc import ABC, abstractmethod
 from functools import partial
 from typing import List, Union
 from math import ceil
-
 
 class ConnectivityPlanner(ABC):
     def __init__(self) -> None:
@@ -65,16 +66,20 @@ class ConnectivityPlanner(ABC):
                 )
             )
             self.comm_cmd_pose_pubs.append(
-                rospy.Publisher(comm_cmd_pose_fmt.format(i), PoseStamped, queue_size=1)
+                rospy.Publisher(comm_cmd_pose_fmt.format(i+1), PoseStamped, queue_size=1)
             )
+
+        self.rviz_pub = rospy.Publisher("~rviz", Marker, queue_size=100)
 
     def pose_callback(self, i, type, pose_stamped: PoseStamped):
         x = pose_to_numpy(pose_stamped)[:2]
         if type == "task":
             rospy.logdebug(f"Task{i}: {x}")
             self.x_task[i, :] = x
+            self.rviz_pub.publish(ConnectivityPlanner.marker_factory("task", i, pose_stamped.pose, color=(0,0,1,1)))
         elif type == "comm":
             self.x_comm[i, :] = x
+            self.rviz_pub.publish(ConnectivityPlanner.marker_factory("comm", i, pose_stamped.pose, color=(1,0,0,1)))
         else:
             rospy.logerr(f"Unexpected pose callback type {type}.")
 
@@ -90,11 +95,31 @@ class ConnectivityPlanner(ABC):
 
     def publish(self, x_comm_target):
         for i, pub in enumerate(self.comm_cmd_pose_pubs):
-            point = Point(x_comm_target[i, 0], x_comm_target[i, 1], self.altitude)
-            pose_stamped = PoseStamped(pose=Pose(position=point))
+            pose = Pose(position = Point(x_comm_target[i, 0], x_comm_target[i, 1], self.altitude))
+            pose_stamped = PoseStamped(pose=pose)
             pose_stamped.header.frame_id = "world"
             pub.publish(pose_stamped)
+            self.rviz_pub.publish(ConnectivityPlanner.marker_factory("comm_target", i, pose_stamped.pose, color=(0,1,0,1)))
 
+    @classmethod
+    def marker_factory(self, ns, i, pose, scale=1, color=(1,0,0,1)):
+        return Marker(
+            Header(frame_id="world"),
+            ns,
+            i,
+            Marker.SPHERE,
+            Marker.MODIFY,
+            pose,
+            Vector3(scale, scale, scale),
+            ColorRGBA(*color),
+            rospy.Duration(60),
+            True,
+            None,
+            None,
+            None,
+            None,
+            None
+        )
 
 class OptimizationPlanner(ConnectivityPlanner):
     def __init__(self) -> None:
@@ -132,9 +157,7 @@ class OptimizationPlanner(ConnectivityPlanner):
                 self.feasible = True
 
         conn_opt = ConnectivityOpt(self.channel_model, x_task, self.x_comm_target)
-        connectivity, success = conn_opt.update_network_config(
-            self.step_size, verbose=True
-        )
+        connectivity, success = conn_opt.update_network_config(self.step_size)
         self.x_comm_target = conn_opt.get_comm_config()
         self.publish(self.x_comm_target)
         # if connectivity is close to zero we are close to infeasability
