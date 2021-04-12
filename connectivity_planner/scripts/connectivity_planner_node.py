@@ -65,7 +65,7 @@ class ConnectivityPlanner(ABC):
                 )
             )
             self.comm_cmd_pose_pubs.append(
-                rospy.Publisher(comm_cmd_pose_fmt.format(i), PoseStamped, queue_size=1)
+                rospy.Publisher(comm_cmd_pose_fmt.format(i+1), PoseStamped, queue_size=1)
             )
 
     def pose_callback(self, i, type, pose_stamped: PoseStamped):
