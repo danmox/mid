@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import rospy
 import rospkg
 import numpy as np
@@ -24,12 +25,14 @@ class ConnectivityPlanner(ABC):
         self.altitude = rospy.get_param("~altitude", 30)
         self.rate = rospy.get_param("~rate", 1)
 
-        self.n_comm = rospy.get_param("~n_comm")
-        self.n_task = rospy.get_param("~n_task")
-        if self.n_comm is None or self.n_task is None:
-            raise ValueError(
-                "Must specify `num_comm_agents` and `num_task_agents`. Cannot be None."
-            )
+        if rospy.has_param('~comm_ids') and rospy.has_param('~task_ids'):
+            self.comm_ids = rospy.get_param('~comm_ids')
+            self.task_ids = rospy.get_param('~task_ids')
+        else:
+            raise ValueError('failed to fetch "comm_ids" and/or "task_ids" from parameter server')
+
+        self.n_comm = len(self.comm_ids)
+        self.n_task = len(self.task_ids)
 
         comm_pose_fmt = rospy.get_param("~comm_pose_fmt", "~comm{}/pose")
         comm_cmd_pose_fmt = rospy.get_param("~comm_cmd_pose_fmt", "~comm{}/cmd_pose")
@@ -54,28 +57,26 @@ class ConnectivityPlanner(ABC):
         self.task_pose_subs: List[rospy.Subscriber] = []
         self.comm_pose_subs: List[rospy.Subscriber] = []
         self.comm_cmd_pose_pubs: List[rospy.Publisher] = []
-        for i in range(self.n_task):
+        for i, agent_id in enumerate(self.task_ids):
             self.task_pose_subs.append(
                 rospy.Subscriber(
-                    task_pose_fmt.format(i + 1),
+                    task_pose_fmt.format(agent_id),
                     PoseStamped,
                     partial(self.pose_callback, i, "task"),
                     queue_size=1,
                 )
             )
-        for i in range(self.n_comm):
+        for i, agent_id in enumerate(self.comm_ids):
             self.comm_pose_subs.append(
                 rospy.Subscriber(
-                    comm_pose_fmt.format(i + 1),
+                    comm_pose_fmt.format(agent_id),
                     PoseStamped,
                     partial(self.pose_callback, i, "comm"),
                     queue_size=1,
                 )
             )
             self.comm_cmd_pose_pubs.append(
-                rospy.Publisher(
-                    comm_cmd_pose_fmt.format(i + 1), PoseStamped, queue_size=1
-                )
+                rospy.Publisher(comm_cmd_pose_fmt.format(agent_id), PoseStamped, queue_size=1)
             )
 
         self.rviz_pub = rospy.Publisher("~rviz", Marker, queue_size=100)
