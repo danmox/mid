@@ -120,9 +120,7 @@ class ConnectivityPlanner(ABC):
             rate.sleep()
 
     def publish_single(self, i, target):
-        pose = Pose(
-            position=Point(target[0], target[1], self.altitude)
-        )
+        pose = Pose(position=Point(target[0], target[1], self.altitude))
         pose_stamped = PoseStamped(pose=pose)
         pose_stamped.header.frame_id = "world"
         self.comm_cmd_pose_pubs[i].publish(pose_stamped)
@@ -134,7 +132,7 @@ class ConnectivityPlanner(ABC):
 
     def publish(self, x_comm_target):
         for i in range(self.n_comm):
-            self.publish_single(i, x_comm_target[i,:])
+            self.publish_single(i, x_comm_target[i, :])
 
     @classmethod
     def marker_factory(self, ns, i, pose, scale=1, color=(1, 0, 0, 1)):
@@ -244,9 +242,12 @@ class CNNPlanner(ConnectivityPlanner):
 
     def update(self):
         # Copy to avoid race condition
-        # rescale to the scale on which model was trained on
-        x_task = np.copy(self.x_task) / self.model_scale
-        x_comm = np.copy(self.x_comm) / self.model_scale
+        x_task = np.copy(self.x_task)
+        x_comm = np.copy(self.x_comm)
+        # center and rescale to model scale
+        x_mean = np.mean(x_task)
+        x_task = (x_task - x_mean) / self.model_scale
+        x_comm = (x_comm - x_mean) / self.model_scale
 
         input_img = lloyd.kernelized_config_img(x_task, self.params)
         cnn_img = (
@@ -276,9 +277,11 @@ class CNNPlanner(ConnectivityPlanner):
         # assign agents to targets
         distance = distance_matrix(x_comm, x_comm_target)
         comm_idx, target_idx = linear_sum_assignment(distance)
-        for i,j in zip(comm_idx,target_idx):
-            self.publish_single(i, x_comm_target[j,:])
-        rospy.loginfo(f"Took {(t1-t0).to_sec()} seconds")
+
+        # transform back into original coordinates
+        x_comm_target = (x_comm_target * self.model_scale) + x_mean
+        for i, j in zip(comm_idx, target_idx):
+            self.publish_single(i, x_comm_target[j, :])
 
     @staticmethod
     def numpy_to_image_msg(x):
@@ -298,6 +301,7 @@ def pose_to_numpy(pose: Union[Pose, PoseStamped]) -> np.ndarray:
         pose = pose.pose
     point = pose.position
     return np.asarray([point.x, point.y, point.z])
+
 
 def deal_positions(n_agents, positions):
     """
