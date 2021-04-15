@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 
-import rospy
-import rospkg
+import json
+from abc import ABC, abstractmethod
+from functools import partial
+from math import ceil
+from os import path
+from os.path import join
+from typing import List, Union
+
 import numpy as np
+import rospkg
+import rospy
+import torch
+import torch.jit
+from connectivity_planner import lloyd
 from connectivity_planner.channel_model import PiecewisePathLossModel
 from connectivity_planner.connectivity_optimization import ConnectivityOpt
 from connectivity_planner.feasibility import connect_graph
-from connectivity_planner import lloyd
-from geometry_msgs.msg import PoseStamped, Pose, Point, Vector3
+from geometry_msgs.msg import Point, Pose, PoseStamped, Vector3
+from sensor_msgs.msg import Image
 from std_msgs.msg import ColorRGBA, Header
 from visualization_msgs.msg import Marker
-from abc import ABC, abstractmethod
-from functools import partial
-from typing import List, Union
-from math import ceil
-import torch
-import torch.jit
-import json
-from os import path
+from scipy.optimize import linear_sum_assignment
+from scipy.spatial import distance_matrix
 
 
 class ConnectivityPlanner(ABC):
@@ -25,11 +30,13 @@ class ConnectivityPlanner(ABC):
         self.altitude = rospy.get_param("~altitude", 30)
         self.rate = rospy.get_param("~rate", 1)
 
-        if rospy.has_param('~comm_ids') and rospy.has_param('~task_ids'):
-            self.comm_ids = rospy.get_param('~comm_ids')
-            self.task_ids = rospy.get_param('~task_ids')
+        if rospy.has_param("~comm_ids") and rospy.has_param("~task_ids"):
+            self.comm_ids = rospy.get_param("~comm_ids")
+            self.task_ids = rospy.get_param("~task_ids")
         else:
-            raise ValueError('failed to fetch "comm_ids" and/or "task_ids" from parameter server')
+            raise ValueError(
+                'failed to fetch "comm_ids" and/or "task_ids" from parameter server'
+            )
 
         self.n_comm = len(self.comm_ids)
         self.n_task = len(self.task_ids)
@@ -76,7 +83,9 @@ class ConnectivityPlanner(ABC):
                 )
             )
             self.comm_cmd_pose_pubs.append(
-                rospy.Publisher(comm_cmd_pose_fmt.format(agent_id), PoseStamped, queue_size=1)
+                rospy.Publisher(
+                    comm_cmd_pose_fmt.format(agent_id), PoseStamped, queue_size=1
+                )
             )
 
         self.rviz_pub = rospy.Publisher("~rviz", Marker, queue_size=100)
@@ -84,7 +93,6 @@ class ConnectivityPlanner(ABC):
     def pose_callback(self, i, type, pose_stamped: PoseStamped):
         x = pose_to_numpy(pose_stamped)[:2]
         if type == "task":
-            rospy.logdebug(f"Task{i}: {x}")
             self.x_task[i, :] = x
             self.rviz_pub.publish(
                 ConnectivityPlanner.marker_factory(
@@ -111,19 +119,22 @@ class ConnectivityPlanner(ABC):
             self.update()
             rate.sleep()
 
+    def publish_single(self, i, target):
+        pose = Pose(
+            position=Point(target[0], target[1], self.altitude)
+        )
+        pose_stamped = PoseStamped(pose=pose)
+        pose_stamped.header.frame_id = "world"
+        self.comm_cmd_pose_pubs[i].publish(pose_stamped)
+        self.rviz_pub.publish(
+            ConnectivityPlanner.marker_factory(
+                "comm_target", i, pose_stamped.pose, color=(0, 1, 0, 1)
+            )
+        )
+
     def publish(self, x_comm_target):
-        for i, pub in enumerate(self.comm_cmd_pose_pubs):
-            pose = Pose(
-                position=Point(x_comm_target[i, 0], x_comm_target[i, 1], self.altitude)
-            )
-            pose_stamped = PoseStamped(pose=pose)
-            pose_stamped.header.frame_id = "world"
-            pub.publish(pose_stamped)
-            self.rviz_pub.publish(
-                ConnectivityPlanner.marker_factory(
-                    "comm_target", i, pose_stamped.pose, color=(0, 1, 0, 1)
-                )
-            )
+        for i in range(self.n_comm):
+            self.publish_single(i, x_comm_target[i,:])
 
     @classmethod
     def marker_factory(self, ns, i, pose, scale=1, color=(1, 0, 0, 1)):
@@ -211,16 +222,75 @@ class OptimizationPlanner(ConnectivityPlanner):
 
 class CNNPlanner(ConnectivityPlanner):
     def __init__(self) -> None:
-        pass
+        super().__init__()
+        self.max_steps = rospy.get_param("~max_steps", 100)
+        self.model, self.params = self.load_model("best.ts")
+        self.model_scale = self.comm_range / self.params["comm_range"]
+        rospy.loginfo(f"Model scale: {self.model_scale}")
 
-    def load_model(self, model_name):
+        self.input_img_pub = rospy.Publisher("~input_image", Image, queue_size=1)
+        self.cnn_img_pub = rospy.Publisher("~cnn_image", Image, queue_size=1)
+
+    @staticmethod
+    def load_model(model_name):
         rospack = rospkg.RosPack()
-        model_dir = rospack.get_path('learning_connectivity')
+        models_dir = join(rospack.get_path("connectivity_planner"), "models")
 
-        with open(path.join(models_dir, "params.json")) as f:
-            params = json.load(f)[model_name]
+        with open(path.join(models_dir, f"{model_name}.json")) as f:
+            params = json.load(f)
+        params = lloyd.compute_paramaters(params)
         model = torch.jit.load(join(models_dir, model_name))
         return model, params
+
+    def update(self):
+        # Copy to avoid race condition
+        # rescale to the scale on which model was trained on
+        x_task = np.copy(self.x_task) / self.model_scale
+        x_comm = np.copy(self.x_comm) / self.model_scale
+
+        input_img = lloyd.kernelized_config_img(x_task, self.params)
+        cnn_img = (
+            self.model.evaluate(torch.from_numpy(input_img)).cpu().detach().numpy()
+        )
+        self.input_img_pub.publish(self.numpy_to_image_msg(input_img))
+        self.cnn_img_pub.publish(self.numpy_to_image_msg(cnn_img))
+
+        # extract peaks
+        config_subs, _ = lloyd.compute_peaks(cnn_img, threshold_val=60)
+        x_comm_target = lloyd.sub_to_pos(
+            self.params["meters_per_pixel"], self.params["img_size"][0], config_subs
+        )
+        # run lloyds
+        for _ in range(self.max_steps):
+            voronoi_cells = lloyd.compute_voronoi(x_comm_target, self.params["bbx"])
+            x_comm_target_new = lloyd.lloyd_step(
+                cnn_img,
+                self.params["xy"],
+                x_comm_target,
+                voronoi_cells,
+                self.params["coverage_range"],
+            )
+            if np.linalg.norm(x_comm_target_new - x_comm_target) < 1e-8:
+                break
+            x_comm_target = x_comm_target_new
+        # assign agents to targets
+        distance = distance_matrix(x_comm, x_comm_target)
+        comm_idx, target_idx = linear_sum_assignment(distance)
+        for i,j in zip(comm_idx,target_idx):
+            self.publish_single(i, x_comm_target[j,:])
+        rospy.loginfo(f"Took {(t1-t0).to_sec()} seconds")
+
+    @staticmethod
+    def numpy_to_image_msg(x):
+        img = Image()
+        img.header.frame_id = "world"
+        img.height = x.shape[0]
+        img.width = x.shape[1]
+        img.encoding = "mono8"
+        img.is_bigendian = 0
+        img.step = x.shape[1]
+        img.data = list(x[:].astype(np.uint8).tobytes())
+        return img
 
 
 def pose_to_numpy(pose: Union[Pose, PoseStamped]) -> np.ndarray:
@@ -228,7 +298,6 @@ def pose_to_numpy(pose: Union[Pose, PoseStamped]) -> np.ndarray:
         pose = pose.pose
     point = pose.position
     return np.asarray([point.x, point.y, point.z])
-
 
 def deal_positions(n_agents, positions):
     """
