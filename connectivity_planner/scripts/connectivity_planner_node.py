@@ -245,7 +245,7 @@ class CNNPlanner(ConnectivityPlanner):
         x_task = np.copy(self.x_task)
         x_comm = np.copy(self.x_comm)
         # center and rescale to model scale
-        x_mean = np.mean(x_task)
+        x_mean = np.mean(x_task, axis=0)
         x_task = (x_task - x_mean) / self.model_scale
         x_comm = (x_comm - x_mean) / self.model_scale
 
