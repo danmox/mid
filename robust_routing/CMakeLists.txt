@@ -5,20 +5,28 @@ set(PKG_DEPENDS
   rospy
   routing_msgs
 )
+
 set(BUILD_DEPENDS
   ${PKG_DEPENDS}
+  message_generation
 )
+
 set(RUN_DEPENDS
   ${PKG_DEPENDS}
+  message_runtime
 )
 
-find_package(catkin REQUIRED ${BUILD_DEPENDS})
+find_package(catkin REQUIRED COMPONENTS
+  ${BUILD_DEPENDS}
+)
 
-include_directories(
-  ${catkin_INCLUDE_DIRS}
+add_service_files(FILES
+  CommSpec.srv
 )
 
 catkin_python_setup()
+
+generate_messages(DEPENDENCIES std_msgs routing_msgs)
 
 catkin_package(
   CATKIN_DEPENDS ${RUN_DEPENDS}

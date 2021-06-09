@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import special, spatial
+from scipy.optimize import toms748
 
 
 def dbm2mw(dbm):
@@ -97,6 +98,9 @@ class PathLossModel:
         if dist < 1e-6:
             return np.zeros((2,1))
         return self.derivative_coeff(dist) * (xi - xj)
+
+    def calculate_range(self, max_range=100):
+        return toms748(lambda a : self.predict_link(np.zeros((2,)), np.asarray([a,0]))[0]-1e-10, 1, max_range)
 
 
 class PiecewisePathLossModel(PathLossModel):

@@ -11,5 +11,6 @@
 
   <depend>rospy</depend>
   <depend>routing_msgs</depend>
+  <depend>visualization_msgs</depend>
 
 </package>

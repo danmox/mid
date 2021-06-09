@@ -4,19 +4,26 @@ import rospy
 import numpy as np
 
 import robust_routing.socp as socp
+
+from robust_routing.srv import CommSpec as CommSpecSrv
+from robust_routing.srv import CommSpecResponse, CommSpecRequest
 from robust_routing.utils import parse_rate_graph, socp_info
 from routing_msgs.msg import *
+
+from threading import Lock
 
 
 class RobustRoutingNode():
     def __init__(self):
         super().__init__()
 
+        self.lock = Lock()
+
         self.comm_spec = None
 
-        self.reqs_sub = rospy.Subscriber('robust_routing/comm_spec', CommSpec, self.set_comm_spec)
-        self.rate_sub = rospy.Subscriber('rate_graph', RateGraph, self.solve, queue_size=1)
-        self.route_pub = rospy.Publisher('robust_routing/routes', RobustRoutes)
+        self.rate_sub = rospy.Subscriber('rate_graph', RateGraph, self.solve_shim, queue_size=1)
+        self.route_pub = rospy.Publisher('robust_routing/routes', RobustRoutes, queue_size=2)
+        self.reqs_srv = rospy.Service('robust_routing/comm_spec', CommSpecSrv, self.set_comm_spec)
 
         self.print_info = rospy.get_param('~socp_info', False)
 
@@ -24,14 +31,34 @@ class RobustRoutingNode():
         self.route_threshold = rospy.get_param('~route_threshold', 1e-5)
         rospy.loginfo(f'using a route threshold of {self.route_threshold}')
 
-    def set_comm_spec(self, spec):
-        rospy.loginfo(f'received CommSpec with {len(spec.flows)} flows')
-        self.comm_spec = spec
+    def set_comm_spec(self, comm_spec_req):
+        rospy.loginfo(f'received CommSpec with {len(comm_spec_req.flows)} flow(s)')
+
+        with self.lock:
+            if comm_spec_req.action == CommSpecRequest.ADD:
+                if self.comm_spec is None:
+                    self.comm_spec = comm_spec_req
+                    rospy.loginfo('comm. spec. initialized with new flow(s)')
+                else:
+                    rospy.loginfo(f'appended new flow(s) to {len(self.comm_spec.flows)} existing flow(s)')
+                    self.comm_spec.flows += comm_spec_req.flows
+            elif comm_spec_req.action == CommSpecRequest.CLEAR:
+                self.comm_spec = comm_spec_req
+                rospy.loginfo('replacing existing flow(s) with new flow(s)')
+            else:
+                rospy.logerr(f'unknown service action {comm_spec_req.action} provided')
+                return CommSpecResponse(success=False)
+
+        return CommSpecResponse(success=True)
+
+    def solve_shim(self, rate_graph):
+        with self.lock:
+            self.solve(rate_graph)
 
     def solve(self, rate_graph):
 
         if self.comm_spec is None:
-            rospy.logwarn('no communication requirements received: no routes will be published')
+            rospy.logwarn_throttle(5, 'no communication requirements received: no routes will be published')
             return
 
         #
@@ -46,7 +73,7 @@ class RobustRoutingNode():
             if not edge.rate_variance > 0.0:
                 if not variance_warning:
                     variance_warning = True
-                    rospy.logwarn('edge.rate_variance of 0 detected: setting to 1bps')
+                    rospy.logwarn_throttle(1, 'edge.rate_variance of 0 detected: setting to 1bps')
                 edge.rate_variance = 1  # bps (extremely low variance)
 
         # convert rate_graph message to rate and variance matrices used in the optimization
@@ -56,7 +83,7 @@ class RobustRoutingNode():
         spec_names = set([f.rx for f in self.comm_spec.flows] + [f.tx for f in self.comm_spec.flows])
         for name in spec_names:
             if name not in name2idx:
-                rospy.logerr(f'{name} in CommSpec but not in RateGraph: no routes will be published')
+                rospy.logwarn_throttle(1, f'{name} in CommSpec but not in RateGraph: no routes will be published')
                 return
 
         slack, routes, status = socp.solve(self.comm_spec.flows, rate_mean, rate_var, name2idx)
