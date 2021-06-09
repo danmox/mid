@@ -17,7 +17,7 @@ from connectivity_planner import lloyd
 from connectivity_planner.channel_model import PiecewisePathLossModel
 from connectivity_planner.connectivity_optimization import ConnectivityOpt
 from connectivity_planner.feasibility import connect_graph
-from geometry_msgs.msg import Point, Pose, PoseStamped, Vector3
+from geometry_msgs.msg import Point, Pose, PoseStamped, Vector3, Quaternion
 from sensor_msgs.msg import Image
 from std_msgs.msg import ColorRGBA, Header
 from visualization_msgs.msg import Marker
@@ -44,6 +44,9 @@ class ConnectivityPlanner(ABC):
         comm_pose_fmt = rospy.get_param("~comm_pose_fmt", "~comm{}/pose")
         comm_cmd_pose_fmt = rospy.get_param("~comm_cmd_pose_fmt", "~comm{}/cmd_pose")
         task_pose_fmt = rospy.get_param("~task_pose_fmt", "~task{}/pose")
+
+        # rviz marker scale
+        self.ms = rospy.get_param("~marker_scale", 1)
 
         self.N0 = rospy.get_param("~N0", -70.0)
         self.n = rospy.get_param("~n", 2.52)
@@ -96,14 +99,14 @@ class ConnectivityPlanner(ABC):
             self.x_task[i, :] = x
             self.rviz_pub.publish(
                 ConnectivityPlanner.marker_factory(
-                    "task", i, pose_stamped.pose, color=(0, 0, 1, 1)
+                    "task", i, pose_stamped.pose, scale=self.ms, color=(0, 0, 1, 1)
                 )
             )
         elif type == "comm":
             self.x_comm[i, :] = x
             self.rviz_pub.publish(
                 ConnectivityPlanner.marker_factory(
-                    "comm", i, pose_stamped.pose, color=(1, 0, 0, 1)
+                    "comm", i, pose_stamped.pose, scale=self.ms, color=(1, 0, 0, 1)
                 )
             )
         else:
@@ -120,13 +123,13 @@ class ConnectivityPlanner(ABC):
             rate.sleep()
 
     def publish_single(self, i, target):
-        pose = Pose(position=Point(target[0], target[1], self.altitude))
+        pose = Pose(Point(target[0], target[1], self.altitude), Quaternion(0,0,0,1))
         pose_stamped = PoseStamped(pose=pose)
         pose_stamped.header.frame_id = "world"
         self.comm_cmd_pose_pubs[i].publish(pose_stamped)
         self.rviz_pub.publish(
             ConnectivityPlanner.marker_factory(
-                "comm_target", i, pose_stamped.pose, color=(0, 1, 0, 1)
+                "comm_target", i, pose_stamped.pose, scale=self.ms, color=(0, 1, 0, 1)
             )
         )
 
