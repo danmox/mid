@@ -1,0 +1,9 @@
+# action constants
+uint8 ADD=1    # append flows to existing comm. specs.
+uint8 CLEAR=2  # clear any existing comm. specs. and add flows
+
+time stamp
+routing_msgs/FlowSpec[] flows
+uint8 action
+---
+bool success
