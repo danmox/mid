@@ -56,7 +56,7 @@ def compute_peaks(image, threshold_val=80, blur_sigma=1, region_size=7):
     out_peaks = np.zeros((0, 2))
     while threshold_val > 0 and out_peaks.shape[0] == 0:
         out_peaks = peaks[image[peaks[:, 0], peaks[:, 1]] > threshold_val]
-        threshold_val -= 20
+        threshold_val -= 10
     return out_peaks, blurred_img
 
 
