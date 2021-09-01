@@ -48,6 +48,7 @@ class ConnectivityPlanner(ABC):
         # rviz marker scale
         self.ms = rospy.get_param("~marker_scale", 1)
 
+        self.t = rospy.get_param("~t", 0.0)
         self.N0 = rospy.get_param("~N0", -70.0)
         self.n = rospy.get_param("~n", 2.52)
         self.L0 = rospy.get_param("~L0", -53.0)
@@ -55,7 +56,7 @@ class ConnectivityPlanner(ABC):
         self.b = rospy.get_param("~b", 6.0)
 
         self.channel_model = PiecewisePathLossModel(
-            print_values=False, n0=self.N0, n=self.n, l0=self.L0, a=self.a, b=self.b
+            print_values=False, t=self.t, n0=self.N0, n=self.n, l0=self.L0, a=self.a, b=self.b
         )
         self.comm_range = self.channel_model.calculate_range(max_range=1000)
         rospy.loginfo(f"Comm range is {self.comm_range:.2f} meters.")

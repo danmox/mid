@@ -91,12 +91,12 @@ def dcist_channel_plot():
 
 
 def power_plot():
-    pwr1 = -53.0
-    pwr2 = -52.0
-    pwr3 = -51.0
-    cm1 = PiecewisePathLossModel(print_values=False, l0=pwr1)
-    cm2 = PiecewisePathLossModel(print_values=False, l0=pwr2)
-    cm3 = PiecewisePathLossModel(print_values=False, l0=pwr3)
+    pwr1 = 0.0
+    pwr2 = 1.0
+    pwr3 = 2.0
+    cm1 = PiecewisePathLossModel(print_values=False, t=pwr1)
+    cm2 = PiecewisePathLossModel(print_values=False, t=pwr2)
+    cm3 = PiecewisePathLossModel(print_values=False, t=pwr3)
 
     x = np.linspace(0.1, 40.0, num=100)
     rate1 = np.zeros(x.shape)

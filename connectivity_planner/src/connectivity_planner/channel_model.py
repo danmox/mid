@@ -20,15 +20,18 @@ class PathLossModel:
 
     """
 
-    def __init__(self, print_values=True, n0=-70.0, n=2.52, l0=-53.0, a=0.2, b=6.0):
-        self.L0 = l0                # transmit power (dBm)
+    def __init__(self, print_values=True, t=0, n0=-70.0, n=2.52, l0=-53.0, a=0.2, b=6.0):
+        self.t = t                  # transmit power (dBm)
+        self.L0 = l0                # hardware specific constant (dB)
         self.n = n                  # decay rate
         self.N0 = n0                # noise at receiver (dBm)
         self.a = a                  # sigmoid parameter 1
         self.b = b                  # sigmoid parameter 2
-        self.PL0 = dbm2mw(self.L0)  # transmit power (mW)
-        self.PN0 = dbm2mw(self.N0)  # noise at receiver (mW)
+
+        self.C = np.sqrt(dbm2mw(self.t + self.L0 - self.N0))
+
         if print_values is True:
+            print('t  = %.3f' % self.t)
             print('L0 = %.3f' % self.L0)
             print('n  = %.3f' % self.n)
             print('N0 = %.3f' % self.N0)
@@ -47,10 +50,9 @@ class PathLossModel:
 
         """
         d = spatial.distance_matrix(x, x)
-        dist_mask = ~np.eye(d.shape[0], dtype=bool)
-        power = np.zeros(d.shape)
-        power[dist_mask] = dbm2mw(self.L0 - 10 * self.n * np.log10(d[dist_mask]))
-        rate = special.erf(np.sqrt(power / self.PN0))
+        mask = ~np.eye(d.shape[0], dtype=bool)
+        rate = np.zeros(d.shape)
+        rate[mask] = special.erf(self.C * np.sqrt(np.power(d[mask], -self.n)))
         var = (self.a * d / (self.b + d)) ** 2
         return rate, var
 
@@ -67,15 +69,13 @@ class PathLossModel:
 
         """
         d = np.linalg.norm(xi - xj)
-        power = dbm2mw(self.L0 - 10 * self.n * np.log10(d))
-        rate = special.erf(np.sqrt(power / self.PN0))
+        rate = special.erf(self.C * np.sqrt(d**(-self.n)))
         var = (self.a * d / (self.b + d)) ** 2
         return rate, var
 
     def derivative_coeff(self, d):
-        return - 10.0**(self.L0/20) * self.n * np.sqrt(d ** (-self.n) / self.PN0) \
-            * np.exp(-10.0**(self.L0 / 10.0) * d**(-self.n) / self.PN0) \
-            / (np.sqrt(np.pi) * d) / d
+        return -(np.sqrt(d**(-self.n)) * np.exp(-d**(-self.n) * self.C**2) \
+                 * self.C * self.n) / (d * np.sqrt(np.pi)) / d
 
     def derivative(self, xi, xj):
         """Compute the derivative of the channel rate function w.r.t xi.
@@ -119,11 +119,14 @@ class PiecewisePathLossModel(PathLossModel):
 
     """
 
-    def __init__(self, print_values=True, n0=-70.0, n=2.52, l0=-53.0, a=0.2, b=6.0,
+    def __init__(self, print_values=True, t=0, n0=-70.0, n=2.52, l0=-53.0, a=0.2, b=6.0,
                  transition_rate=0.2320007930054694):
-        PathLossModel.__init__(self, print_values, n0, n, l0, a, b)
+        PathLossModel.__init__(self, print_values, t, n0, n, l0, a, b)
 
-        self.trans_dist = (self.PL0 / (self.PN0 * special.erfinv(transition_rate) ** 2)) ** (1/self.n)
+        PL0 = dbm2mw(self.L0)
+        PN0 = dbm2mw(self.N0)
+        PT = dbm2mw(self.t)
+        self.trans_dist = (PL0 * PT / (PN0 * special.erfinv(transition_rate) ** 2)) ** (1/self.n)
 
         # find the slope of R(xi, xj) at the cuttoff distance; this will serve
         # as the slope of the linear section that decays to zero
