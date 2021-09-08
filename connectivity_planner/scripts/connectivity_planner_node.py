@@ -48,9 +48,9 @@ class ConnectivityPlanner(ABC):
         # rviz marker scale
         self.ms = rospy.get_param("~marker_scale", 1)
 
-        self.t = rospy.get_param("~t", 0.0)
-        self.N0 = rospy.get_param("~N0", -70.0)
-        self.n = rospy.get_param("~n", 2.52)
+        self.t = rospy.get_param("~transmit_power", 0.0)
+        self.N0 = rospy.get_param("~noise_floor", -70.0)
+        self.n = rospy.get_param("~fading_exponent", 2.52)
         self.L0 = rospy.get_param("~L0", -53.0)
         self.a = rospy.get_param("~a", 0.2)
         self.b = rospy.get_param("~b", 6.0)
@@ -226,7 +226,7 @@ class CNNPlanner(ConnectivityPlanner):
     def __init__(self) -> None:
         super().__init__()
         self.max_steps = rospy.get_param("~max_steps", 100)
-        self.model, self.params = self.load_model("best.ts")
+        self.model, self.params = self.load_model("convae.ts")
         self.model_scale = self.comm_range / self.params["comm_range"]
         rospy.loginfo(f"Model scale: {self.model_scale}")
 
@@ -266,7 +266,8 @@ class CNNPlanner(ConnectivityPlanner):
             self.params["meters_per_pixel"], self.params["img_size"][0], config_subs
         )
         # run lloyds
-        for _ in range(self.max_steps):
+        lloyd_its = 0
+        while lloyd_its < self.max_steps:
             voronoi_cells = lloyd.compute_voronoi(x_comm_target, self.params["bbx"])
             x_comm_target_new = lloyd.lloyd_step(
                 cnn_img,
@@ -278,6 +279,8 @@ class CNNPlanner(ConnectivityPlanner):
             if np.linalg.norm(x_comm_target_new - x_comm_target) < 1e-8:
                 break
             x_comm_target = x_comm_target_new
+            lloyd_its += 1
+        rospy.loginfo(f"converged after {lloyd_its} iterations of lloyd's algorithm")
         # assign agents to targets
         distance = distance_matrix(x_comm, x_comm_target)
         comm_idx, target_idx = linear_sum_assignment(distance)
