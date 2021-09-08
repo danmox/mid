@@ -5,12 +5,15 @@ import re
 import rospy
 
 from functools import partial
-from connectivity_planner.channel_model import PiecewisePathLossModel
-from connectivity_planner.connectivity_optimization import ConnectivityOpt
+from threading import Lock
+
 from geometry_msgs.msg import Point, Vector3, Pose, Quaternion
 from tf2_msgs.msg import TFMessage
 from std_msgs.msg import ColorRGBA, Header
 from visualization_msgs.msg import Marker
+
+from connectivity_planner.channel_model import PiecewisePathLossModel
+from connectivity_planner.connectivity_optimization import ConnectivityOpt
 
 
 class ConnectivityViz:
@@ -28,6 +31,15 @@ class ConnectivityViz:
                 self.run = False
                 return
 
+        # need to enforce thread safety since pose information will be updated
+        # in the subscriber callback but accessed in the main loop
+        self.pose_lock = Lock()
+
+        transmit_power = rospy.get_param("~transmit_power", 0.0)
+        self.channel_model = PiecewisePathLossModel(print_values=False, t=transmit_power)
+
+        self.robot_poses = {}
+
         # robot ID map
         robot_ids = self.params['comm_ids'] + self.params['task_ids']
         self.robot_id_to_idx = {robot_id: i for i, robot_id in enumerate(robot_ids)}
@@ -35,10 +47,12 @@ class ConnectivityViz:
         # optional params
         self.frame_id = rospy.get_param('~frame_id', 'world')
         self.ms = rospy.get_param('~marker_scale', 10)
+        self.ls = rospy.get_param('~line_scale', 1)
         self.lifetime = rospy.get_param('~lifetime', 1)
 
-        self.tf_sub = rospy.Subscriber('tf_relay', TFMessage, self.tf_cb, queue_size=1)
-        self.viz_pub = rospy.Publisher('connectivity_marker', Marker, queue_size=10)
+        self.tf_sub = rospy.Subscriber('tf_relay', TFMessage, self.tf_cb, queue_size=10)
+        self.viz_pub = rospy.Publisher('connectivity_marker', Marker, queue_size=1)
+        self.conn_pub = rospy.Publisher('connectivity', Marker, queue_size=1)
 
     def tf_cb(self, tf_msg):
 
@@ -57,7 +71,7 @@ class ConnectivityViz:
             marker_msg = Marker()
 
             marker_msg.header.frame_id = self.frame_id
-            marker_msg.header.stamp = rospy.get_rostime()
+            marker_msg.header.stamp = tf.header.stamp
             marker_msg.id = self.robot_id_to_idx[robot_id]
             marker_msg.type = Marker.SPHERE
             marker_msg.action = Marker.MODIFY
@@ -77,9 +91,55 @@ class ConnectivityViz:
 
             self.viz_pub.publish(marker_msg)
 
+            # update internal robot pose used for drawing connectivity lines
+            with self.pose_lock:
+                self.robot_poses[robot_id] = {'pose': np.asarray((trans.x, trans.y, trans.z)),
+                                              'stamp': tf.header.stamp}
+
     def run_node(self):
+
+        msg = Marker()
+        msg.header.frame_id = self.frame_id
+        msg.type = Marker.LINE_LIST
+        msg.action = Marker.MODIFY
+        msg.lifetime = rospy.Duration(self.lifetime)
+        msg.scale.x = self.ls
+        msg.color = ColorRGBA(0,0,0,0.9)
+        msg.ns = 'conn'
+        msg.id = 0
+
+        loop_rate = rospy.Rate(30)
         while self.run and not rospy.is_shutdown():
-            rospy.spin()
+
+            loop_rate.sleep()
+
+            # we only want to publish links between agents with active pose information
+            # TODO publish on a link by link basis?
+            now = rospy.get_rostime()
+            active_poses = []
+            with self.pose_lock:
+                for key in self.robot_poses.keys():
+                    if (now - self.robot_poses[key]['stamp']).to_sec() < self.lifetime:
+                        active_poses.append(self.robot_poses[key]['pose'])
+                    else:
+                        rospy.logdebug(f"skipped pose with time diff: {(now - self.robot_poses[key]['stamp']).to_sec()} seconds")
+
+            if len(active_poses) < 2:
+                rospy.loginfo('no active poses. skipping this iteration.')
+                continue
+
+            msg.points = []
+
+            np_poses = np.vstack(active_poses)
+            rate, _ = self.channel_model.predict(np_poses[:,:2])
+
+            for i in range(rate.shape[0]):
+                for j in range(i+1, rate.shape[0]):
+                    if rate[i,j] > 0.0:
+                        msg.points.append(Point(*np_poses[i,:]))
+                        msg.points.append(Point(*np_poses[j,:]))
+
+            self.conn_pub.publish(msg)
 
 
 if __name__ == '__main__':
