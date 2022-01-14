@@ -7,7 +7,7 @@ import rospy
 from functools import partial
 from threading import Lock
 
-from geometry_msgs.msg import Point, Vector3, Pose, Quaternion
+from geometry_msgs.msg import Point, Vector3, Pose, Quaternion, PoseStamped
 from tf2_msgs.msg import TFMessage
 from std_msgs.msg import ColorRGBA, Header
 from visualization_msgs.msg import Marker
@@ -45,14 +45,63 @@ class ConnectivityViz:
         self.robot_id_to_idx = {robot_id: i for i, robot_id in enumerate(robot_ids)}
 
         # optional params
+        self.pose_topic = rospy.get_param('~pose_topic', '/unity_command/ground_truth/{}/pose')
         self.frame_id = rospy.get_param('~frame_id', 'world')
         self.ms = rospy.get_param('~marker_scale', 10)
         self.ls = rospy.get_param('~line_scale', 1)
         self.lifetime = rospy.get_param('~lifetime', 1)
 
-        self.tf_sub = rospy.Subscriber('tf_relay', TFMessage, self.tf_cb, queue_size=10)
+        self.pose_subs = []
+        for id in robot_ids:
+            self.pose_subs.append(
+                rospy.Subscriber(
+                    self.pose_topic.format(id),
+                    PoseStamped,
+                    partial(self.pose_cb, id),
+                    queue_size=1
+                )
+            )
+
+        # self.tf_sub = rospy.Subscriber('tf_relay', TFMessage, self.tf_cb, queue_size=10)
         self.viz_pub = rospy.Publisher('connectivity_marker', Marker, queue_size=1)
         self.conn_pub = rospy.Publisher('connectivity', Marker, queue_size=1)
+
+    def process_pose(self, pose, robot_id, timestamp):
+
+        # publish pose marker
+
+        marker_msg = Marker()
+
+        marker_msg.header.frame_id = self.frame_id
+        marker_msg.header.stamp = timestamp
+        marker_msg.id = self.robot_id_to_idx[robot_id]
+        marker_msg.type = Marker.SPHERE
+        marker_msg.action = Marker.MODIFY
+        marker_msg.pose = pose
+        marker_msg.scale = Vector3(self.ms, self.ms, self.ms)
+        marker_msg.lifetime = rospy.Duration(self.lifetime)
+
+        if robot_id in self.params['comm_ids']:
+            marker_msg.ns = 'comm'
+            marker_msg.color = ColorRGBA(0, 0, 1, 1)
+        elif robot_id in self.params['task_ids']:
+            marker_msg.ns = 'task'
+            marker_msg.color = ColorRGBA(1, 0, 0, 1)
+        else:
+            rospy.logerr(f'{robot_id} not in comm_ids or task_ids: skipping')
+            return
+
+        self.viz_pub.publish(marker_msg)
+
+        # update internal robot pose used for drawing connectivity lines
+
+        trans = pose.position
+        with self.pose_lock:
+            self.robot_poses[robot_id] = {'pose': np.asarray((trans.x, trans.y, trans.z)),
+                                          'stamp': timestamp}
+
+    def pose_cb(self, robot_id, pose_msg):
+        self.process_pose(pose_msg.pose, robot_id, pose_msg.header.stamp)
 
     def tf_cb(self, tf_msg):
 
@@ -66,35 +115,7 @@ class ConnectivityViz:
             trans = tf.transform.translation
             pose = Pose(Point(trans.x, trans.y, trans.z), Quaternion(0,0,0,1))
 
-            # get marker
-
-            marker_msg = Marker()
-
-            marker_msg.header.frame_id = self.frame_id
-            marker_msg.header.stamp = tf.header.stamp
-            marker_msg.id = self.robot_id_to_idx[robot_id]
-            marker_msg.type = Marker.SPHERE
-            marker_msg.action = Marker.MODIFY
-            marker_msg.pose = pose
-            marker_msg.scale = Vector3(self.ms, self.ms, self.ms)
-            marker_msg.lifetime = rospy.Duration(self.lifetime)
-
-            if robot_id in self.params['comm_ids']:
-                marker_msg.ns = 'comm'
-                marker_msg.color = ColorRGBA(0, 0, 1, 1)
-            elif robot_id in self.params['task_ids']:
-                marker_msg.ns = 'task'
-                marker_msg.color = ColorRGBA(1, 0, 0, 1)
-            else:
-                rospy.logerr(f'{robot_id} not in comm_ids or task_ids: skipping')
-                continue
-
-            self.viz_pub.publish(marker_msg)
-
-            # update internal robot pose used for drawing connectivity lines
-            with self.pose_lock:
-                self.robot_poses[robot_id] = {'pose': np.asarray((trans.x, trans.y, trans.z)),
-                                              'stamp': tf.header.stamp}
+            self.process_pose(pose, robot_id, tf.header.stamp)
 
     def run_node(self):
 
