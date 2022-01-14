@@ -262,6 +262,9 @@ class CNNPlanner(ConnectivityPlanner):
 
         # extract peaks
         config_subs, _ = lloyd.compute_peaks(cnn_img, threshold_val=60)
+        if config_subs.shape[0] == 0:
+            rospy.logwarn('no peaks extracted from CNN output!')
+            return
         x_comm_target = lloyd.sub_to_pos(
             self.params["meters_per_pixel"], self.params["img_size"][0], config_subs
         )
