@@ -2,15 +2,9 @@
   <name>perch_experiment</name>
   <version>0.1.0</version>
   <description>perch_experiment</description>
-  <maintainer email="davetcoleman@gmail.com">Dave Coleman</maintainer>
+  <maintainer email="mox@seas.upenn.edu">Daniel Mox</maintainer>
 
-  <license>BSD</license>
-
-  <url type="website">http://gazebosim.org/w/index.php?title=Tutorials/1.9/Using_A_URDF_In_Gazebo</url>
-  <url type="bugtracker">https://github.com/osrf/gazebo_ros_demos/issues</url>
-  <url type="repository">https://github.com/osrf/gazebo_ros_demos</url>
-
-  <author email="davetcoleman@gmail.com">Dave Coleman</author>
+  <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
 
