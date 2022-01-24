@@ -6,7 +6,7 @@
   <arg name="ground_truth" default="true"/> <!-- publish ground truth tf tree -->
 
   <!-- gazebo args -->
-  <arg name="world_name"  default="$(find scarab_gazebo)/worlds/perch.world"/>
+  <arg name="world_name"  default="$(find perch_experiment)/worlds/perch.world"/>
   <arg name="verbose"     default="false"/>
   <arg name="debug"       default="false"/>
   <arg name="gazebo_gui"  default="true"/>
@@ -55,7 +55,7 @@
 
   <!-- load perch world -->
   <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
-        args="-sdf -model perch -file $(find scarab_gazebo)/models/perch/model.sdf"/>
+        args="-sdf -model perch -file $(find perch_experiment)/models/perch/model.sdf"/>
 
   <group ns="$(arg agent)">
 
