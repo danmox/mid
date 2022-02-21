@@ -37,6 +37,10 @@ ORNode::ORNode(std::string _IP, int _port) :
   port(_port),
   IP(_IP)
 {
+  my_sa.sin_family = AF_INET;
+  inet_pton(AF_INET, IP.c_str(), &(my_sa.sin_addr));
+  my_sa.sin_port = htons(port);
+
   recv_thread = std::thread(&ORNode::recv_loop, this);
   send_thread = std::thread(&ORNode::send_loop, this);
 
@@ -52,6 +56,7 @@ ORNode::~ORNode() {
 }
 
 
+// listen for incoming UDP messages on the supplied port
 void ORNode::recv_loop()
 {
   struct addrinfo hints, *res, *p;
@@ -61,9 +66,9 @@ void ORNode::recv_loop()
   int status, num_bytes;
 
   memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_flags = AI_PASSIVE;
+  hints.ai_family = AF_INET;      // IPv4
+  hints.ai_socktype = SOCK_DGRAM; // UDP
+  hints.ai_flags = AI_PASSIVE;    // fill in my IP for me
 
   std::string port_str = std::to_string(port);
   if ((status = getaddrinfo(NULL, port_str.c_str(), &hints, &res)) != 0) {
@@ -72,7 +77,6 @@ void ORNode::recv_loop()
     return;
   }
 
-  // loop through all the results and bind to the first we can
   for (p = res; p != NULL; p = p->ai_next) {
 
     if ((recv_sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
@@ -106,6 +110,13 @@ void ORNode::recv_loop()
       run = false;
       return;
     }
+
+    // NOTE currently broadcast messages originating from the send_loop() are
+    // picked up in the recv_loop() of the same machine -- I imagine there is a
+    // better way of filtering these messages but for now just manually
+    // filtering them
+    if (((struct sockaddr_in*)&addr)->sin_addr.s_addr == my_sa.sin_addr.s_addr)
+      continue;
 
     char s[INET_ADDRSTRLEN];
     if (inet_ntop(AF_INET, get_in_addr((struct sockaddr *)&addr), s,
