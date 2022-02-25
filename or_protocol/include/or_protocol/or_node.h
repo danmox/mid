@@ -1,10 +1,14 @@
-#ifndef OR_PROTOCOL_HOST_H_
-#define OR_PROTOCOL_HOST_H_
+#ifndef OR_PROTOCOL_OR_NODE_H_
+#define OR_PROTOCOL_OR_NODE_H_
 
 #include <atomic>
+#include <memory>
 #include <netinet/in.h>
 #include <string>
 #include <thread>
+
+#include <or_protocol/bcast_socket.h>
+
 
 namespace or_protocol {
 
@@ -12,22 +16,16 @@ namespace or_protocol {
 class ORNode
 {
   public:
-    std::atomic<bool> run;
+    volatile std::atomic<bool> run;
 
     ORNode(std::string _IP, int _port);
-    ~ORNode();
+    void main_loop();
+    void sig_handler(int s);
 
   private:
-    int recv_sockfd, port;
-    std::string IP;
+    std::shared_ptr<BCastSocket> bcast_socket;
 
-    // IPv4 address information about this node
-    sockaddr_in my_sa;
-
-    std::thread send_thread, recv_thread;
-
-    void send_loop();
-    void recv_loop();
+    void recv(char* buff, int size);
 };
 
 
