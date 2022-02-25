@@ -1,21 +1,18 @@
 #include <chrono>
 #include <csignal>
 #include <iostream>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <thread>
-#include <unistd.h>
+#include <memory>
 
 #include <or_protocol/or_node.h>
 
 
-volatile bool run = true;
+std::shared_ptr<or_protocol::ORNode> or_node;
 
 
 void handler(int s)
 {
-  run = false;
+  std::cout << "[main] received shutdown signal (" << s << ")" << std::endl;
+  or_node->run = false;
 }
 
 
@@ -32,10 +29,8 @@ int main(int argc, char** argv)
   siginthandler.sa_flags = 0;
   sigaction(SIGINT, &siginthandler, NULL);
 
-  or_protocol::ORNode node(argv[1], 4568);
-
-  while (run)
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  or_node.reset(new or_protocol::ORNode(argv[1], 4568));
+  or_node->main_loop();
 
   return 0;
 }
