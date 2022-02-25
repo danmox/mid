@@ -20,5 +20,5 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(or_test src/node.cpp src/or_node.cpp)
+add_executable(or_test src/test_node.cpp src/or_node.cpp src/bcast_socket.cpp)
 target_link_libraries(or_test ${catkin_LIBRARIES} Threads::Threads)
