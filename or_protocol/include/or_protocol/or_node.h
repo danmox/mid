@@ -19,13 +19,15 @@ class ORNode
     volatile std::atomic<bool> run;
 
     ORNode(std::string _IP, int _port);
-    void main_loop();
+    void send_loop();
+    void recv_loop();
     void sig_handler(int s);
 
   private:
     std::shared_ptr<BCastSocket> bcast_socket;
 
     void recv(char* buff, int size);
+    void send(const char* buff, int size);
 };
 
 

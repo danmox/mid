@@ -112,10 +112,10 @@ void BCastSocket::recv_loop()
       return;
     }
 
-    // NOTE currently broadcast messages originating from the send_loop() are
-    // picked up in the recv_loop() of the same machine -- I imagine there is a
-    // better way of filtering these messages but for now just manually
-    // filter them
+    // NOTE currently, broadcast messages originating from the send_loop() are
+    // picked up in the recv_loop() of the same machine -- there must be a way
+    // of configuring the system to automatically do this but for now just
+    // manually filter them
     if (((struct sockaddr_in*)&addr)->sin_addr.s_addr == my_sa.sin_addr.s_addr)
       continue;
 
@@ -161,7 +161,7 @@ bool BCastSocket::init_send_socket()
     return false;
   }
 
-  // this call is what allows broadcast packets to be sent:
+  // allow broadcast packets to be sent:
   if (setsockopt(send_sockfd, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof bcast) == -1) {
     perror("[BCastSocket] setsockopt (SO_BROADCAST)");
     return false;
