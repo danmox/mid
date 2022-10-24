@@ -30,7 +30,7 @@ int main(int argc, char** argv)
   sigaction(SIGINT, &siginthandler, NULL);
 
   or_node.reset(new or_protocol::ORNode(argv[1], 4568));
-  or_node->send_loop();
+  or_node->recv_loop();
 
   return 0;
 }

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <or_protocol/or_node.h>
+#include <or_protocol_msgs/Packet.h>
 
 
 std::shared_ptr<or_protocol::ORNode> or_node;
@@ -30,7 +31,14 @@ int main(int argc, char** argv)
   sigaction(SIGINT, &siginthandler, NULL);
 
   or_node.reset(new or_protocol::ORNode(argv[1], 4568));
-  or_node->send_loop();
+
+  // build message
+  or_protocol_msgs::PacketPtr msg(new or_protocol_msgs::Packet);
+  msg->dest_id = 2;
+  msg->seq = 1;
+  msg->data = std::vector<uint8_t>{'h','e','l','l','o'};
+
+  or_node->send_loop(msg);
 
   return 0;
 }
