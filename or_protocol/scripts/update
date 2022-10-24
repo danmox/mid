@@ -1,0 +1,21 @@
+#!/usr/bin/env fish
+
+# update
+#
+# a script used to update the or_protocol running on one of the odroids in the
+# mesh network testbed remotely
+
+cd ~/mid_ws
+
+if not test -d .catkin_tools
+    if test -d /opt/ros/melodic
+        catkin config --init --extend /opt/ros/melodic
+    else if test -d /opt/ros/noetic
+        catkin config --init --extend /opt/ros/noetic
+    else
+        echo "no ROS installation found under /opt/ros"
+        exit
+    end
+end
+
+catkin build or_protocol
