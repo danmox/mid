@@ -191,7 +191,6 @@ bool BCastSocket::send(const char *buff, int buff_size)
     return false;
   }
 
-  std::cout << "[BCastSocket] sent message to " << bcast_IP << std::endl;
   return true;
 }
 
