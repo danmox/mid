@@ -129,7 +129,8 @@ void BCastSocket::recv_loop()
     buff[num_bytes] = '\0';
 
     // TODO don't block the receiving thread
-    recv_handle(buff, num_bytes);
+    if (num_bytes > 0)
+      recv_handle(buff, num_bytes);
   }
 
   std::cout << "[BCastSocket] exiting recv_loop()" << std::endl;
