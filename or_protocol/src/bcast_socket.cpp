@@ -178,7 +178,7 @@ bool BCastSocket::init_send_socket()
 }
 
 
-bool BCastSocket::send(const char *buff, int buff_size)
+bool BCastSocket::send(const char *buff, size_t buff_size)
 {
   int numbytes;
   if ((numbytes = sendto(send_sockfd, buff, buff_size, 0,
