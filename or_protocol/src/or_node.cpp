@@ -26,24 +26,33 @@ ORNode::ORNode(std::string _IP, int _port)
 }
 
 
-void ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
+bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
 {
   ros::SerializedMessage m = ros::serialization::serializeMessage(*msg);
-  if (!bcast_socket->send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes)) {
-    std::cout << "[ORNode] failed to send message" << std::endl;
+  return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
+}
+
+
+bool ORNode::send(const char* buff, size_t size)
+{
+  if (!bcast_socket->send(buff, size)) {
+    std::fprintf(stderr, "[ORNode] failed to send message");
+    return false;
   }
+  return true;
 }
 
 
 void ORNode::recv(char* buff, size_t size)
 {
   or_protocol_msgs::Packet msg;
-  // the size of the message is prepended when sent
+  // the size of the message is prepended as an int32_t when sent
   ros::serialization::IStream s(reinterpret_cast<uint8_t*>(buff + 4), size - 4);
+  // TODO deserialize only enough to make a choice about forwarding?
   ros::serialization::deserialize(s, msg);
 
-  printf("%d: %d > %d, seq: %d, %ld bytes\n", node_id, msg.src_id, msg.dest_id,
-         msg.seq, msg.data.size());
+  printf("recv: %d: %d > %d, seq: %d, %ld bytes\n", node_id, msg.src_id,
+         msg.dest_id, msg.seq, msg.data.size());
 }
 
 
@@ -53,8 +62,8 @@ void ORNode::send_loop(or_protocol_msgs::PacketPtr& msg) {
   // TODO devise better way of shutting down
   while (run && bcast_socket->run) {
     send(msg);
-    printf("%d: %d > %d, seq: %d, %ld bytes\n", node_id, msg->src_id, msg->dest_id,
-           msg->seq, msg->data.size());
+    printf("send: %d: %d > %d, seq: %d, %ld bytes\n", node_id, msg->src_id,
+           msg->dest_id, msg->seq, msg->data.size());
     msg->seq++;
     std::this_thread::sleep_for(std::chrono::milliseconds(5000));
   }
