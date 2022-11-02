@@ -23,7 +23,7 @@ class BCastSocket
     ~BCastSocket();
 
     std::string getIP() {return my_IP;}
-    bool send(const char *buff, size_t size);
+    bool send(const char *buff, int size);
 
   private:
     int recv_sockfd, send_sockfd, port;

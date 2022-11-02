@@ -62,7 +62,7 @@ void BCastSocket::recv_loop()
 {
   struct addrinfo hints, *res, *p;
   struct sockaddr_storage addr;
-  const int bufflen = 100;
+  const int bufflen = 1500;
   char buff[bufflen];
   int status, num_bytes;
 
@@ -126,9 +126,13 @@ void BCastSocket::recv_loop()
       continue;
     }
 
+    if (num_bytes > bufflen) {
+      fprintf(stderr, "[BCastSocket] Insufficient buffer size. Dropping message.");
+      continue;
+    }
     buff[num_bytes] = '\0';
 
-    // TODO don't block the receiving thread
+    // TODO don't block the receiving thread?
     if (num_bytes > 0)
       recv_handle(buff, num_bytes);
   }
@@ -178,8 +182,10 @@ bool BCastSocket::init_send_socket()
 }
 
 
-bool BCastSocket::send(const char *buff, size_t buff_size)
+bool BCastSocket::send(const char *buff, int buff_size)
 {
+  // TODO chunking?
+
   int numbytes;
   if ((numbytes = sendto(send_sockfd, buff, buff_size, 0,
                          (struct sockaddr *)&bcast_addr, sizeof bcast_addr)) == -1) {
