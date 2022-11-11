@@ -34,9 +34,9 @@ int main(int argc, char** argv)
 
   // build message
   or_protocol_msgs::PacketPtr msg(new or_protocol_msgs::Packet);
-  msg->dest_id = 2;
+  msg->dest_id = 100;
   msg->seq = 1;
-  msg->data = std::vector<uint8_t>{'h','e','l','l','o'};
+  msg->data = std::vector<uint8_t>(200, 1);
 
   or_node->send_loop(msg);
 
