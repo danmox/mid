@@ -26,9 +26,24 @@ ORNode::ORNode(std::string _IP, int _port)
 }
 
 
+void ORNode::print_msg_info(std::string msg,
+                            const or_protocol_msgs::Packet& packet) {
+  printf("%s: %d: %d > %d via %d, seq: %d, %ld bytes\n", msg.c_str(), node_id,
+         packet.src_id, packet.dest_id, packet.curr_id, packet.seq,
+         packet.data.size());
+}
+
+
 bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
 {
   ros::SerializedMessage m = ros::serialization::serializeMessage(*msg);
+  return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
+}
+
+
+bool ORNode::send(const or_protocol_msgs::Packet& msg)
+{
+  ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
   return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
 }
 
@@ -51,21 +66,30 @@ void ORNode::recv(char* buff, size_t size)
   // TODO deserialize only enough to make a choice about forwarding?
   ros::serialization::deserialize(s, msg);
 
-  printf("recv: %d: %d > %d, seq: %d, %ld bytes\n", node_id, msg.src_id,
-         msg.dest_id, msg.seq, msg.data.size());
+  print_msg_info("recv", msg);
+
+  // relay
+  if (msg.dest_id != node_id &&
+      msg.src_id != node_id &&
+      msg.curr_id != node_id) {
+    msg.curr_id = node_id;
+    // TODO keep track of which messages have been re-transmitted
+    print_msg_info("relay", msg);
+    send(msg);
+  }
 }
 
 
 void ORNode::send_loop(or_protocol_msgs::PacketPtr& msg) {
   msg->src_id = node_id;
+  msg->curr_id = node_id;
 
   // TODO devise better way of shutting down
   while (run && bcast_socket->run) {
     send(msg);
-    printf("send: %d: %d > %d, seq: %d, %ld bytes\n", node_id, msg->src_id,
-           msg->dest_id, msg->seq, msg->data.size());
+    print_msg_info("send", *msg);
     msg->seq++;
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 }
 

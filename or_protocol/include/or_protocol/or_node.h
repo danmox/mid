@@ -29,8 +29,10 @@ class ORNode
     int node_id;
 
     void recv(char* buff, size_t size);
+    bool send(const or_protocol_msgs::Packet& msg);
     bool send(const or_protocol_msgs::PacketConstPtr& msg);
     bool send(const char* buff, size_t size);
+    void print_msg_info(std::string msg, const or_protocol_msgs::Packet& packet);
 };
 
 
