@@ -6,6 +6,7 @@ uint8 msg_type
 
 # packet identification information
 uint8 src_id  # the source node IPv4 address digits identified by the subnet mask: 0.0.0.255
+uint8 curr_id # the transmitting node IPv4 address...
 uint8 dest_id # the destination node IPv4 address...
 uint32 seq    # the unique (to the source node) packet sequence number
 
