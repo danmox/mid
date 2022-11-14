@@ -12,7 +12,7 @@ volatile bool run = true;
 
 void handler(int s)
 {
-  std::cout << "[main] received shutdown signal (" << s << ")" << std::endl;
+  ROS_INFO("[main] received shutdown signal %d", s);
   run = false;
 }
 
@@ -38,7 +38,6 @@ int main(int argc, char** argv)
   msg.dest_id = 100;
   msg.data = std::vector<uint8_t>(200, 1);
 
-  std::cout << "starting send loop" << std::endl;
   while (run && or_node.run()) {
     or_node.send(msg);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));

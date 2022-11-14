@@ -44,8 +44,6 @@ BCastSocket::BCastSocket(std::string _IP, int _port, recv_function _recv_handle)
 
   run = init_send_socket();
   recv_thread = std::thread(&BCastSocket::recv_loop, this);
-
-  std::cout << "[BCastSocket] started recv thread" << std::endl;
 }
 
 
@@ -136,8 +134,6 @@ void BCastSocket::recv_loop()
     if (num_bytes > 0)
       recv_handle(buff, num_bytes);
   }
-
-  std::cout << "[BCastSocket] exiting recv_loop()" << std::endl;
 }
 
 
@@ -177,7 +173,6 @@ bool BCastSocket::init_send_socket()
   bcast_addr.sin_addr = *((struct in_addr *)he->h_addr);
   memset(bcast_addr.sin_zero, '\0', sizeof bcast_addr.sin_zero);
 
-  std::cout << "[BCastSocket] initialized send socket" << std::endl;
   return true;
 }
 
