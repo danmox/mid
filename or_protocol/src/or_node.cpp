@@ -25,9 +25,9 @@ ORNode::ORNode(std::string _IP, int _port)
 
 void ORNode::print_msg_info(std::string msg,
                             const or_protocol_msgs::Packet& packet) {
-  printf("%s: %d: %d > %d via %d, seq: %d, %ld bytes\n", msg.c_str(), node_id,
-         packet.src_id, packet.dest_id, packet.curr_id, packet.seq,
-         packet.data.size());
+  OR_DEBUG("%s: %d: %d > %d via %d, seq: %d, %ld bytes", msg.c_str(), node_id,
+           packet.src_id, packet.dest_id, packet.curr_id, packet.seq,
+           packet.data.size());
 }
 
 
@@ -75,9 +75,7 @@ void ORNode::recv(char* buff, size_t size)
   print_msg_info("recv", msg);
 
   // relay
-  if (msg.dest_id != node_id &&
-      msg.src_id != node_id &&
-      msg.curr_id != node_id) {
+  if (msg.dest_id != node_id && msg.src_id != node_id) {
     // TODO keep track of which messages have been re-transmitted
     print_msg_info("relay", msg);
     send(msg, false); // don't overwrite src field when relaying
