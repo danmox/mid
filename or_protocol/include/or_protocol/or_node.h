@@ -17,21 +17,18 @@ namespace or_protocol {
 class ORNode
 {
   public:
-    volatile std::atomic<bool> run;
-
     ORNode(std::string _IP, int _port);
-    void send_loop(or_protocol_msgs::PacketPtr& msg);
-    void recv_loop();
-    void sig_handler(int s);
+    bool send(or_protocol_msgs::Packet &msg, bool fill_src = true);
+    bool send(const or_protocol_msgs::PacketConstPtr &msg);
+    bool send(const char *buff, size_t size);
+    bool run() const {return bcast_socket->run;}
 
   private:
     std::shared_ptr<BCastSocket> bcast_socket;
     int node_id;
+    int seq = 0;
 
     void recv(char* buff, size_t size);
-    bool send(const or_protocol_msgs::Packet& msg);
-    bool send(const or_protocol_msgs::PacketConstPtr& msg);
-    bool send(const char* buff, size_t size);
     void print_msg_info(std::string msg, const or_protocol_msgs::Packet& packet);
 };
 
