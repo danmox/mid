@@ -1,4 +1,3 @@
-#include <chrono>
 #include <iostream>
 
 #include <or_protocol/or_node.h>
@@ -21,8 +20,6 @@ ORNode::ORNode(std::string _IP, int _port)
   using namespace std::placeholders;
   recv_function fcn = std::bind(&ORNode::recv, this, _1, _2);
   bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
-
-  run = true;
 }
 
 
@@ -41,8 +38,17 @@ bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
 }
 
 
-bool ORNode::send(const or_protocol_msgs::Packet& msg)
+// assuming node specific message header information has not been completed
+bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
 {
+  if (fill_src) {
+    msg.src_id = node_id;
+  }
+  msg.curr_id = node_id;
+  msg.seq = seq++;
+
+  print_msg_info("send", msg);
+
   ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
   return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
 }
@@ -72,32 +78,9 @@ void ORNode::recv(char* buff, size_t size)
   if (msg.dest_id != node_id &&
       msg.src_id != node_id &&
       msg.curr_id != node_id) {
-    msg.curr_id = node_id;
     // TODO keep track of which messages have been re-transmitted
     print_msg_info("relay", msg);
-    send(msg);
-  }
-}
-
-
-void ORNode::send_loop(or_protocol_msgs::PacketPtr& msg) {
-  msg->src_id = node_id;
-  msg->curr_id = node_id;
-
-  // TODO devise better way of shutting down
-  while (run && bcast_socket->run) {
-    send(msg);
-    print_msg_info("send", *msg);
-    msg->seq++;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  }
-}
-
-
-void ORNode::recv_loop()
-{
-  while (run && bcast_socket->run) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    send(msg, false); // don't overwrite src field when relaying
   }
 }
 
