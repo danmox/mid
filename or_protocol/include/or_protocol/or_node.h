@@ -9,9 +9,14 @@
 
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol_msgs/Packet.h>
+#include <ros/console.h>
 
 
 namespace or_protocol {
+
+
+#define OR_INFO(fmt, ...) ROS_INFO("[ORNode] " fmt, ##__VA_ARGS__)
+#define OR_DEBUG(fmt, ...) ROS_DEBUG("[ORNode] " fmt, ##__VA_ARGS__)
 
 
 class ORNode
