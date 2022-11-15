@@ -11,7 +11,7 @@
 namespace or_protocol {
 
 
-typedef std::function<void(char*,int)> recv_function;
+typedef std::function<void(char*,int)> buff_recv_func;
 
 
 class BCastSocket
@@ -19,7 +19,7 @@ class BCastSocket
   public:
     volatile std::atomic<bool> run;
 
-    BCastSocket(std::string _IP, int _port, recv_function _recv_handle);
+    BCastSocket(std::string _IP, int _port, buff_recv_func _recv_handle);
     ~BCastSocket();
 
     std::string getIP() {return my_IP;}
@@ -30,7 +30,7 @@ class BCastSocket
     std::string my_IP, bcast_IP;
 
     // function handle to call when receiving messages
-    recv_function recv_handle;
+    buff_recv_func recv_handle;
 
     // IPv4 address information about this node
     sockaddr_in my_sa, bcast_addr;
