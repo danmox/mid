@@ -37,3 +37,6 @@ target_link_libraries(send_node ${catkin_LIBRARIES} ${PROJECT_NAME})
 
 add_executable(recv_node src/recv_node.cpp)
 target_link_libraries(recv_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
+add_executable(ping_node src/ping_node.cpp)
+target_link_libraries(ping_node ${catkin_LIBRARIES} ${PROJECT_NAME})
