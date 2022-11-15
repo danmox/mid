@@ -18,16 +18,38 @@ ORNode::ORNode(std::string _IP, int _port)
 
   // initialize BCastSocket and register recv function handle
   using namespace std::placeholders;
-  recv_function fcn = std::bind(&ORNode::recv, this, _1, _2);
+  buff_recv_func fcn = std::bind(&ORNode::recv, this, _1, _2);
   bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
 }
 
 
+void ORNode::register_recv_func(msg_recv_func fcn)
+{
+  recv_handle = fcn;
+}
+
+
+std::string packet_type_string(const or_protocol_msgs::Packet& msg)
+{
+  switch (msg.msg_type) {
+    case or_protocol_msgs::Packet::STATUS:
+      return std::string("STATUS");
+    case or_protocol_msgs::Packet::PAYLOAD:
+      return std::string("PAYLOAD");
+    case or_protocol_msgs::Packet::PING_REQ:
+      return std::string("PING_REQ");
+    case or_protocol_msgs::Packet::PING_RES:
+      return std::string("PING_RES");
+    default:
+      return std::string("UNKNOWN");
+  }
+}
+
 void ORNode::print_msg_info(std::string msg,
                             const or_protocol_msgs::Packet& packet) {
-  OR_DEBUG("%s: %d: %d > %d via %d, seq: %d, %ld bytes", msg.c_str(), node_id,
-           packet.src_id, packet.dest_id, packet.curr_id, packet.seq,
-           packet.data.size());
+  OR_DEBUG("%s: [%d] %d > %d via %d, %ld bytes, seq=%d, type=%s", msg.c_str(),
+           node_id, packet.src_id, packet.dest_id, packet.curr_id,
+           packet.data.size(), packet.seq, packet_type_string(packet).c_str());
 }
 
 
@@ -50,7 +72,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
   print_msg_info("send", msg);
 
   ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
-  return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
+  return send(reinterpret_cast<char*>(m.buf.get()), m.num_bytes);
 }
 
 
@@ -67,19 +89,34 @@ bool ORNode::send(const char* buff, size_t size)
 void ORNode::recv(char* buff, size_t size)
 {
   or_protocol_msgs::Packet msg;
-  // the size of the message is prepended as an int32_t when sent
+  // NOTE the total size of the serialized message is prepended as an int32_t
+  // due to or_protocol_msgs::Packet containing variable length fields:
+  // http://wiki.ros.org/msg#Fields
   ros::serialization::IStream s(reinterpret_cast<uint8_t*>(buff + 4), size - 4);
   // TODO deserialize only enough to make a choice about forwarding?
   ros::serialization::deserialize(s, msg);
 
   print_msg_info("recv", msg);
 
-  // relay
+  // relay standard messages
   if (msg.dest_id != node_id && msg.src_id != node_id) {
     // TODO keep track of which messages have been re-transmitted
+    // TODO take into account forwarding preferences
     print_msg_info("relay", msg);
     send(msg, false); // don't overwrite src field when relaying
+    return;
   }
+
+  // respond to ping requests
+  if (msg.msg_type == or_protocol_msgs::Packet::PING_REQ) {
+    msg.msg_type = or_protocol_msgs::Packet::PING_RES;
+    msg.dest_id = msg.src_id;
+    send(msg);
+    return;
+  }
+
+  if (recv_handle)
+    recv_handle(msg, node_id, size);
 }
 
 

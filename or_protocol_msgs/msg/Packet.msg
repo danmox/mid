@@ -1,5 +1,7 @@
 uint8 STATUS=1
 uint8 PAYLOAD=2
+uint8 PING_REQ=3
+uint8 PING_RES=4
 
 # the type of data encapsulated in the packet
 uint8 msg_type

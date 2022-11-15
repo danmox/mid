@@ -32,7 +32,7 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 
-BCastSocket::BCastSocket(std::string _IP, int _port, recv_function _recv_handle)
+BCastSocket::BCastSocket(std::string _IP, int _port, buff_recv_func _recv_handle)
 {
   port = _port;
   my_IP = _IP;
