@@ -22,6 +22,17 @@ namespace or_protocol {
 typedef std::function<void(or_protocol_msgs::Packet&,int,int)> msg_recv_func;
 
 
+template <typename M>
+void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix=true)
+{
+  // NOTE the total size of the serialized message is often prepended as an
+  // int32_t: http://wiki.ros.org/msg#Fields
+  int offset = size_prefix ? 4 : 0;
+  ros::serialization::IStream s(buff + offset, size - offset);
+  ros::serialization::deserialize(s, msg);
+}
+
+
 class ORNode
 {
   public:
