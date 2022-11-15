@@ -21,11 +21,7 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
     return;
 
   std_msgs::Time send_stamp_msg;
-  // NOTE size of serialized message prepended as an int32_t, although the
-  // documentation says this should only happen for variable sized arrays:
-  // http://wiki.ros.org/msg#Fields
-  ros::serialization::IStream s(msg.data.data() + 4, msg.data.size() - 4);
-  ros::serialization::deserialize(s, send_stamp_msg);
+  or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
 
   double ms = (recv_stamp - send_stamp_msg.data).toSec() * 1000;
   printf("%d bytes from 192.168.0.%d: seq=%d time=%.2f ms\n",
