@@ -89,12 +89,7 @@ bool ORNode::send(const char* buff, size_t size)
 void ORNode::recv(char* buff, size_t size)
 {
   or_protocol_msgs::Packet msg;
-  // NOTE the total size of the serialized message is prepended as an int32_t
-  // due to or_protocol_msgs::Packet containing variable length fields:
-  // http://wiki.ros.org/msg#Fields
-  ros::serialization::IStream s(reinterpret_cast<uint8_t*>(buff + 4), size - 4);
-  // TODO deserialize only enough to make a choice about forwarding?
-  ros::serialization::deserialize(s, msg);
+  deserialize(msg, reinterpret_cast<uint8_t*>(buff), size);
 
   print_msg_info("recv", msg);
 
