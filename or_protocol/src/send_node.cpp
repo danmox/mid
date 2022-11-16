@@ -34,8 +34,8 @@ int main(int argc, char** argv)
 
   // build message
   or_protocol_msgs::Packet msg;
-  msg.msg_type = or_protocol_msgs::Packet::PAYLOAD;
-  msg.dest_id = 100;
+  msg.header.msg_type = or_protocol_msgs::Header::PAYLOAD;
+  msg.header.dest_id = 100;
   msg.data = std::vector<uint8_t>(200, 1);
 
   while (run && or_node.run()) {

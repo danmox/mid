@@ -17,7 +17,8 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
 {
   ros::Time recv_stamp = ros::Time::now();
 
-  if (msg.dest_id != node_id || msg.msg_type != or_protocol_msgs::Packet::PING_RES)
+  if (msg.header.dest_id != node_id ||
+      msg.header.msg_type != or_protocol_msgs::Header::PING_RES)
     return;
 
   std_msgs::Time send_stamp_msg;
@@ -25,7 +26,7 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
 
   double ms = (recv_stamp - send_stamp_msg.data).toSec() * 1000;
   printf("%d bytes from 192.168.0.%d: seq=%d time=%.2f ms\n",
-         bytes, msg.src_id, msg.seq, ms);
+         bytes, msg.header.src_id, msg.header.seq, ms);
 
   recv_msgs++;
 }
@@ -58,8 +59,8 @@ int main(int argc, char** argv)
 
   // build message
   or_protocol_msgs::Packet msg;
-  msg.msg_type = or_protocol_msgs::Packet::PING_REQ;
-  msg.dest_id = std::stoi(argv[2]);
+  msg.header.msg_type = or_protocol_msgs::Header::PING_REQ;
+  msg.header.dest_id = std::stoi(argv[2]);
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
