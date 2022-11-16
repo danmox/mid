@@ -51,7 +51,10 @@ class ORNode
     msg_recv_func recv_handle = nullptr;
 
     void recv(char* buff, size_t size);
-    void print_msg_info(std::string msg, const or_protocol_msgs::Packet& packet);
+    void print_msg_info(std::string msg,
+                        const or_protocol_msgs::Header& header,
+                        int size,
+                        bool total);
 };
 
 

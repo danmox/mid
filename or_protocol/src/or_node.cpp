@@ -29,9 +29,9 @@ void ORNode::register_recv_func(msg_recv_func fcn)
 }
 
 
-std::string packet_type_string(const or_protocol_msgs::Packet& msg)
+std::string packet_type_string(const or_protocol_msgs::Header& header)
 {
-  switch (msg.header.msg_type) {
+  switch (header.msg_type) {
     case or_protocol_msgs::Header::STATUS:
       return std::string("STATUS");
     case or_protocol_msgs::Header::PAYLOAD:
@@ -45,12 +45,15 @@ std::string packet_type_string(const or_protocol_msgs::Packet& msg)
   }
 }
 
+
 void ORNode::print_msg_info(std::string msg,
-                            const or_protocol_msgs::Packet& packet) {
-  OR_DEBUG("%s: [%d] %d > %d via %d, %ld bytes, seq=%d, type=%s", msg.c_str(),
-           node_id, packet.header.src_id, packet.header.dest_id,
-           packet.header.curr_id, packet.data.size(), packet.header.seq,
-           packet_type_string(packet).c_str());
+                            const or_protocol_msgs::Header& header,
+                            int size,
+                            bool total) {
+  std::string data_type = total ? "bytes" : "data bytes";
+  OR_DEBUG("%s: [%d] %d > %d via %d, %d %s, seq=%d, type=%s", msg.c_str(),
+           node_id, header.src_id, header.dest_id, header.curr_id, size,
+           data_type.c_str(), header.seq, packet_type_string(header).c_str());
 }
 
 
@@ -71,7 +74,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
   msg.header.seq = seq++;
   msg.header.hops++;
 
-  print_msg_info("send", msg);
+  print_msg_info("send", msg.header, msg.data.size(), false);
 
   ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
   return send(reinterpret_cast<char*>(m.buf.get()), m.num_bytes);
@@ -90,16 +93,20 @@ bool ORNode::send(const char* buff, size_t size)
 
 void ORNode::recv(char* buff, size_t size)
 {
+  or_protocol_msgs::Header header;
+  deserialize(header, reinterpret_cast<uint8_t *>(buff), size);
+  ROS_INFO_STREAM(header);
+
   or_protocol_msgs::Packet msg;
   deserialize(msg, reinterpret_cast<uint8_t*>(buff), size);
 
-  print_msg_info("recv", msg);
+  print_msg_info("recv", msg.header, size, true);
 
   // relay standard messages
   if (msg.header.dest_id != node_id && msg.header.src_id != node_id) {
     // TODO keep track of which messages have been re-transmitted
     // TODO take into account forwarding preferences
-    print_msg_info("relay", msg);
+    print_msg_info("relay", msg.header, size, true);
     send(msg, false); // don't overwrite src field when relaying
     return;
   }
