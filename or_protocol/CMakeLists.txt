@@ -41,7 +41,10 @@ target_link_libraries(recv_node ${catkin_LIBRARIES} ${PROJECT_NAME})
 add_executable(ping_node src/ping_node.cpp)
 target_link_libraries(ping_node ${catkin_LIBRARIES} ${PROJECT_NAME})
 
+add_executable(serialization_node src/serialization_test.cpp)
+target_link_libraries(serialization_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
 if (CATKIN_ENABLE_TESTING)
   catkin_add_gtest(serialization_test test/serialization_test.cpp)
-  target_link_libraries(serialization_test ${catkin_LIBRARIES})
+  target_link_libraries(serialization_test ${catkin_LIBRARIES} ${PROJECT_NAME})
 endif()

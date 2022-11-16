@@ -14,4 +14,4 @@ uint32 seq     # the unique (to the source node) packet sequence number
 
 # packet trip information
 uint8 hops      # relays traversed to current node
-uint8[] relays  # list of nodes that can act as relays, in order of decreasing priority
+uint8[8] relays  # list of nodes that can act as relays, in order of decreasing priority

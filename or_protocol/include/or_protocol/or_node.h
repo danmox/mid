@@ -23,6 +23,9 @@ namespace or_protocol {
 typedef std::function<void(or_protocol_msgs::Packet&,int,int)> msg_recv_func;
 
 
+void update_msg_header(char*, const or_protocol_msgs::Header&);
+
+
 template <typename M>
 void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix=true)
 {
