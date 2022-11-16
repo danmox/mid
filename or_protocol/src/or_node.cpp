@@ -57,6 +57,13 @@ void ORNode::print_msg_info(std::string msg,
 }
 
 
+void update_msg_header(char* buff, const or_protocol_msgs::Header& header)
+{
+  ros::SerializedMessage m = ros::serialization::serializeMessage(header);
+  memcpy(buff + 4, m.buf.get() + 4, m.num_bytes - 4);
+}
+
+
 bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
 {
   ros::SerializedMessage m = ros::serialization::serializeMessage(*msg);

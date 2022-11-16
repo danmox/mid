@@ -7,7 +7,56 @@
 #include <std_msgs/Time.h>
 
 
-TEST(TestSuite, ping)
+/* test header manipulation */
+TEST(TestSuite, header_update)
+{
+  // original message
+
+  or_protocol_msgs::Packet msg_in;
+  msg_in.header.msg_type = or_protocol_msgs::Header::PAYLOAD;
+  msg_in.header.src_id = 43;
+  msg_in.header.curr_id = 142;
+  msg_in.header.dest_id = 124;
+  msg_in.header.seq = 2;
+  msg_in.header.hops = 1;
+  msg_in.header.relays[0] = 3;
+  msg_in.header.relays[3] = 43;
+  msg_in.data = std::vector<uint8_t>(5, 6);
+
+  ros::SerializedMessage smsg_in = ros::serialization::serializeMessage(msg_in);
+
+  char* msg_buff = reinterpret_cast<char *>(smsg_in.buf.get());
+  size_t msg_size = smsg_in.num_bytes;
+
+  // extract header for serialized original message, update extracted header and
+  // original message, re-serialize
+
+  or_protocol_msgs::Header header_in;
+  or_protocol::deserialize(header_in, reinterpret_cast<uint8_t *>(msg_buff), msg_size);
+
+  header_in.src_id = 25;
+  header_in.curr_id = 24;
+  header_in.relays[2] = 28;
+  header_in.relays[4] = 29;
+
+  msg_in.header.src_id = 25;
+  msg_in.header.curr_id = 24;
+  msg_in.header.relays[2] = 28;
+  msg_in.header.relays[4] = 29;
+
+  // update original message and compare
+
+  or_protocol::update_msg_header(msg_buff, header_in);
+
+  or_protocol_msgs::Packet msg_out;
+  or_protocol::deserialize(msg_out, reinterpret_cast<uint8_t*>(msg_buff), msg_size);
+
+  EXPECT_EQ(msg_in, msg_out);
+}
+
+
+/* test time serialization / de-serialization */
+TEST(TestSuite, time_serialization)
 {
   or_protocol_msgs::Packet msg_in;
 
