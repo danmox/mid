@@ -31,14 +31,14 @@ void ORNode::register_recv_func(msg_recv_func fcn)
 
 std::string packet_type_string(const or_protocol_msgs::Packet& msg)
 {
-  switch (msg.msg_type) {
-    case or_protocol_msgs::Packet::STATUS:
+  switch (msg.header.msg_type) {
+    case or_protocol_msgs::Header::STATUS:
       return std::string("STATUS");
-    case or_protocol_msgs::Packet::PAYLOAD:
+    case or_protocol_msgs::Header::PAYLOAD:
       return std::string("PAYLOAD");
-    case or_protocol_msgs::Packet::PING_REQ:
+    case or_protocol_msgs::Header::PING_REQ:
       return std::string("PING_REQ");
-    case or_protocol_msgs::Packet::PING_RES:
+    case or_protocol_msgs::Header::PING_RES:
       return std::string("PING_RES");
     default:
       return std::string("UNKNOWN");
@@ -48,8 +48,9 @@ std::string packet_type_string(const or_protocol_msgs::Packet& msg)
 void ORNode::print_msg_info(std::string msg,
                             const or_protocol_msgs::Packet& packet) {
   OR_DEBUG("%s: [%d] %d > %d via %d, %ld bytes, seq=%d, type=%s", msg.c_str(),
-           node_id, packet.src_id, packet.dest_id, packet.curr_id,
-           packet.data.size(), packet.seq, packet_type_string(packet).c_str());
+           node_id, packet.header.src_id, packet.header.dest_id,
+           packet.header.curr_id, packet.data.size(), packet.header.seq,
+           packet_type_string(packet).c_str());
 }
 
 
@@ -64,10 +65,11 @@ bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
 bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
 {
   if (fill_src) {
-    msg.src_id = node_id;
+    msg.header.src_id = node_id;
   }
-  msg.curr_id = node_id;
-  msg.seq = seq++;
+  msg.header.curr_id = node_id;
+  msg.header.seq = seq++;
+  msg.header.hops++;
 
   print_msg_info("send", msg);
 
@@ -79,7 +81,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
 bool ORNode::send(const char* buff, size_t size)
 {
   if (!bcast_socket->send(buff, size)) {
-    std::fprintf(stderr, "[ORNode] failed to send message");
+    OR_ERROR("failed to send message");
     return false;
   }
   return true;
@@ -94,7 +96,7 @@ void ORNode::recv(char* buff, size_t size)
   print_msg_info("recv", msg);
 
   // relay standard messages
-  if (msg.dest_id != node_id && msg.src_id != node_id) {
+  if (msg.header.dest_id != node_id && msg.header.src_id != node_id) {
     // TODO keep track of which messages have been re-transmitted
     // TODO take into account forwarding preferences
     print_msg_info("relay", msg);
@@ -103,9 +105,9 @@ void ORNode::recv(char* buff, size_t size)
   }
 
   // respond to ping requests
-  if (msg.msg_type == or_protocol_msgs::Packet::PING_REQ) {
-    msg.msg_type = or_protocol_msgs::Packet::PING_RES;
-    msg.dest_id = msg.src_id;
+  if (msg.header.msg_type == or_protocol_msgs::Header::PING_REQ) {
+    msg.header.msg_type = or_protocol_msgs::Header::PING_RES;
+    msg.header.dest_id = msg.header.src_id;
     send(msg);
     return;
   }

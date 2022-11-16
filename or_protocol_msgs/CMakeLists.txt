@@ -23,6 +23,7 @@ add_message_files(
   DIRECTORY
     msg
   FILES
+    Header.msg
     Packet.msg
 )
 
