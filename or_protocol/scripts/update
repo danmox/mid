@@ -18,4 +18,5 @@ if not test -d .catkin_tools
     end
 end
 
+catkin clean -y
 catkin build or_protocol
