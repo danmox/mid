@@ -20,14 +20,14 @@ namespace or_protocol {
 #define OR_ERROR(fmt, ...) ROS_ERROR("[ORNode] " fmt, ##__VA_ARGS__)
 
 
-typedef std::function<void(or_protocol_msgs::Packet&,int,int)> msg_recv_func;
+typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
 
 
 void update_msg_header(char*, const or_protocol_msgs::Header&);
 
 
 template <typename M>
-void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix=true)
+void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
 {
   // NOTE the total size of the serialized message is often prepended as an
   // int32_t: http://wiki.ros.org/msg#Fields
@@ -41,10 +41,10 @@ class ORNode
 {
   public:
     ORNode(std::string _IP, int _port);
-    bool send(or_protocol_msgs::Packet &msg, bool fill_src = true);
-    bool send(const or_protocol_msgs::PacketConstPtr &msg);
-    bool send(const char *buff, size_t size);
-    bool run() const {return bcast_socket->run;}
+    bool send(or_protocol_msgs::Packet& msg, bool fill_src = true);
+    bool send(const or_protocol_msgs::PacketConstPtr& msg);
+    bool send(const char* buff, size_t size);
+    bool run() const { return bcast_socket->run; }
     void register_recv_func(msg_recv_func fcn);
 
   private:
@@ -61,7 +61,7 @@ class ORNode
 };
 
 
-} // namespace or_protocol
+}  // namespace or_protocol
 
 
 #endif
