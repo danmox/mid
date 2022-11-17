@@ -59,8 +59,12 @@ void ORNode::print_msg_info(std::string msg,
 
 void update_msg_header(char* buff, const or_protocol_msgs::Header& header)
 {
-  ros::SerializedMessage m = ros::serialization::serializeMessage(header);
-  memcpy(buff + 4, m.buf.get() + 4, m.num_bytes - 4);
+  // prepends the total size of the message as an uint32_t
+  ros::SerializedMessage sheader = ros::serialization::serializeMessage(header);
+  // NOTE buff contains: msg size (4 bytes), serialized header (M bytes), ...
+  // sheader contains: header size (4 bytes), serialized header (M bytes)
+  // we overwrite the bytes associated with msg.header with the bytes of header
+  memcpy(buff + 4, sheader.buf.get() + 4, sheader.num_bytes - 4);
 }
 
 
@@ -100,34 +104,43 @@ bool ORNode::send(const char* buff, size_t size)
 
 void ORNode::recv(char* buff, size_t size)
 {
+  // deserialize only header to determine forwarding decisions
   or_protocol_msgs::Header header;
-  deserialize(header, reinterpret_cast<uint8_t *>(buff), size);
-  ROS_INFO_STREAM(header);
+  deserialize(header, reinterpret_cast<uint8_t*>(buff), size);
 
-  or_protocol_msgs::Packet msg;
-  deserialize(msg, reinterpret_cast<uint8_t*>(buff), size);
-
-  print_msg_info("recv", msg.header, size, true);
+  print_msg_info("recv", header, size, true);
 
   // relay standard messages
-  if (msg.header.dest_id != node_id && msg.header.src_id != node_id) {
+  if (header.dest_id != node_id && header.src_id != node_id) {
     // TODO keep track of which messages have been re-transmitted
     // TODO take into account forwarding preferences
-    print_msg_info("relay", msg.header, size, true);
-    send(msg, false); // don't overwrite src field when relaying
+
+    // update current transmitting node and packet hop count
+    header.curr_id = node_id;
+    header.hops++;
+    update_msg_header(buff, header);
+    print_msg_info("relay", header, size, true);
+    send(buff, size);
     return;
   }
 
   // respond to ping requests
-  if (msg.header.msg_type == or_protocol_msgs::Header::PING_REQ) {
-    msg.header.msg_type = or_protocol_msgs::Header::PING_RES;
-    msg.header.dest_id = msg.header.src_id;
-    send(msg);
+  if (header.msg_type == or_protocol_msgs::Header::PING_REQ) {
+    header.msg_type = or_protocol_msgs::Header::PING_RES;
+    header.dest_id = header.src_id;
+    header.curr_id = node_id;
+    header.hops++;
+    update_msg_header(buff, header);
+    send(buff, size);
     return;
   }
 
-  if (recv_handle)
+  if (recv_handle) {
+    // deserialize entire message
+    or_protocol_msgs::Packet msg;
+    deserialize(msg, reinterpret_cast<uint8_t*>(buff), size);
     recv_handle(msg, node_id, size);
+  }
 }
 
 
