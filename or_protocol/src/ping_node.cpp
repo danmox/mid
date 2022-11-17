@@ -25,8 +25,8 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
   or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
 
   double ms = (recv_stamp - send_stamp_msg.data).toSec() * 1000;
-  printf("%d bytes from 192.168.0.%d: seq=%d time=%.2f ms\n",
-         bytes, msg.header.src_id, msg.header.seq, ms);
+  printf("%d bytes from 192.168.0.%d: seq=%d, hops=%d, time=%.2f ms\n",
+         bytes, msg.header.src_id, msg.header.seq, msg.header.hops, ms);
 
   recv_msgs++;
 }
@@ -66,6 +66,7 @@ int main(int argc, char** argv)
   ros::Time start = ros::Time::now();
   while (run && or_node.run()) {
     msg.data.clear();
+    msg.header.hops = 0;
     std_msgs::Time now;
     now.data = ros::Time::now();
     ros::SerializedMessage sermsg = ros::serialization::serializeMessage(now);
