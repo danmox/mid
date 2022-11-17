@@ -20,3 +20,4 @@ end
 
 catkin clean -y
 catkin build or_protocol
+catkin run_tests
