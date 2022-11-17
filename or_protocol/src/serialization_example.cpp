@@ -3,7 +3,7 @@
 #include <or_protocol_msgs/Packet.h>
 
 
-int main()
+int serialization()
 {
   // original message
 
@@ -56,4 +56,45 @@ int main()
   or_protocol::deserialize(msg_out, reinterpret_cast<uint8_t*>(msg_buff), msg_size);
 
   return 0;
+}
+
+
+int serialization_test()
+{
+  or_protocol_msgs::Packet msg_in;
+  msg_in.header.msg_type = or_protocol_msgs::Header::PAYLOAD;
+  msg_in.header.src_id = 43;
+  msg_in.header.curr_id = 142;
+  msg_in.header.dest_id = 124;
+  msg_in.header.seq = 2;
+  msg_in.header.hops = 1;
+  msg_in.header.relays[0] = 3;
+  msg_in.header.relays[3] = 43;
+  msg_in.data = std::vector<uint8_t>(5, 6);
+
+  ros::SerializedMessage smsg_in = ros::serialization::serializeMessage(msg_in);
+
+  char *buff = reinterpret_cast<char *>(smsg_in.buf.get());
+  size_t buff_size = smsg_in.num_bytes;
+
+  std::cout << "deserializing header" << std::endl;
+  or_protocol_msgs::Header header_msg;
+  or_protocol::deserialize(header_msg, reinterpret_cast<uint8_t *>(buff),
+                           buff_size);
+  std::cout << header_msg << std::endl;
+
+  std::cout << "deserializing packet" << std::endl;
+  or_protocol_msgs::Packet packet_msg;
+  or_protocol::deserialize(packet_msg, reinterpret_cast<uint8_t *>(buff),
+                           buff_size);
+  std::cout << packet_msg << std::endl;
+
+  std::cout << "done" << std::endl;
+  return 0;
+}
+
+
+int main ()
+{
+  return serialization_test();
 }
