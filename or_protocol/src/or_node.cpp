@@ -49,7 +49,8 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
 void ORNode::print_msg_info(std::string msg,
                             const or_protocol_msgs::Header& header,
                             int size,
-                            bool total) {
+                            bool total)
+{
   std::string data_type = total ? "bytes" : "data bytes";
   OR_DEBUG("%s: [%d] %d > %d via %d, %d %s, seq=%d, type=%s", msg.c_str(),
            node_id, header.src_id, header.dest_id, header.curr_id, size,
@@ -144,4 +145,4 @@ void ORNode::recv(char* buff, size_t size)
 }
 
 
-} // namespace or_protocol
+}  // namespace or_protocol

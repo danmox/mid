@@ -1,22 +1,22 @@
+#include <arpa/inet.h>
 #include <cstddef>
 #include <cstdlib>
+#include <errno.h>
+#include <fcntl.h>
+#include <iostream>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/poll.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <signal.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <string>
+#include <sys/poll.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <thread>
-#include <iostream>
-#include <poll.h>
+#include <unistd.h>
 
 #include <or_protocol/bcast_socket.h>
 
@@ -24,7 +24,7 @@
 namespace or_protocol {
 
 
-void *get_in_addr(struct sockaddr *sa)
+void* get_in_addr(struct sockaddr* sa)
 {
   if (sa->sa_family == AF_INET)
     return &(((struct sockaddr_in*)sa)->sin_addr);
@@ -47,10 +47,11 @@ BCastSocket::BCastSocket(std::string _IP, int _port, buff_recv_func _recv_handle
 }
 
 
-BCastSocket::~BCastSocket() {
+BCastSocket::~BCastSocket()
+{
   run = false;
   close(send_sockfd);
-  shutdown(recv_sockfd, SHUT_RD); // forces recvfrom command to terminate
+  shutdown(recv_sockfd, SHUT_RD);  // forces recvfrom command to terminate
   recv_thread.join();
 }
 
@@ -65,9 +66,9 @@ void BCastSocket::recv_loop()
   int status, num_bytes;
 
   memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_INET;      // IPv4
-  hints.ai_socktype = SOCK_DGRAM; // UDP
-  hints.ai_flags = AI_PASSIVE;    // fill in my IP for me
+  hints.ai_family = AF_INET;       // IPv4
+  hints.ai_socktype = SOCK_DGRAM;  // UDP
+  hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
 
   std::string port_str = std::to_string(port);
   if ((status = getaddrinfo(NULL, port_str.c_str(), &hints, &res)) != 0) {
@@ -104,7 +105,7 @@ void BCastSocket::recv_loop()
   while (run) {
 
     if ((num_bytes = recvfrom(recv_sockfd, buff, bufflen - 1, 0,
-                              (struct sockaddr *)&addr, &addr_len)) == -1) {
+                              (struct sockaddr*)&addr, &addr_len)) == -1) {
       perror("[BCastSocket] recvfrom");
       run = false;
       return;
@@ -118,7 +119,7 @@ void BCastSocket::recv_loop()
       continue;
 
     char s[INET_ADDRSTRLEN];
-    if (inet_ntop(AF_INET, get_in_addr((struct sockaddr *)&addr), s,
+    if (inet_ntop(AF_INET, get_in_addr((struct sockaddr*)&addr), s,
                   sizeof s) == NULL) {
       perror("[BCastSocket] inet_ntop");
       continue;
@@ -141,7 +142,7 @@ bool BCastSocket::init_send_socket()
 {
   // get destination address (broadcast)
 
-  struct hostent *he;
+  struct hostent* he;
   int bcast = 1;
 
   size_t last_dot = my_IP.rfind(".");
@@ -170,20 +171,20 @@ bool BCastSocket::init_send_socket()
 
   bcast_addr.sin_family = AF_INET;    // host byte order
   bcast_addr.sin_port = htons(port);  // short, network byte order
-  bcast_addr.sin_addr = *((struct in_addr *)he->h_addr);
+  bcast_addr.sin_addr = *((struct in_addr*)he->h_addr);
   memset(bcast_addr.sin_zero, '\0', sizeof bcast_addr.sin_zero);
 
   return true;
 }
 
 
-bool BCastSocket::send(const char *buff, int buff_size)
+bool BCastSocket::send(const char* buff, int buff_size)
 {
   // TODO chunking?
 
   int numbytes;
   if ((numbytes = sendto(send_sockfd, buff, buff_size, 0,
-                         (struct sockaddr *)&bcast_addr, sizeof bcast_addr)) == -1) {
+                         (struct sockaddr*)&bcast_addr, sizeof bcast_addr)) == -1) {
     perror("[BCastSocket] sendto");
     return false;
   }
@@ -197,4 +198,4 @@ bool BCastSocket::send(const char *buff, int buff_size)
 }
 
 
-} // namespace or_protocol
+}  // namespace or_protocol
