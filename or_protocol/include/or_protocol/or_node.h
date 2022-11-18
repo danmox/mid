@@ -42,8 +42,6 @@ class ORNode
   public:
     ORNode(std::string _IP, int _port);
     bool send(or_protocol_msgs::Packet& msg, bool fill_src = true);
-    bool send(const or_protocol_msgs::PacketConstPtr& msg);
-    bool send(const char* buff, size_t size);
     bool run() const { return bcast_socket->run; }
     void register_recv_func(msg_recv_func fcn);
 
@@ -53,6 +51,7 @@ class ORNode
     int seq = 0;
     msg_recv_func recv_handle = nullptr;
 
+    bool send(const char* buff, size_t size);
     void recv(char* buff, size_t size);
     void print_msg_info(std::string msg,
                         const or_protocol_msgs::Header& header,
