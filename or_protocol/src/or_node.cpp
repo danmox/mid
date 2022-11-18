@@ -69,13 +69,6 @@ void update_msg_header(char* buff, const or_protocol_msgs::Header& header)
 }
 
 
-bool ORNode::send(const or_protocol_msgs::PacketConstPtr& msg)
-{
-  ros::SerializedMessage m = ros::serialization::serializeMessage(*msg);
-  return send(reinterpret_cast<const char*>(m.buf.get()), m.num_bytes);
-}
-
-
 // assuming node specific message header information has not been completed
 bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
 {
