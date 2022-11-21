@@ -3,9 +3,9 @@
 #include <iostream>
 #include <memory>
 
-#include <ros/ros.h>
 #include <or_protocol/or_node.h>
 #include <or_protocol_msgs/Packet.h>
+#include <ros/ros.h>
 #include <std_msgs/Time.h>
 
 

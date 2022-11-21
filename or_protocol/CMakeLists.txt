@@ -25,6 +25,7 @@ include_directories(
 )
 
 set(LIBRARY_FILES
+  src/node_state.cpp
   src/or_node.cpp
   src/bcast_socket.cpp
 )
