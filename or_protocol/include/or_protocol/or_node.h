@@ -6,8 +6,10 @@
 #include <netinet/in.h>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include <or_protocol/bcast_socket.h>
+#include <or_protocol/node_state.h>
 #include <or_protocol_msgs/Packet.h>
 #include <ros/console.h>
 
@@ -50,9 +52,11 @@ class ORNode
     int node_id;
     int seq = 0;
     msg_recv_func recv_handle = nullptr;
+    std::unordered_map<int, NodeState> node_states;
 
     bool send(const char* buff, size_t size);
     void recv(char* buff, size_t size);
+
     void print_msg_info(std::string msg,
                         const or_protocol_msgs::Header& header,
                         int size,
