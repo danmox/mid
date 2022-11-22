@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iostream>
+#include <memory>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -62,7 +63,6 @@ void BCastSocket::recv_loop()
   struct addrinfo hints, *res, *p;
   struct sockaddr_storage addr;
   const int bufflen = 1500;
-  char buff[bufflen];
   int status, num_bytes;
 
   memset(&hints, 0, sizeof hints);
@@ -104,7 +104,9 @@ void BCastSocket::recv_loop()
   socklen_t addr_len = sizeof addr;
   while (run) {
 
-    if ((num_bytes = recvfrom(recv_sockfd, buff, bufflen - 1, 0,
+    buffer_ptr buff_ptr(new char[bufflen]);
+
+    if ((num_bytes = recvfrom(recv_sockfd, buff_ptr.get(), bufflen - 1, 0,
                               (struct sockaddr*)&addr, &addr_len)) == -1) {
       perror("[BCastSocket] recvfrom");
       run = false;
@@ -129,11 +131,11 @@ void BCastSocket::recv_loop()
       fprintf(stderr, "[BCastSocket] Insufficient buffer size. Dropping message.");
       continue;
     }
-    buff[num_bytes] = '\0';
+    buff_ptr[num_bytes] = '\0';
 
     // TODO don't block the receiving thread?
     if (num_bytes > 0)
-      recv_handle(buff, num_bytes);
+      recv_handle(buff_ptr, num_bytes);
   }
 }
 

@@ -95,12 +95,11 @@ bool ORNode::send(const char* buff, size_t size)
   return true;
 }
 
-
-void ORNode::recv(char* buff, size_t size)
+void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
 {
   // deserialize only header to determine forwarding decisions
   or_protocol_msgs::Header header;
-  deserialize(header, reinterpret_cast<uint8_t*>(buff), size);
+  deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
 
   print_msg_info("recv", header, size, true);
 
@@ -124,9 +123,9 @@ void ORNode::recv(char* buff, size_t size)
     // update current transmitting node and packet hop count
     header.curr_id = node_id;
     header.hops++;
-    update_msg_header(buff, header);
+    update_msg_header(buff_ptr.get(), header);
     print_msg_info("relay", header, size, true);
-    send(buff, size);
+    send(buff_ptr.get(), size);
     return;
   }
 
@@ -137,16 +136,16 @@ void ORNode::recv(char* buff, size_t size)
     header.curr_id = node_id;
     header.src_id = node_id;
     header.hops++;
-    update_msg_header(buff, header);
+    update_msg_header(buff_ptr.get(), header);
     print_msg_info("reply ping", header, size, true);
-    send(buff, size);
+    send(buff_ptr.get(), size);
     return;
   }
 
   if (recv_handle) {
     // deserialize entire message
     or_protocol_msgs::Packet msg;
-    deserialize(msg, reinterpret_cast<uint8_t*>(buff), size);
+    deserialize(msg, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
     // TODO don't block receiving thread?
     print_msg_info("process", header, size, true);
     recv_handle(msg, node_id, size);

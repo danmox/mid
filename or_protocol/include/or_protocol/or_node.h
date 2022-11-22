@@ -55,7 +55,7 @@ class ORNode
     std::unordered_map<int, NodeState> node_states;
 
     bool send(const char* buff, size_t size);
-    void recv(char* buff, size_t size);
+    void recv(buffer_ptr& buff_ptr, size_t size);
 
     void print_msg_info(std::string msg,
                         const or_protocol_msgs::Header& header,
