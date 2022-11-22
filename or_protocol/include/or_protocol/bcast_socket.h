@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <netinet/in.h>
 #include <string>
 #include <thread>
@@ -11,7 +12,8 @@
 namespace or_protocol {
 
 
-typedef std::function<void(char*,int)> buff_recv_func;
+typedef std::function<void(std::shared_ptr<char[]>&, int)> buff_recv_func;
+typedef std::shared_ptr<char[]> buffer_ptr;
 
 
 class BCastSocket
@@ -22,8 +24,8 @@ class BCastSocket
     BCastSocket(std::string _IP, int _port, buff_recv_func _recv_handle);
     ~BCastSocket();
 
-    std::string getIP() {return my_IP;}
-    bool send(const char *buff, int size);
+    std::string getIP() { return my_IP; }
+    bool send(const char* buff, int size);
 
   private:
     int recv_sockfd, send_sockfd, port;
@@ -42,7 +44,7 @@ class BCastSocket
 };
 
 
-} // namespace or_protocol
+}  // namespace or_protocol
 
 
 #endif
