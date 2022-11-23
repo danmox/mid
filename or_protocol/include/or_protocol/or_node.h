@@ -2,7 +2,9 @@
 #define OR_PROTOCOL_OR_NODE_H_
 
 #include <atomic>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <netinet/in.h>
 #include <string>
 #include <thread>
@@ -39,6 +41,21 @@ void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
 }
 
 
+struct PacketQueueItem
+{
+    buffer_ptr buff_ptr;
+    size_t size;
+    ros::Time min_transmit_time;
+    bool processed;
+
+    PacketQueueItem(buffer_ptr& _buff_ptr, size_t _size) :
+      buff_ptr(_buff_ptr), size(_size), min_transmit_time(0), processed(false)
+    {}
+
+    char* buffer() { return buff_ptr.get(); }
+};
+
+
 class ORNode
 {
   public:
@@ -47,11 +64,17 @@ class ORNode
     // network)
     ORNode(std::string _IP, int _port);
 
+    // destructor required for thread cleanup logic
+    ~ORNode();
+
     // the send interface between higher level application nodes and ORNode
     bool send(or_protocol_msgs::Packet& msg, bool fill_src = true);
 
-    // checks if the underlying socket is ready for use
-    bool run() const { return bcast_socket->run; }
+    // checks if this node and the underlying socket is ready for use
+    bool is_running() const { return run && bcast_socket->run; }
+
+    // TODO implement: shut down the node
+    void shutdown();
 
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
@@ -71,6 +94,9 @@ class ORNode
     // this node
     int seq = 0;
 
+    // internal state used to gracefully signal a shutdown to running threads
+    volatile std::atomic<bool> run;
+
     // a function called by the process thread for messages for which the
     // current node is the intended destination
     msg_recv_func recv_handle = nullptr;
@@ -80,12 +106,24 @@ class ORNode
     // as well as network statistics for each node
     std::unordered_map<int, NodeState> node_states;
 
+    // the main packet queue processed by this node; incoming messages are
+    // pushed onto this queue for processing by the process thread
+    std::deque<std::shared_ptr<PacketQueueItem>> packet_queue;
+
+    std::mutex queue_mutex;
+
+    // packet processing thread
+    std::thread process_thread;
+
     // a wrapper for BCastSocket::send(...)
     bool send(const char* buff, size_t size);
 
     // a function called by the underlying BCastSocket instance for each
     // incoming message
     void recv(buffer_ptr& buff_ptr, size_t size);
+
+    // main thread processing packet_queue and making forwarding decisions
+    void process_packets();
 
     // a helper function for logging information about a message
     void print_msg_info(std::string msg,

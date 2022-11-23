@@ -38,7 +38,7 @@ int main(int argc, char** argv)
   msg.header.dest_id = 100;
   msg.data = std::vector<uint8_t>(200, 1);
 
-  while (run && or_node.run()) {
+  while (run && or_node.is_running()) {
     or_node.send(msg);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }

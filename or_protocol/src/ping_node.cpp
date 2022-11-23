@@ -64,7 +64,7 @@ int main(int argc, char** argv)
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
-  while (run && or_node.run()) {
+  while (run && or_node.is_running()) {
     msg.data.clear();
     msg.header.hops = 0;
     std_msgs::Time now;
