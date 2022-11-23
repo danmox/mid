@@ -71,7 +71,7 @@ class ORNode
     bool send(or_protocol_msgs::Packet& msg, bool fill_src = true);
 
     // checks if this node and the underlying socket is ready for use
-    bool is_running() const { return run && bcast_socket->run; }
+    bool is_running() const { return run && bcast_socket->is_running(); }
 
     // TODO implement: shut down the node
     void shutdown();
@@ -80,7 +80,6 @@ class ORNode
     void register_recv_func(msg_recv_func fcn);
 
   private:
-
     // socket used for broadcasting to peers, implementing the lower level
     // broadcast socket setup / cleanup and usage
     std::shared_ptr<BCastSocket> bcast_socket;
