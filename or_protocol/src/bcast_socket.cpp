@@ -133,7 +133,6 @@ void BCastSocket::recv_loop()
     }
     buff_ptr[num_bytes] = '\0';
 
-    // TODO don't block the receiving thread?
     if (num_bytes > 0)
       recv_handle(buff_ptr, num_bytes);
   }
