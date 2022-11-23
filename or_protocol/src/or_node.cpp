@@ -20,6 +20,18 @@ ORNode::ORNode(std::string _IP, int _port)
   using namespace std::placeholders;
   buff_recv_func fcn = std::bind(&ORNode::recv, this, _1, _2);
   bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
+
+  run = bcast_socket->run;  // true if bcast_socket initializes successfully
+
+  // start main packet processing thread
+  process_thread = std::thread(&ORNode::process_packets, this);
+}
+
+
+ORNode::~ORNode()
+{
+  run = false;
+  process_thread.join();
 }
 
 
@@ -95,60 +107,105 @@ bool ORNode::send(const char* buff, size_t size)
   return true;
 }
 
+
 void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
 {
-  // deserialize only header to determine forwarding decisions
-  or_protocol_msgs::Header header;
-  deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
+  std::lock_guard<std::mutex> queue_lock(queue_mutex);
+  std::shared_ptr<PacketQueueItem> item(new PacketQueueItem(buff_ptr, size));
+  packet_queue.push_back(item);
+  OR_DEBUG("queued message");
+}
 
-  print_msg_info("recv", header, size, true);
 
-  // TODO update statistics: node_states[header.curr_id].update_stats(header);
+void ORNode::process_packets()
+{
+  while (run) {
 
-  // filter out messages originating from the current node (i.e. echoed back
-  // from an intermediate relay) or have already been received and processed
-  bool new_msg = false;
-  if (header.src_id != node_id) {
-    new_msg = node_states[header.src_id].update_queue(header);
-  }
-  if (!new_msg) {
-    print_msg_info("drop", header, size, true);
-    return;
-  }
+    std::shared_ptr<PacketQueueItem> item;
+    {
+      std::lock_guard<std::mutex> queue_lock(queue_mutex);
+      if (packet_queue.size() > 0) {
+        item = packet_queue.front();
+        packet_queue.pop_front();
+      }
+    }
+    if (!item)
+      continue;
 
-  // relay standard messages
-  if (header.dest_id != node_id) {
-    // TODO take into account forwarding preferences
+    // in order to approximate desired opportunistic relaying priority, some
+    // packets may be processed but held for a short period of time before
+    // actually transmitted
+    if (item->processed) {
+      // requeue message if it should not be sent yet
+      // TODO determine a smarter way of doing this so that the packet is not
+      // delayed unnecessarily (step through queue and insert packet before
+      // others with more recent min_transmit_time?)
+      if (item->min_transmit_time > ros::Time::now()) {
+        std::lock_guard<std::mutex> queue_lock(queue_mutex);
+        packet_queue.push_back(item);
+      } else {
+        send(item->buffer(), item->size);
+      }
+      continue;
+    }
 
-    // update current transmitting node and packet hop count
-    header.curr_id = node_id;
-    header.hops++;
-    update_msg_header(buff_ptr.get(), header);
-    print_msg_info("relay", header, size, true);
-    send(buff_ptr.get(), size);
-    return;
-  }
+    // process message
 
-  // respond to ping requests
-  if (header.msg_type == or_protocol_msgs::Header::PING_REQ) {
-    header.msg_type = or_protocol_msgs::Header::PING_RES;
-    header.dest_id = header.src_id;
-    header.curr_id = node_id;
-    header.src_id = node_id;
-    header.hops++;
-    update_msg_header(buff_ptr.get(), header);
-    print_msg_info("reply ping", header, size, true);
-    send(buff_ptr.get(), size);
-    return;
-  }
+    // deserialize only header to determine forwarding decisions
+    or_protocol_msgs::Header header;
+    deserialize(header, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
 
-  if (recv_handle) {
-    // deserialize entire message
-    or_protocol_msgs::Packet msg;
-    deserialize(msg, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
-    // TODO don't block receiving thread?
-    print_msg_info("process", header, size, true);
-    recv_handle(msg, node_id, size);
+    print_msg_info("process", header, item->size, true);
+
+    // TODO update statistics: node_states[header.curr_id].update_stats(header);
+
+    // filter out messages that originated from the current node (i.e. echoed
+    // back from an intermediate relay) or have already been received/processed
+    bool new_msg = false;
+    if (header.src_id != node_id) {
+      new_msg = node_states[header.src_id].update_queue(header);
+    }
+    if (!new_msg) {
+      print_msg_info("drop", header, item->size, true);
+      continue;
+    }
+
+    // relay standard messages
+    if (header.dest_id != node_id) {
+      // TODO take into account forwarding preferences by appropriately setting
+      // the min_transmit_time and requeueing the message if this node is not
+      // the highest priority relay
+
+      // update current transmitting node and packet hop count
+      header.curr_id = node_id;
+      header.hops++;
+      update_msg_header(item->buffer(), header);
+      print_msg_info("relay", header, item->size, true);
+      send(item->buffer(), item->size);
+      continue;
+    }
+
+    // respond to ping requests
+    if (header.msg_type == or_protocol_msgs::Header::PING_REQ) {
+      header.msg_type = or_protocol_msgs::Header::PING_RES;
+      header.dest_id = header.src_id;
+      header.curr_id = node_id;
+      header.src_id = node_id;
+      header.hops++;
+      update_msg_header(item->buffer(), header);
+      print_msg_info("reply ping", header, item->size, true);
+      send(item->buffer(), item->size);
+      continue;
+    }
+
+    if (recv_handle) {
+      // deserialize entire message
+      or_protocol_msgs::Packet msg;
+      deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
+      // TODO don't block receiving thread?
+      print_msg_info("deliver", header, item->size, true);
+      recv_handle(msg, node_id, item->size);
+    }
   }
 }
 

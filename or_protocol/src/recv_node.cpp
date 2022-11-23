@@ -30,7 +30,7 @@ int main(int argc, char** argv)
   sigaction(SIGINT, &siginthandler, NULL);
 
   or_protocol::ORNode or_node(argv[1], 4568);
-  while (run && or_node.run()) {
+  while (run && or_node.is_running()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
