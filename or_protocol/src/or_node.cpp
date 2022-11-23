@@ -21,7 +21,7 @@ ORNode::ORNode(std::string _IP, int _port)
   buff_recv_func fcn = std::bind(&ORNode::recv, this, _1, _2);
   bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
 
-  run = bcast_socket->run;  // true if bcast_socket initializes successfully
+  run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
 
   // start main packet processing thread
   process_thread = std::thread(&ORNode::process_packets, this);
