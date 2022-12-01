@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <or_protocol/or_node.h>
+#include <ros/console.h>
 
 
 volatile bool run = true;

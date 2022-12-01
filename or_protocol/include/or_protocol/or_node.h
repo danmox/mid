@@ -13,15 +13,9 @@
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/node_state.h>
 #include <or_protocol_msgs/Packet.h>
-#include <ros/console.h>
 
 
 namespace or_protocol {
-
-
-#define OR_DEBUG(fmt, ...) ROS_DEBUG("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_INFO(fmt, ...) ROS_INFO("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_ERROR(fmt, ...) ROS_ERROR("[ORNode] " fmt, ##__VA_ARGS__)
 
 
 typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
@@ -30,6 +24,7 @@ typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
 void update_msg_header(char*, const or_protocol_msgs::Header&);
 
 
+// TODO return type?
 template <typename M>
 void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
 {
@@ -45,11 +40,16 @@ struct PacketQueueItem
 {
     buffer_ptr buff_ptr;
     size_t size;
-    ros::Time min_transmit_time;
+    ros::Time recv_time, send_time;
     bool processed;
+    int priority, src_id, msg_seq;
 
-    PacketQueueItem(buffer_ptr& _buff_ptr, size_t _size) :
-      buff_ptr(_buff_ptr), size(_size), min_transmit_time(0), processed(false)
+    PacketQueueItem(buffer_ptr& _buff_ptr, size_t _size, ros::Time& now) :
+      buff_ptr(_buff_ptr),
+      size(_size),
+      recv_time(now),
+      send_time(0),
+      processed(false)
     {}
 
     char* buffer() { return buff_ptr.get(); }
@@ -92,6 +92,9 @@ class ORNode
     // a sequence number uniquely identifying messages that originating from
     // this node
     int seq = 0;
+
+    // minimum unit of delay for enforcing relay priority in nanoseconds
+    static const uint32_t UNIT_DELAY = 10000000;
 
     // internal state used to gracefully signal a shutdown to running threads
     volatile std::atomic<bool> run;

@@ -61,6 +61,7 @@ int main(int argc, char** argv)
   or_protocol_msgs::Packet msg;
   msg.header.msg_type = or_protocol_msgs::Header::PING_REQ;
   msg.header.dest_id = std::stoi(argv[2]);
+  msg.header.relays[0] = 2;
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
