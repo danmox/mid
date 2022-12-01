@@ -2,10 +2,15 @@
 
 # update
 #
-# a script used to update the or_protocol running on one of the odroids in the
+# a script used to update the or_protocol running on one of the nodes in the
 # mesh network testbed remotely
 
-cd ~/mid_ws
+if test -z "$OR_PROTOCOL_DIR"
+    echo "OR_PROTOCOL_DIR not set, exiting."
+    exit
+end
+
+cd $OR_PROTOCOL_DIR
 
 if not test -d .catkin_tools
     if test -d /opt/ros/melodic
@@ -20,4 +25,4 @@ end
 
 catkin clean -y
 catkin build or_protocol
-catkin run_tests
+# catkin run_tests
