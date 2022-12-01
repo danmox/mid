@@ -91,7 +91,7 @@ class ORNode
 
     // a sequence number uniquely identifying messages that originating from
     // this node
-    int seq = 0;
+    uint32_t seq = 0;
 
     // minimum unit of delay for enforcing relay priority in nanoseconds
     static const uint32_t UNIT_DELAY = 10000000;
@@ -132,6 +132,10 @@ class ORNode
                         const or_protocol_msgs::Header& header,
                         int size,
                         bool total);
+
+    // a helper function that returns the unique message sequence number to be
+    // embedded in outgoing message headers
+    inline uint32_t getSeqNum() { return seq++; }
 };
 
 

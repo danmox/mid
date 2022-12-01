@@ -91,7 +91,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
     msg.header.src_id = node_id;
   }
   msg.header.curr_id = node_id;
-  msg.header.seq = seq++;
+  msg.header.seq = getSeqNum();
   msg.header.hops++;
 
   print_msg_info("send", msg.header, msg.data.size(), false);
@@ -225,7 +225,7 @@ void ORNode::process_packets()
       header.dest_id = header.src_id;
       header.curr_id = node_id;
       header.src_id = node_id;
-      header.seq = seq++;
+      header.seq = getSeqNum();
       header.hops++;
       update_msg_header(item->buffer(), header);
       print_msg_info("reply ping", header, item->size, true);
