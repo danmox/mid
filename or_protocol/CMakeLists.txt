@@ -25,9 +25,10 @@ include_directories(
 )
 
 set(LIBRARY_FILES
+  src/bcast_socket.cpp
   src/node_state.cpp
   src/or_node.cpp
-  src/bcast_socket.cpp
+  src/utils.cpp
 )
 
 add_library(${PROJECT_NAME} ${LIBRARY_FILES})
