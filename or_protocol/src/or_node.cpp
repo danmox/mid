@@ -225,6 +225,7 @@ void ORNode::process_packets()
       header.dest_id = header.src_id;
       header.curr_id = node_id;
       header.src_id = node_id;
+      header.seq = seq++;
       header.hops++;
       update_msg_header(item->buffer(), header);
       print_msg_info("reply ping", header, item->size, true);

@@ -6,6 +6,7 @@
 #include <or_protocol/or_node.h>
 #include <or_protocol_msgs/Packet.h>
 #include <ros/ros.h>
+#include <std_msgs/Int32.h>
 #include <std_msgs/Time.h>
 
 
@@ -24,9 +25,13 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
   std_msgs::Time send_stamp_msg;
   or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
 
+  std_msgs::Int32 msg_seq;
+  uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
+  or_protocol::deserialize(msg_seq, msg.data.data() + offset, msg.data.size() - offset);
+
   double ms = (recv_stamp - send_stamp_msg.data).toSec() * 1000;
   printf("%d bytes from 192.168.0.%d: seq=%d, hops=%d, time=%.2f ms\n",
-         bytes, msg.header.src_id, msg.header.seq, msg.header.hops, ms);
+         bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
 
   recv_msgs++;
 }
@@ -68,13 +73,22 @@ int main(int argc, char** argv)
   while (run && or_node.is_running()) {
     msg.data.clear();
     msg.header.hops = 0;
+
     std_msgs::Time now;
     now.data = ros::Time::now();
-    ros::SerializedMessage sermsg = ros::serialization::serializeMessage(now);
-    msg.data.insert(msg.data.end(), sermsg.buf.get(), sermsg.buf.get() + sermsg.num_bytes);
+    ros::SerializedMessage s = ros::serialization::serializeMessage(now);
+    msg.data.insert(msg.data.end(), s.buf.get(), s.buf.get() + s.num_bytes);
+
+    // the ping sequence and message sequence may not correspond if there are
+    // more that 1 datastream originating from the sending node
+    std_msgs::Int32 ping_seq;
+    ping_seq.data = sent_msgs;
+    s = ros::serialization::serializeMessage(ping_seq);
+    msg.data.insert(msg.data.end(), s.buf.get(), s.buf.get() + s.num_bytes);
+
     or_node.send(msg);
     sent_msgs++;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
   }
 
   int total_time = (ros::Time::now() - start).toSec() * 1000;
