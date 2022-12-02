@@ -18,9 +18,6 @@
 namespace or_protocol {
 
 
-typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
-
-
 void update_msg_header(char*, const or_protocol_msgs::Header&);
 
 
@@ -40,13 +37,18 @@ struct PacketQueueItem
 {
     buffer_ptr buff_ptr;
     size_t size;
+    or_protocol_msgs::Header header;
     ros::Time recv_time, send_time;
     bool processed;
-    int priority, src_id, msg_seq;
+    int priority;
 
-    PacketQueueItem(buffer_ptr& _buff_ptr, size_t _size, ros::Time& now) :
+    PacketQueueItem(buffer_ptr& _buff_ptr,
+                    size_t _size,
+                    or_protocol_msgs::Header& _header,
+                    ros::Time& now) :
       buff_ptr(_buff_ptr),
       size(_size),
+      header(_header),
       recv_time(now),
       send_time(0),
       processed(false)
@@ -54,6 +56,10 @@ struct PacketQueueItem
 
     char* buffer() { return buff_ptr.get(); }
 };
+
+
+typedef std::shared_ptr<PacketQueueItem> PacketQueueItemPtr;
+typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
 
 
 class ORNode
@@ -128,14 +134,21 @@ class ORNode
     void process_packets();
 
     // a helper function for logging information about a message
-    void print_msg_info(std::string msg,
+    void print_msg_info(const std::string& msg,
                         const or_protocol_msgs::Header& header,
                         int size,
-                        bool total);
+                        bool total = true);
 
-    // a helper function that returns the unique message sequence number to be
+    // helper function returning the unique message sequence number to be
     // embedded in outgoing message headers
     inline uint32_t getSeqNum() { return seq++; }
+
+    // helper function returning the priority of the most recent received
+    // message associated with header
+    inline int msg_priority(const or_protocol_msgs::Header& header)
+    {
+      return node_states[header.src_id].priority(header.seq);
+    };
 };
 
 

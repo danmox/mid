@@ -61,7 +61,7 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
 }
 
 
-void ORNode::print_msg_info(std::string msg,
+void ORNode::print_msg_info(const std::string& msg,
                             const or_protocol_msgs::Header& header,
                             int size,
                             bool total)
@@ -114,10 +114,16 @@ bool ORNode::send(const char* buff, size_t size)
 void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
 {
   ros::Time now = ros::Time::now();
+
+  // deserialize just the header to determine future forwarding decisions
+  or_protocol_msgs::Header header;
+  deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
+
   std::lock_guard<std::mutex> queue_lock(queue_mutex);
-  std::shared_ptr<PacketQueueItem> item(new PacketQueueItem(buff_ptr, size, now));
+  PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
   packet_queue.push_back(item);
-  OR_DEBUG("queued message");
+
+  print_msg_info("recv", header, size);
 }
 
 
@@ -141,94 +147,88 @@ void ORNode::process_packets()
     // packets may be processed but held for a short period of time before
     // being re-transmitted
     if (item->processed) {
-      // requeue message if it should not be sent yet
-      // TODO determine a smarter way of doing this so that the packet is not
+      // determine if processed message should be dropped, delayed, or sent
+      // TODO determine a smarter way of requeuing so that the packet is not
       // delayed unnecessarily (step through queue and insert packet before
       // others with more recent send_time?)
       if (item->send_time > ros::Time::now()) {
         std::lock_guard<std::mutex> queue_lock(queue_mutex);
         packet_queue.push_back(item);
-      } else if (item->priority < node_states[item->src_id].priority(item->msg_seq)) {
+      } else if (item->priority < msg_priority(item->header)) {
         send(item->buffer(), item->size);
         double actual_dt = (ros::Time::now() - item->recv_time).toSec() * 1000;
         double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
-        OR_DEBUG("relayed: target delay: %.2f, actual delay: %.2f", target_dt, actual_dt);
+        char buff[30];
+        snprintf(buff, 30, "relay (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
+        print_msg_info(buff, item->header, item->size);
       } else {
-        OR_DEBUG("dropping message since a higher priority relay was received");
-        OR_DEBUG("queued packet priority: %d, cached priority: %d",
-                 item->priority, node_states[item->src_id].priority(item->msg_seq));
+        char buff[6];
+        snprintf(buff, 6, "%d > %d", item->priority, msg_priority(item->header));
+        print_msg_info("superseded (drop)", item->header, item->size);
       }
       continue;
     }
-
-    // deserialize only header to determine forwarding decisions
-    or_protocol_msgs::Header header;
-    deserialize(header, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
-    item->src_id = header.src_id;
-    item->msg_seq = header.seq;
-
-    print_msg_info("process", header, item->size, true);
 
     // TODO update statistics: node_states[header.curr_id].update_stats(header);
 
     // filter out messages that originated from the current node (i.e. echoed
     // back from an intermediate relay)
-    if (header.src_id == node_id) {
-      print_msg_info("echoed (drop)", header, item->size, true);
+    if (item->header.src_id == node_id) {
+      print_msg_info("echo (drop)", item->header, item->size);
       continue;
     }
 
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
-    if (!node_states[header.src_id].update_queue(header)) {
-      print_msg_info("duplicate (drop)", header, item->size, true);
+    if (!node_states[item->header.src_id].update_queue(item->header)) {
+      print_msg_info("dupe (drop)", item->header, item->size);
       continue;
     }
 
     // relay message
-    if (header.dest_id != node_id) {
+    if (item->header.dest_id != node_id) {
 
-      int relay_node_priority = relay_priority(header.curr_id, header);
-      int current_node_priority = relay_priority(node_id, header);
+      int sender_priority = relay_priority(item->header.curr_id, item->header);
+      int current_priority = relay_priority(node_id, item->header);
 
-      if (current_node_priority == header.relays.size()) {
-        print_msg_info("not a relay (drop)", header, item->size, true);
-      } else if (current_node_priority > relay_node_priority) {
-        print_msg_info("low priority relay (drop)", header, item->size, true);
+      if (current_priority == item->header.relays.size()) {
+        print_msg_info("not relay (drop)", item->header, item->size);
+      } else if (current_priority > sender_priority) {
+        print_msg_info("low priority (drop)", item->header, item->size);
       } else {
 
         // update current transmitting node and packet hop count
-        header.curr_id = node_id;
-        header.hops++;
-        update_msg_header(item->buffer(), header);
+        item->header.curr_id = node_id;
+        item->header.hops++;
+        update_msg_header(item->buffer(), item->header);
 
         // relay message or requeue if it should be delayed
-        if (current_node_priority == 0) {
+        if (current_priority == 0) {
           send(item->buffer(), item->size);
-          print_msg_info("relay", header, item->size, true);
+          print_msg_info("relay", item->header, item->size);
         } else {
-          const ros::Duration delay(0, UNIT_DELAY * current_node_priority);
+          const ros::Duration delay(0, UNIT_DELAY * current_priority);
           item->send_time = item->recv_time + delay;
-          item->priority = current_node_priority;
+          item->priority = current_priority;
           item->processed = true;
           std::lock_guard<std::mutex> queue_lock(queue_mutex);
           packet_queue.push_back(item);
-          print_msg_info("requeue", header, item->size, true);
+          print_msg_info("queue", item->header, item->size);
         }
       }
       continue;
     }
 
     // respond to ping requests
-    if (header.msg_type == or_protocol_msgs::Header::PING_REQ) {
-      header.msg_type = or_protocol_msgs::Header::PING_RES;
-      header.dest_id = header.src_id;
-      header.curr_id = node_id;
-      header.src_id = node_id;
-      header.seq = getSeqNum();
-      header.hops++;
-      update_msg_header(item->buffer(), header);
-      print_msg_info("reply ping", header, item->size, true);
+    if (item->header.msg_type == or_protocol_msgs::Header::PING_REQ) {
+      item->header.msg_type = or_protocol_msgs::Header::PING_RES;
+      item->header.dest_id = item->header.src_id;
+      item->header.curr_id = node_id;
+      item->header.src_id = node_id;
+      item->header.seq = getSeqNum();
+      item->header.hops++;
+      update_msg_header(item->buffer(), item->header);
+      print_msg_info("reply ping", item->header, item->size);
       send(item->buffer(), item->size);
       continue;
     }
@@ -238,7 +238,7 @@ void ORNode::process_packets()
       or_protocol_msgs::Packet msg;
       deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
       // TODO don't block receiving thread
-      print_msg_info("deliver", header, item->size, true);
+      print_msg_info("deliver", item->header, item->size);
       recv_handle(msg, node_id, item->size);
     }
   }
