@@ -10,5 +10,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>or_protocol_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>rosbag</depend>
 
 </package>
