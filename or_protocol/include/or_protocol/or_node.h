@@ -5,7 +5,6 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <netinet/in.h>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -13,6 +12,7 @@
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/node_state.h>
 #include <or_protocol_msgs/Packet.h>
+#include <rosbag/bag.h>
 
 
 namespace or_protocol {
@@ -123,6 +123,9 @@ class ORNode
     // packet processing thread
     std::thread process_thread;
 
+    // bagfile used for logging packet statistics
+    rosbag::Bag bag;
+
     // a wrapper for BCastSocket::send(...)
     bool send(const char* buff, size_t size);
 
@@ -138,6 +141,12 @@ class ORNode
                         const or_protocol_msgs::Header& header,
                         int size,
                         bool total = true);
+
+    // helper function for logging messages
+    void log_message(const or_protocol_msgs::Header& header,
+                     const int action,
+                     const int size,
+                     const ros::Time& time);
 
     // helper function returning the unique message sequence number to be
     // embedded in outgoing message headers

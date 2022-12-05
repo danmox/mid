@@ -24,6 +24,7 @@ add_message_files(
     msg
   FILES
     Header.msg
+    Log.msg
     Packet.msg
 )
 

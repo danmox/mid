@@ -6,8 +6,9 @@ add_compile_options(-std=c++17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
   or_protocol_msgs
+  rosbag
+  roscpp
 )
 find_package(Threads REQUIRED)
 
@@ -16,6 +17,8 @@ catkin_package(
   LIBRARIES or_protocol
   CATKIN_DEPENDS
     or_protocol_msgs
+    rosbag
+    roscpp
   DEPENDS Threads
 )
 

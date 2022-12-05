@@ -1,13 +1,18 @@
+#include <filesystem>
 #include <iostream>
 
 #include <or_protocol/or_node.h>
 #include <ros/serialization.h>
 
 #include <or_protocol/utils.h>
+#include <or_protocol_msgs/Log.h>
 #include <or_protocol_msgs/Packet.h>
 
 
 namespace or_protocol {
+
+
+using or_protocol_msgs::Log;
 
 
 ORNode::ORNode(std::string _IP, int _port)
@@ -18,8 +23,8 @@ ORNode::ORNode(std::string _IP, int _port)
   node_id = std::stoi(id_str);
 
   // initialize BCastSocket and register recv function handle
-  using namespace std::placeholders;
-  buff_recv_func fcn = std::bind(&ORNode::recv, this, _1, _2);
+  namespace ph = std::placeholders;
+  buff_recv_func fcn = std::bind(&ORNode::recv, this, ph::_1, ph::_2);
   bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
 
   run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
@@ -28,6 +33,28 @@ ORNode::ORNode(std::string _IP, int _port)
   process_thread = std::thread(&ORNode::process_packets, this);
 
   ros::Time::init();
+
+  // set up log file
+  std::filesystem::path log_dir;
+  char* home_dir_c_str = std::getenv("HOME");
+  if (home_dir_c_str) {
+    log_dir = std::filesystem::path(home_dir_c_str) / ".ros";
+    if (!std::filesystem::exists(log_dir)) {
+      OR_WARN("%s does not exist", log_dir.c_str());
+      log_dir = std::filesystem::path(".");
+    }
+  } else {
+    OR_WARN("unable to fetch HOME environment variable");
+    log_dir = std::filesystem::path(".");
+  }
+  std::filesystem::path log_file = log_dir / "or-protocol.bag";
+  bag.open(log_file.string(), rosbag::bagmode::Write);
+  if (!bag.isOpen()) {
+    OR_FATAL("failed to open log file: %s", log_file.c_str());
+    run = false;
+  } else {
+    OR_INFO("logging to: %s", log_file.c_str());
+  }
 }
 
 
@@ -35,6 +62,7 @@ ORNode::~ORNode()
 {
   run = false;
   process_thread.join();
+  bag.close();
 }
 
 
@@ -97,7 +125,11 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
   print_msg_info("send", msg.header, msg.data.size(), false);
 
   ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
-  return send(reinterpret_cast<char*>(m.buf.get()), m.num_bytes);
+  if (send(reinterpret_cast<char*>(m.buf.get()), m.num_bytes)) {
+    log_message(msg.header, Log::SEND, m.num_bytes, ros::Time::now());
+    return true;
+  }
+  return false;
 }
 
 
@@ -124,6 +156,19 @@ void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
   packet_queue.push_back(item);
 
   print_msg_info("recv", header, size);
+}
+
+
+void ORNode::log_message(const or_protocol_msgs::Header& header,
+                         const int action,
+                         const int size,
+                         const ros::Time& time)
+{
+  Log msg;
+  msg.header = header;
+  msg.action = action;
+  msg.size = size;
+  bag.write("packet_stream", time, msg);
 }
 
 
@@ -156,11 +201,13 @@ void ORNode::process_packets()
         packet_queue.push_back(item);
       } else if (item->priority < msg_priority(item->header)) {
         send(item->buffer(), item->size);
-        double actual_dt = (ros::Time::now() - item->recv_time).toSec() * 1000;
+        ros::Time now = ros::Time::now();
+        double actual_dt = (now - item->recv_time).toSec() * 1000;
         double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
         char buff[30];
         snprintf(buff, 30, "relay (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
         print_msg_info(buff, item->header, item->size);
+        log_message(item->header, Log::SEND, item->size, now);
       } else {
         char buff[6];
         snprintf(buff, 6, "%d > %d", item->priority, msg_priority(item->header));
@@ -183,13 +230,15 @@ void ORNode::process_packets()
     if (!node_states[item->header.src_id].update_queue(item->header)) {
       print_msg_info("dupe (drop)", item->header, item->size);
       continue;
+    } else {
+      log_message(item->header, Log::RECEIVE, item->size, item->recv_time);
     }
 
     // relay message
     if (item->header.dest_id != node_id) {
 
-      int sender_priority = relay_priority(item->header.curr_id, item->header);
-      int current_priority = relay_priority(node_id, item->header);
+      unsigned int sender_priority = relay_priority(item->header.curr_id, item->header);
+      unsigned int current_priority = relay_priority(node_id, item->header);
 
       if (current_priority == item->header.relays.size()) {
         print_msg_info("not relay (drop)", item->header, item->size);
@@ -206,6 +255,7 @@ void ORNode::process_packets()
         if (current_priority == 0) {
           send(item->buffer(), item->size);
           print_msg_info("relay", item->header, item->size);
+          log_message(item->header, Log::SEND, item->size, ros::Time::now());
         } else {
           const ros::Duration delay(0, UNIT_DELAY * current_priority);
           item->send_time = item->recv_time + delay;
@@ -228,8 +278,9 @@ void ORNode::process_packets()
       item->header.seq = getSeqNum();
       item->header.hops++;
       update_msg_header(item->buffer(), item->header);
-      print_msg_info("reply ping", item->header, item->size);
       send(item->buffer(), item->size);
+      print_msg_info("reply ping", item->header, item->size);
+      log_message(item->header, Log::SEND, item->size, ros::Time::now());
       continue;
     }
 
