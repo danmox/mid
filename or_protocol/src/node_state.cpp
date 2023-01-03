@@ -7,13 +7,12 @@ namespace or_protocol {
 
 bool NodeState::update_queue(const or_protocol_msgs::Header& header)
 {
-  if (msg_hist_map.size() == buff_capacity) {
+  if (msg_hist_map.size() > buff_capacity) {
     uint32_t smallest = msg_hist_deque.back();
     msg_hist_deque.pop_back();
     msg_hist_map.erase(smallest);
   }
 
-  // compute node relay priority
   unsigned int priority = relay_priority(header.curr_id, header);
 
   bool first = false;
@@ -26,6 +25,14 @@ bool NodeState::update_queue(const or_protocol_msgs::Header& header)
   }
 
   return first;
+}
+
+
+void NodeState::ack_msg(const uint32_t seq)
+{
+  if (msg_hist_map.count(seq) == 0)
+    msg_hist_deque.push_front(seq);
+  msg_hist_map[seq] = 0;
 }
 
 

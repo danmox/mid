@@ -76,15 +76,13 @@ int main(int argc, char** argv)
 
     std_msgs::Time now;
     now.data = ros::Time::now();
-    ros::SerializedMessage s = ros::serialization::serializeMessage(now);
-    msg.data.insert(msg.data.end(), s.buf.get(), s.buf.get() + s.num_bytes);
+    or_protocol::pack_msg(msg, now);
 
     // the ping sequence and message sequence may not correspond if there are
     // more that 1 datastream originating from the sending node
     std_msgs::Int32 ping_seq;
     ping_seq.data = sent_msgs;
-    s = ros::serialization::serializeMessage(ping_seq);
-    msg.data.insert(msg.data.end(), s.buf.get(), s.buf.get() + s.num_bytes);
+    or_protocol::pack_msg(msg, ping_seq);
 
     or_node.send(msg);
     sent_msgs++;
