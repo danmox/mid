@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 
@@ -7,6 +8,7 @@
 #include <or_protocol/utils.h>
 #include <or_protocol_msgs/Log.h>
 #include <or_protocol_msgs/Packet.h>
+#include <std_msgs/UInt32.h>
 
 
 namespace or_protocol {
@@ -35,6 +37,7 @@ ORNode::ORNode(std::string _IP, int _port)
   ros::Time::init();
 
   // set up log file
+  // TODO race condition with processing thread?
   std::filesystem::path log_dir;
   char* home_dir_c_str = std::getenv("HOME");
   if (home_dir_c_str) {
@@ -83,6 +86,8 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
       return std::string("PING_REQ");
     case or_protocol_msgs::Header::PING_RES:
       return std::string("PING_RES");
+    case or_protocol_msgs::Header::ACK:
+      return std::string("ACK");
     default:
       return std::string("UNKNOWN");
   }
@@ -151,11 +156,14 @@ void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
   or_protocol_msgs::Header header;
   deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
 
-  std::lock_guard<std::mutex> queue_lock(queue_mutex);
-  PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
-  packet_queue.push_back(item);
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex);
+    PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
+    packet_queue.push_back(item);
+  }
 
   print_msg_info("recv", header, size);
+  log_message(header, Log::RECEIVE, size, now);
 }
 
 
@@ -174,7 +182,7 @@ void ORNode::log_message(const or_protocol_msgs::Header& header,
 
 void ORNode::process_packets()
 {
-  // TODO reduce busy waiting?
+  // TODO reduce time spent busy waiting?
   while (run) {
 
     std::shared_ptr<PacketQueueItem> item;
@@ -187,6 +195,10 @@ void ORNode::process_packets()
     }
     if (!item)
       continue;
+
+    //
+    // re-queue processing
+    //
 
     // in order to approximate desired opportunistic relaying priority, some
     // packets may be processed but held for a short period of time before
@@ -216,6 +228,10 @@ void ORNode::process_packets()
       continue;
     }
 
+    //
+    // new packet processing
+    //
+
     // TODO update statistics: node_states[header.curr_id].update_stats(header);
 
     // filter out messages that originated from the current node (i.e. echoed
@@ -227,15 +243,26 @@ void ORNode::process_packets()
 
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
-    if (!node_states[item->header.src_id].update_queue(item->header)) {
+    bool new_msg = node_states[item->header.src_id].update_queue(item->header);
+    if (!new_msg) {
       print_msg_info("dupe (drop)", item->header, item->size);
       continue;
-    } else {
-      log_message(item->header, Log::RECEIVE, item->size, item->recv_time);
     }
 
     // relay message
     if (item->header.dest_id != node_id) {
+
+      // update ACKed message in node_states so that no more relays are sent
+      if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
+        std_msgs::UInt32 ack_seq;
+        const int header_size = ros::serialization::serializationLength(item->header);
+        // the ACK's payload is the sequence number of the original message
+        deserialize(ack_seq,
+                    reinterpret_cast<uint8_t*>(item->buffer() + header_size + 8),
+                    item->size - header_size - 8);  // should be 8 bytes
+        // the source of the original message is the destination of the ACK
+        node_states[item->header.dest_id].ack_msg(ack_seq.data);
+      }
 
       unsigned int sender_priority = relay_priority(item->header.curr_id, item->header);
       unsigned int current_priority = relay_priority(node_id, item->header);
@@ -250,6 +277,11 @@ void ORNode::process_packets()
         item->header.curr_id = node_id;
         item->header.hops++;
         update_msg_header(item->buffer(), item->header);
+
+        // TODO delay relay if the message is reliable and the destination is
+        // likely to receive the message? (i.e. delay the highest priority relay
+        // from transmitting so that there is enough time for it to receive the
+        // ACK and cancel unnecessarily relaying the message)
 
         // relay message or requeue if it should be delayed
         if (current_priority == 0) {
@@ -282,6 +314,29 @@ void ORNode::process_packets()
       print_msg_info("reply ping", item->header, item->size);
       log_message(item->header, Log::SEND, item->size, ros::Time::now());
       continue;
+    }
+
+    // process received acknowledgements
+    if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
+      // TODO remove from send queue
+      print_msg_info("got ACK", item->header, item->size);
+    }
+
+    // send acknowledgement, if required
+    if (item->header.reliable) {
+      or_protocol_msgs::Packet ack;
+
+      std_msgs::UInt32 ack_seq;
+      ack_seq.data = item->header.seq;
+      pack_msg(ack, ack_seq);
+
+      ack.header.msg_type = or_protocol_msgs::Header::ACK;
+      ack.header.dest_id = item->header.src_id;
+      ack.header.reliable = false;
+      std::reverse_copy(item->header.relays.begin(),
+                        item->header.relays.end(),
+                        ack.header.relays.begin());
+      send(ack);  // calls print_msg_info and log_message internally
     }
 
     if (recv_handle) {
