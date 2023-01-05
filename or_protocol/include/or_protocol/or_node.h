@@ -118,7 +118,12 @@ class ORNode
     // pushed onto this queue for processing by the process thread
     std::deque<std::shared_ptr<PacketQueueItem>> packet_queue;
 
+    // the receive thread (initiated by BCastSocket) and the process thread both
+    // manipulate packet_queue and must be coordinated
     std::mutex queue_mutex;
+
+    // logging happens across multiple threads and must be coordinated
+    std::mutex log_mutex;
 
     // packet processing thread
     std::thread process_thread;
