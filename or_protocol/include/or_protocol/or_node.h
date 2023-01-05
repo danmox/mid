@@ -97,7 +97,7 @@ class ORNode
 
     // a sequence number uniquely identifying messages that originating from
     // this node
-    uint32_t seq = 0;
+    volatile std::atomic<uint32_t> seq = 0;
 
     // minimum unit of delay for enforcing relay priority in nanoseconds
     static const uint32_t UNIT_DELAY = 10000000;
