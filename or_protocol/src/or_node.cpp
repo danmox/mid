@@ -172,11 +172,13 @@ void ORNode::log_message(const or_protocol_msgs::Header& header,
                          const int size,
                          const ros::Time& time)
 {
+  static const std::string topic = "node" + std::to_string(node_id);
   Log msg;
   msg.header = header;
   msg.action = action;
   msg.size = size;
-  bag.write("packet_stream", time, msg);
+  std::lock_guard<std::mutex> lock(log_mutex);
+  bag.write(topic, time, msg);
 }
 
 
@@ -219,7 +221,7 @@ void ORNode::process_packets()
         char buff[30];
         snprintf(buff, 30, "relay (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
         print_msg_info(buff, item->header, item->size);
-        log_message(item->header, Log::SEND, item->size, now);
+        log_message(item->header, Log::RELAY, item->size, now);
       } else {
         char buff[6];
         snprintf(buff, 6, "%d > %d", item->priority, msg_priority(item->header));
@@ -287,14 +289,16 @@ void ORNode::process_packets()
         if (current_priority == 0) {
           send(item->buffer(), item->size);
           print_msg_info("relay", item->header, item->size);
-          log_message(item->header, Log::SEND, item->size, ros::Time::now());
+          log_message(item->header, Log::RELAY, item->size, ros::Time::now());
         } else {
           const ros::Duration delay(0, UNIT_DELAY * current_priority);
           item->send_time = item->recv_time + delay;
           item->priority = current_priority;
           item->processed = true;
-          std::lock_guard<std::mutex> queue_lock(queue_mutex);
-          packet_queue.push_back(item);
+          {
+            std::lock_guard<std::mutex> queue_lock(queue_mutex);
+            packet_queue.push_back(item);
+          }
           print_msg_info("queue", item->header, item->size);
         }
       }
