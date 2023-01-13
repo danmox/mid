@@ -107,17 +107,6 @@ void ORNode::print_msg_info(const std::string& msg,
 }
 
 
-void update_msg_header(char* buff, const or_protocol_msgs::Header& header)
-{
-  // prepends the total size of the message as an uint32_t
-  ros::SerializedMessage sheader = ros::serialization::serializeMessage(header);
-  // NOTE buff contains: msg size (4 bytes), serialized header (M bytes), ...
-  // sheader contains: header size (4 bytes), serialized header (M bytes)
-  // we overwrite the bytes associated with msg.header with the bytes of header
-  memcpy(buff + 4, sheader.buf.get() + 4, sheader.num_bytes - 4);
-}
-
-
 // assuming node specific message header information has not been completed
 bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
 {
@@ -204,18 +193,6 @@ void ORNode::log_message(const or_protocol_msgs::Header& header,
   msg.size = size;
   std::lock_guard<std::mutex> lock(log_mutex);
   bag.write(topic, time, msg);
-}
-
-
-uint32_t ORNode::extract_ack(const PacketQueueItemPtr& ptr)
-{
-  std_msgs::UInt32 ack_seq;
-  const int header_size = ros::serialization::serializationLength(ptr->header);
-  // the ACK's payload is the sequence number of the original message
-  deserialize(ack_seq,
-              reinterpret_cast<uint8_t*>(ptr->buffer() + header_size + 8),
-              ptr->size - header_size - 8);  // should be 8 bytes
-  return ack_seq.data;
 }
 
 
