@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <or_protocol/or_node.h>
-#include <or_protocol_msgs/Header.h>
-#include <or_protocol_msgs/Packet.h>
+#include <or_protocol/types.h>
+#include <or_protocol/utils.h>
 
 #include <std_msgs/Time.h>
 #include <std_msgs/UInt32.h>
@@ -93,16 +92,21 @@ TEST(TestSuite, ack_serialization)
 
   ros::SerializedMessage sint = ros::serialization::serializeMessage(seq_in);
   msg_in.data.insert(msg_in.data.end(), sint.buf.get(), sint.buf.get() + sint.num_bytes);
-  ros::SerializedMessage smsg = ros::serialization::serializeMessage(msg_in);
 
-  char* buff = reinterpret_cast<char*>(smsg.buf.get());
-  size_t size = smsg.num_bytes;
+  // manually serialize to get access to a buffer_ptr
+  uint32_t msg_len = ros::serialization::serializationLength(msg_in) + 4;
+  or_protocol::buffer_ptr buff_ptr(new char[msg_len]);
+  ros::serialization::OStream s(reinterpret_cast<uint8_t*>(buff_ptr.get()), msg_len);
+  ros::serialization::serialize(s, msg_len - 4);
+  ros::serialization::serialize(s, msg_in);
+
+  or_protocol::PacketQueueItemPtr item;
+  item->header = msg_in.header;
+  item->buff_ptr = buff_ptr;
+  item->size = msg_len;
 
   std_msgs::UInt32 seq_out;
-  uint32_t header_size = ros::serialization::serializationLength(msg_in.header);
-  // msg size: 4 bytes msg size + header size + 4 bytes payload size + payload
-  uint8_t* payload_ptr = reinterpret_cast<uint8_t*>(buff + header_size + 8);
-  or_protocol::deserialize(seq_out, payload_ptr, size - header_size - 8);
+  seq_out.data = or_protocol::extract_ack(item);
 
   EXPECT_EQ(seq_in, seq_out);
 }

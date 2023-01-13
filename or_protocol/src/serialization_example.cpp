@@ -1,6 +1,4 @@
-#include <or_protocol/or_node.h>
-#include <or_protocol_msgs/Header.h>
-#include <or_protocol_msgs/Packet.h>
+#include <or_protocol/utils.h>
 
 
 int serialization()

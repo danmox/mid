@@ -8,13 +8,10 @@
 #include <string>
 #include <thread>
 
+#include <or_protocol/types.h>
+
 
 namespace or_protocol {
-
-
-// TODO switch to std::unique_ptr for better performance?
-typedef std::function<void(std::shared_ptr<char[]>&, int)> buff_recv_func;
-typedef std::shared_ptr<char[]> buffer_ptr;
 
 
 class BCastSocket

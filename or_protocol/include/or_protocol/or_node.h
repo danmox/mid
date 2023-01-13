@@ -11,58 +11,10 @@
 
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/node_state.h>
-#include <or_protocol_msgs/Packet.h>
 #include <rosbag/bag.h>
 
 
 namespace or_protocol {
-
-
-void update_msg_header(char*, const or_protocol_msgs::Header&);
-
-
-// TODO return type?
-template <typename M>
-void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
-{
-  // NOTE the total size of the serialized message is often prepended as an
-  // int32_t: http://wiki.ros.org/msg#Fields
-  int offset = size_prefix ? 4 : 0;
-  ros::serialization::IStream s(buff + offset, size - offset);
-  ros::serialization::deserialize(s, msg);
-}
-
-
-struct PacketQueueItem
-{
-    buffer_ptr buff_ptr;
-    size_t size;
-    or_protocol_msgs::Header header;
-    ros::Time recv_time, send_time;
-    bool processed, retransmission;
-    int priority, retries;
-
-    PacketQueueItem(buffer_ptr& _buff_ptr,
-                    size_t _size,
-                    or_protocol_msgs::Header& _header,
-                    ros::Time& now) :
-      buff_ptr(_buff_ptr),
-      size(_size),
-      header(_header),
-      recv_time(now),
-      send_time(0),
-      processed(false),
-      retransmission(false),
-      priority(0),
-      retries(0)
-    {}
-
-    char* buffer() { return buff_ptr.get(); }
-};
-
-
-typedef std::shared_ptr<PacketQueueItem> PacketQueueItemPtr;
-typedef std::function<void(or_protocol_msgs::Packet&, int, int)> msg_recv_func;
 
 
 class ORNode
