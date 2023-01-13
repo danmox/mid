@@ -207,6 +207,18 @@ void ORNode::log_message(const or_protocol_msgs::Header& header,
 }
 
 
+uint32_t ORNode::extract_ack(const PacketQueueItemPtr& ptr)
+{
+  std_msgs::UInt32 ack_seq;
+  const int header_size = ros::serialization::serializationLength(ptr->header);
+  // the ACK's payload is the sequence number of the original message
+  deserialize(ack_seq,
+              reinterpret_cast<uint8_t*>(ptr->buffer() + header_size + 8),
+              ptr->size - header_size - 8);  // should be 8 bytes
+  return ack_seq.data;
+}
+
+
 void ORNode::process_packets()
 {
   // TODO reduce time spent busy waiting?
@@ -313,14 +325,9 @@ void ORNode::process_packets()
 
       // update ACKed message in node_states so that no more relays are sent
       if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
-        std_msgs::UInt32 ack_seq;
-        const int header_size = ros::serialization::serializationLength(item->header);
-        // the ACK's payload is the sequence number of the original message
-        deserialize(ack_seq,
-                    reinterpret_cast<uint8_t*>(item->buffer() + header_size + 8),
-                    item->size - header_size - 8);  // should be 8 bytes
+        uint32_t ack_seq = extract_ack(item);
         // the source of the original message is the destination of the ACK
-        node_states[item->header.dest_id].ack_msg(ack_seq.data);
+        node_states[item->header.dest_id].ack_msg(ack_seq);
       }
 
       unsigned int sender_priority = relay_priority(item->header.curr_id, item->header);
@@ -377,9 +384,10 @@ void ORNode::process_packets()
     // process received acknowledgements
     if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
       {
+        uint32_t ack_seq = extract_ack(item);
         std::lock_guard<std::mutex> lock(retrans_mutex);
-        if (retransmission_set.count(item->header.seq) > 0)
-          retransmission_set.erase(item->header.seq);
+        if (retransmission_set.count(ack_seq) > 0)
+          retransmission_set.erase(ack_seq);
       }
       print_msg_info("got ACK", item->header, item->size);
     }
