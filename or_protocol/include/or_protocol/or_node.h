@@ -7,7 +7,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <unordered_map>
+#include <unordered_set>
 
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/node_state.h>
@@ -39,8 +39,8 @@ struct PacketQueueItem
     size_t size;
     or_protocol_msgs::Header header;
     ros::Time recv_time, send_time;
-    bool processed;
-    int priority;
+    bool processed, retransmission;
+    int priority, retries;
 
     PacketQueueItem(buffer_ptr& _buff_ptr,
                     size_t _size,
@@ -51,7 +51,10 @@ struct PacketQueueItem
       header(_header),
       recv_time(now),
       send_time(0),
-      processed(false)
+      processed(false),
+      retransmission(false),
+      priority(0),
+      retries(0)
     {}
 
     char* buffer() { return buff_ptr.get(); }
@@ -86,6 +89,17 @@ class ORNode
     void register_recv_func(msg_recv_func fcn);
 
   private:
+    // minimum unit of delay for enforcing relay priority in nanoseconds
+    static const uint32_t UNIT_DELAY = 10000000;  // 10ms
+
+    // duration of time in nanoseconds to wait for an ACK before re-transmitting
+    // a reliable packet, taking into account the worst case forwarding path for
+    // the packet and ACK
+    static const uint32_t RETRY_DELAY = 13 * UNIT_DELAY;
+
+    // maximum number of times a reliable packet should be re-transmitted
+    static const int MAX_RETRY_COUNT = 2;
+
     // socket used for broadcasting to peers, implementing the lower level
     // broadcast socket setup / cleanup and usage
     std::shared_ptr<BCastSocket> bcast_socket;
@@ -98,9 +112,6 @@ class ORNode
     // a sequence number uniquely identifying messages that originating from
     // this node
     volatile std::atomic<uint32_t> seq = 0;
-
-    // minimum unit of delay for enforcing relay priority in nanoseconds
-    static const uint32_t UNIT_DELAY = 10000000;
 
     // internal state used to gracefully signal a shutdown to running threads
     volatile std::atomic<bool> run;
@@ -118,12 +129,13 @@ class ORNode
     // pushed onto this queue for processing by the process thread
     std::deque<std::shared_ptr<PacketQueueItem>> packet_queue;
 
-    // the receive thread (initiated by BCastSocket) and the process thread both
-    // manipulate packet_queue and must be coordinated
-    std::mutex queue_mutex;
+    // sequence numbers of unACKed reliable messages
+    // TODO make thread safe
+    std::unordered_set<uint32_t> retransmission_set;
 
-    // logging happens across multiple threads and must be coordinated
-    std::mutex log_mutex;
+    // processing the packet queue, logging, and updating the retransmission set
+    // occur across threads and must be protected
+    std::mutex queue_mutex, log_mutex, retrans_mutex;
 
     // packet processing thread
     std::thread process_thread;
@@ -163,6 +175,12 @@ class ORNode
     {
       return node_states[header.src_id].priority(header.seq);
     };
+
+    inline void push_packet_queue(PacketQueueItemPtr& ptr)
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex);
+      packet_queue.push_back(ptr);
+    }
 };
 
 

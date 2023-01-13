@@ -21,6 +21,8 @@ ORNode::ORNode(std::string _IP, int _port)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
+  OR_INFO("starting ORNode @ %s:%d", _IP.c_str(), _port);
+
   std::string id_str = _IP.substr(_IP.find_last_of('.') + 1);
   node_id = std::stoi(id_str);
 
@@ -31,13 +33,9 @@ ORNode::ORNode(std::string _IP, int _port)
 
   run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
 
-  // start main packet processing thread
-  process_thread = std::thread(&ORNode::process_packets, this);
-
-  ros::Time::init();
+  ros::Time::init(); // enables ros::Time without an attached ROS node, master
 
   // set up log file
-  // TODO race condition with processing thread?
   std::filesystem::path log_dir;
   char* home_dir_c_str = std::getenv("HOME");
   if (home_dir_c_str) {
@@ -58,6 +56,9 @@ ORNode::ORNode(std::string _IP, int _port)
   } else {
     OR_INFO("logging to: %s", log_file.c_str());
   }
+
+  // start main packet processing thread
+  process_thread = std::thread(&ORNode::process_packets, this);
 }
 
 
@@ -127,11 +128,38 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
   msg.header.seq = getSeqNum();
   msg.header.hops++;
 
-  print_msg_info("send", msg.header, msg.data.size(), false);
+  // manually serialize message so that we can keep a copy of buffer_ptr around
+  // for later retransmission of reliable messages (i.e. reimplement
+  // ros::serialization::serializMessage but around buffer_ptr instead of
+  // SerializedMessage)
+  // TODO check if message needs to be chunked
+  uint32_t len = ros::serialization::serializationLength(msg) + 4;
+  buffer_ptr buff_ptr(new char[len]);
+  ros::serialization::OStream s(reinterpret_cast<uint8_t*>(buff_ptr.get()), len);
+  ros::serialization::serialize(s, len - 4);
+  ros::serialization::serialize(s, msg);
 
-  ros::SerializedMessage m = ros::serialization::serializeMessage(msg);
-  if (send(reinterpret_cast<char*>(m.buf.get()), m.num_bytes)) {
-    log_message(msg.header, Log::SEND, m.num_bytes, ros::Time::now());
+  if (send(buff_ptr.get(), len)) {
+    ros::Time now = ros::Time::now();
+    print_msg_info("send", msg.header, len);
+    log_message(msg.header, Log::SEND, len, now);
+
+    // queue message for re-transmission (will get cancelled if an ACK is
+    // received within RETRY_DELAY)
+    if (msg.header.reliable) {
+      {
+        std::lock_guard<std::mutex> lock(retrans_mutex);
+        retransmission_set.emplace(msg.header.seq);
+      }
+
+      PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, len, msg.header, now));
+      item->send_time = now + ros::Duration(0, RETRY_DELAY);
+      item->processed = true;
+      item->retransmission = true;
+      item->retries = MAX_RETRY_COUNT;
+
+      push_packet_queue(item);
+    }
     return true;
   }
   return false;
@@ -156,11 +184,8 @@ void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
   or_protocol_msgs::Header header;
   deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
 
-  {
-    std::lock_guard<std::mutex> queue_lock(queue_mutex);
-    PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
-    packet_queue.push_back(item);
-  }
+  PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
+  push_packet_queue(item);
 
   print_msg_info("recv", header, size);
   log_message(header, Log::RECEIVE, size, now);
@@ -198,6 +223,8 @@ void ORNode::process_packets()
     if (!item)
       continue;
 
+    // TODO check packet queue for overflow?
+
     //
     // re-queue processing
     //
@@ -211,8 +238,38 @@ void ORNode::process_packets()
       // delayed unnecessarily (step through queue and insert packet before
       // others with more recent send_time?)
       if (item->send_time > ros::Time::now()) {
-        std::lock_guard<std::mutex> queue_lock(queue_mutex);
-        packet_queue.push_back(item);
+        push_packet_queue(item);
+      } else if (item->retransmission) {
+        retrans_mutex.lock();
+        if (retransmission_set.count(item->header.seq) > 0) {
+          // retransmitted messages need new sequence numbers in order to avoid
+          // being filtered as duplicates during relaying
+          retransmission_set.erase(item->header.seq);
+          item->header.seq = getSeqNum();
+          retransmission_set.emplace(item->header.seq);
+          retrans_mutex.unlock();
+          update_msg_header(item->buffer(), item->header);
+
+          send(item->buffer(), item->size);
+
+          ros::Time now = ros::Time::now();
+          double actual_dt = (now - item->recv_time).toSec() * 1000;
+          double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
+          char buff[33];
+          snprintf(buff, 33, "retry (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
+          print_msg_info(buff, item->header, item->size);
+          log_message(item->header, Log::RETRY, item->size, now);
+
+          // add message back to queue if retries remain
+          item->retries--;
+          if (item->retries > 0) {
+            item->send_time += ros::Duration(0, RETRY_DELAY);
+            push_packet_queue(item);
+          }
+        } else {
+          retrans_mutex.unlock();
+          print_msg_info("canceled retry", item->header, item->size);
+        }
       } else if (item->priority < msg_priority(item->header)) {
         send(item->buffer(), item->size);
         ros::Time now = ros::Time::now();
@@ -295,10 +352,7 @@ void ORNode::process_packets()
           item->send_time = item->recv_time + delay;
           item->priority = current_priority;
           item->processed = true;
-          {
-            std::lock_guard<std::mutex> queue_lock(queue_mutex);
-            packet_queue.push_back(item);
-          }
+          push_packet_queue(item);
           print_msg_info("queue", item->header, item->size);
         }
       }
@@ -322,7 +376,11 @@ void ORNode::process_packets()
 
     // process received acknowledgements
     if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
-      // TODO remove from send queue
+      {
+        std::lock_guard<std::mutex> lock(retrans_mutex);
+        if (retransmission_set.count(item->header.seq) > 0)
+          retransmission_set.erase(item->header.seq);
+      }
       print_msg_info("got ACK", item->header, item->size);
     }
 
