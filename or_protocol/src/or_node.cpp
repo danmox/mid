@@ -392,7 +392,7 @@ void ORNode::process_packets()
       deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
       // TODO don't block receiving thread
       print_msg_info("deliver", item->header, item->size);
-      recv_handle(msg, node_id, item->size);
+      recv_handle(item->recv_time, msg, node_id, item->size);
     }
   }
 }
