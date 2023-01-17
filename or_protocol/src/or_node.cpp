@@ -367,6 +367,7 @@ void ORNode::process_packets()
           retransmission_set.erase(ack_seq);
       }
       print_msg_info("got ACK", item->header, item->size);
+      continue;
     }
 
     // send acknowledgement, if required
