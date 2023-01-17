@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <or_protocol/or_node.h>
+#include <or_protocol/utils.h>
 #include <or_protocol_msgs/Packet.h>
 #include <ros/ros.h>
 #include <std_msgs/Int32.h>
@@ -14,10 +15,8 @@ volatile bool run = true;
 int recv_msgs = 0;
 
 
-void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
+void ping_recv(ros::Time recv_time, or_protocol_msgs::Packet& msg, int node_id, int bytes)
 {
-  ros::Time recv_stamp = ros::Time::now();
-
   if (msg.header.dest_id != node_id ||
       msg.header.msg_type != or_protocol_msgs::Header::PING_RES)
     return;
@@ -29,7 +28,7 @@ void ping_recv(or_protocol_msgs::Packet& msg, int node_id, int bytes)
   uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
   or_protocol::deserialize(msg_seq, msg.data.data() + offset, msg.data.size() - offset);
 
-  double ms = (recv_stamp - send_stamp_msg.data).toSec() * 1000;
+  double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
   printf("%d bytes from 192.168.0.%d: seq=%d, hops=%d, time=%.2f ms\n",
          bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
 
@@ -67,6 +66,8 @@ int main(int argc, char** argv)
   msg.header.msg_type = or_protocol_msgs::Header::PING_REQ;
   msg.header.dest_id = std::stoi(argv[2]);
   msg.header.relays[0] = 2;
+  msg.header.relays[1] = 3;
+  msg.header.relays[2] = 4;
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
