@@ -181,6 +181,7 @@ void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
 }
 
 
+// TODO move logging to a separate thread?
 void ORNode::log_message(const or_protocol_msgs::Header& header,
                          const int action,
                          const int size,
@@ -321,24 +322,18 @@ void ORNode::process_packets()
         item->header.hops++;
         update_msg_header(item->buffer(), item->header);
 
-        // TODO delay relay if the message is reliable and the destination is
-        // likely to receive the message? (i.e. delay the highest priority relay
-        // from transmitting so that there is enough time for it to receive the
-        // ACK and cancel unnecessarily relaying the message)
-
-        // relay message or requeue if it should be delayed
-        if (current_priority == 0) {
-          send(item->buffer(), item->size);
-          print_msg_info("relay", item->header, item->size);
-          log_message(item->header, Log::RELAY, item->size, ros::Time::now());
-        } else {
-          const ros::Duration delay(0, UNIT_DELAY * current_priority);
-          item->send_time = item->recv_time + delay;
-          item->priority = current_priority;
-          item->processed = true;
-          push_packet_queue(item);
-          print_msg_info("queue", item->header, item->size);
-        }
+        // requeue relay with a delay to allow for the reception of ACKs
+        // TODO if we expect the destination to receive the original
+        // transmission, we should delay the relay to allow for ACKs to be
+        // received to avoid unnecessary relays; however, if it is unlikely the
+        // destination will receive the original transmission then we are adding
+        // unnecessary latency and shouldn't wait to relay
+        const ros::Duration delay(0, UNIT_DELAY * (current_priority + 1));
+        item->send_time = item->recv_time + delay;
+        item->priority = current_priority;
+        item->processed = true;
+        push_packet_queue(item);
+        print_msg_info("queue", item->header, item->size);
       }
       continue;
     }
