@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+
+import argparse
+import numpy as np
+import re
+try:
+    import rosbag
+    import rospy
+    from or_protocol_msgs.msg import Header, Log
+except:
+    print('ROS environment must be sourced!')
+    exit(-1)
+from pathlib import Path
+
+
+str_action_dict = {'RECEIVE': Log.RECEIVE, 'SEND': Log.SEND, 'RELAY': Log.RELAY, 'RETRY': Log.RETRY}
+action_str_dict = {str_action_dict[key]: key for key in str_action_dict}
+str_msg_type_dict = {'STATUS': Header.STATUS, 'PAYLOAD': Header.PAYLOAD, 'PING_REQ': Header.PING_REQ,
+                     'PING_RES': Header.PING_RES, 'ACK': Header.ACK}
+msg_type_str_dict = {str_msg_type_dict[key]: key for key in str_msg_type_dict}
+
+
+def merge(args):
+
+    if len(args.bags) < 2:
+        print(f'must provide 2 or more bagfiles to merge')
+        return
+
+    bag_filenames = [Path(f) for f in args.bags]
+    for name in bag_filenames:
+        if not name.exists():
+            print(f'bagfile {name} does not exist')
+            return
+
+    print(f"merging: {', '.join(args.bags)}")
+    bags = [rosbag.Bag(f, 'r', allow_unindexed=True) for f in bag_filenames]
+
+    messages = []
+    for bag in bags:
+        for topic, msg, t in bag:
+            messages.append((t, topic, msg))
+    messages.sort(key=lambda msg: msg[0])
+
+    outbagfilename = args.output
+    with rosbag.Bag(outbagfilename, 'w') as outbag:
+        for t, topic, msg in messages:
+            outbag.write(topic, msg, t)
+
+    print(f'wrote contents to: {outbagfilename}')
+
+
+def stats(args):
+
+    bag_filename = Path(args.bag)
+    if not bag_filename.exists():
+        print(f'bagfile {bag_filename} does not exist')
+        return
+
+    bag = rosbag.Bag(bag_filename, 'r')
+    nodes = [k for k in list(bag.get_type_and_topic_info()[1].keys()) if k[:4] == 'node']
+    topic_to_index = {t: i for i, t in enumerate(nodes)}
+    index_to_topic = {i: t for i, t in enumerate(nodes)}
+    id_to_index = {int(re.match('^node([0-9]+)$', t).group(1)): i for i, t in enumerate(nodes)}
+    index_to_id = {i: int(re.match('^node([0-9]+)$', t).group(1)) for i, t in enumerate(nodes)}
+    N = len(nodes)
+
+    pairwise_sent_msgs = np.zeros((N, N))
+    pairwise_recv_msgs = np.zeros((N, N))
+    pairwise_recv_bytes = np.zeros((N, N))
+    total_sent_msgs = np.zeros((N,))
+    total_sent_bytes = np.zeros((N,))
+    total_recv_msgs = np.zeros((N,))
+    total_recv_bytes = np.zeros((N,))
+    total_retry_msgs = np.zeros((N,))
+    total_retry_bytes = np.zeros((N,))
+    total_relay_msgs = np.zeros((N,))
+    total_relay_bytes = np.zeros((N,))
+
+    flows = {}
+
+    for topic, msg, t in bag.read_messages(topics=nodes):
+        if msg.action == Log.RECEIVE:
+            if topic_to_index[topic] == id_to_index[msg.header.dest_id]:
+                if msg.header.src_id not in flows:
+                    flows[msg.header.src_id] = {msg.header.dest_id: {'send': [], 'retry': [],
+                                                                     'recv': set(), 'rel': 0, 'ack': 0}}
+                flows[msg.header.src_id][msg.header.dest_id]['recv'].add(msg.header.seq)
+            sender = id_to_index[msg.header.curr_id]
+            receiver = topic_to_index[topic]
+            pairwise_recv_msgs[sender, receiver] += 1
+            pairwise_recv_bytes[sender, receiver] += msg.size
+            total_recv_msgs[receiver] += 1
+            total_recv_bytes[receiver] += msg.size
+        elif msg.action == Log.SEND or msg.action == Log.RETRY:
+            if topic_to_index[topic] == id_to_index[msg.header.src_id]:
+                if msg.header.src_id not in flows:
+                    flows[msg.header.src_id] = {msg.header.dest_id: {'send': [], 'retry': [],
+                                                                     'recv': set(), 'rel': 0, 'ack': 0}}
+                if msg.action == Log.SEND:
+                    flows[msg.header.src_id][msg.header.dest_id]['send'].append(msg.header.seq)
+                if msg.action == Log.RETRY:
+                    flows[msg.header.src_id][msg.header.dest_id]['retry'].append(msg.header.seq)
+                if msg.header.reliable:
+                    flows[msg.header.src_id][msg.header.dest_id]['rel'] += 1
+                if msg.header.msg_type == Header.ACK:
+                    flows[msg.header.src_id][msg.header.dest_id]['ack'] += 1
+            sender = id_to_index[msg.header.curr_id]
+            if msg.action == Log.SEND:
+                total_sent_msgs[sender] += 1
+                total_sent_bytes[sender] += msg.size
+            if msg.action == Log.RETRY:
+                total_retry_msgs[sender] += 1
+                total_retry_bytes[sender] += msg.size
+        elif msg.action == Log.RELAY:
+            sender = id_to_index[msg.header.curr_id]
+            total_relay_msgs[sender] += 1
+            total_relay_bytes[sender] += msg.size
+
+    # printing settings
+    spaces = 2
+
+    # delivery probability
+
+    delivery_prob = np.zeros((N, N))
+    for i in range(N):
+        if total_sent_msgs[i] > 0:
+            delivery_prob[i] = pairwise_recv_msgs[i] / (total_sent_msgs[i] + total_retry_msgs[i])
+
+    cells = [[''] + nodes + ['sent']]
+    for i in range(N):
+        row = delivery_prob[i]
+        nums = [f'{row[j]*100:.1f}' if row[j] > 1e-3 else '-' for j in range(N)]
+        cells.append([nodes[i]] + nums + [f'{int(total_sent_msgs[i] + total_retry_msgs[i])}'])
+    cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
+    cell_size = spaces + max(max(len(c) for c in cells[i]) for i in range(len(cells)))
+
+    print('delivery probability (SEND, RETRY only):')
+    for row in cells:
+        padded_row = [(cell_size - len(cell))*' ' + cell for cell in row]
+        print(''.join(padded_row))
+    print('')
+
+    # received messages
+
+    cells = [[''] + nodes + ['sent']]
+    for i in range(N):
+        row = pairwise_recv_msgs[i]
+        nums = [f'{int(row[j])}' if row[j] > 0 else '-' for j in range(N)]
+        total_transmitted_msgs = int(total_sent_msgs[i] + total_retry_msgs[i] + total_relay_msgs[i])
+        cells.append([nodes[i]] + nums + [f'{total_transmitted_msgs}'])
+    cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
+    cell_size = spaces + max(max(len(c) for c in cells[i]) for i in range(len(cells)))
+
+    print('received messages (all messages):')
+    for row in cells:
+        padded_row = [(cell_size - len(cell))*' ' + cell for cell in row]
+        print(''.join(padded_row))
+    print('')
+
+    # flows
+
+    print('flows:')
+    for src in flows:
+        for dest in flows[src]:
+            sent = len(flows[src][dest]['send'])
+            recv = len(flows[src][dest]['recv'])
+            retry = len(flows[src][dest]['retry'])
+            drop = sent - recv
+            dp = recv / sent * 100.0
+            flow_desc = f'  '
+
+            flow_type = ''
+            if flows[src][dest]['ack'] / sent > 0.8:
+                flow_type = '(ACK)'
+            if flows[src][dest]['rel'] / sent > 0.8:
+                flow_type = '(RELIABLE)'
+            print(f'  {src} -> {dest}: {sent} sent, {retry} retries, {drop} dropped, {dp:.1f}% delivered {flow_type}')
+
+
+def msg_type_str(msg):
+    if hasattr(msg, 'msg_type'):
+        if msg.msg_type in msg_type_str_dict:
+            return msg_type_str_dict[msg.msg_type]
+    if hasattr(msg, 'action'):
+        if msg.action in action_str_dict:
+            return action_str_dict[msg.action]
+    return 'UNKNOWN'
+
+
+def print_main(args):
+
+    bag_filename = Path(args.bag)
+    if not bag_filename.exists():
+        print(f'bagfile {bag_filename} does not exist')
+        return
+
+    action_dict = {'RECEIVE': Log.RECEIVE, 'SEND': Log.SEND, 'RELAY': Log.RELAY, 'RETRY': Log.RETRY}
+    action = None if args.action not in action_dict else action_dict[args.action]
+
+    msg_type_dict = {'STATUS': Header.STATUS, 'PAYLOAD': Header.PAYLOAD, 'PING_REQ': Header.PING_REQ,
+                     'PING_RES': Header.PING_RES, 'ACK': Header.ACK}
+    msg_type = None if args.type not in msg_type_dict else msg_type_dict[args.type]
+
+    bag = rosbag.Bag(bag_filename, 'r')
+    bag_start = bag.get_start_time()
+    time_str_len = len(f'{bag.get_end_time() - bag.get_start_time():.0f}') + 9
+    t0 = bag.get_start_time()
+    print_count = 0
+    for topic, msg, t in bag:
+        if action is not None and msg.action != action:
+            continue
+        if msg_type is not None and msg.header.msg_type != msg_type:
+            continue
+        if args.count is not None and print_count + 1 > args.count:
+            break
+
+        if hasattr(msg, 'action'):
+
+            print_count += 1
+            if args.quiet:
+                continue
+
+            time_str = ''
+            if msg.action == Log.SEND or msg.action == Log.RETRY:
+                time_str = f'{t.to_sec() - bag_start:.6f} s'
+                t0 = t.to_sec()
+            else:
+                time_str = f'+{(t.to_sec() - t0)*1000:.2f} ms'
+            time_str = (time_str_len - len(time_str))*' ' + time_str
+
+            node_id = int(re.match('^node([0-9]+)$', topic).group(1))
+            print(f'[{time_str}] {msg_type_str(msg)} @ {node_id}: {msg_type_str(msg.header)}:'
+                  f' {msg.header.src_id} > {msg.header.dest_id} via {msg.header.curr_id}, '
+                  f'{msg.size} bytes, seq={msg.header.seq}, rel={1 if msg.header.reliable else 0}')
+
+    print(f'{print_count} messages')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='operations on rosbag logs generated by or_protocol')
+    subparsers = parser.add_subparsers(dest='command', required=True)
+
+    # bag merging
+    merge_parser = subparsers.add_parser('merge', help='merge multiple rosbags')
+    merge_parser.add_argument('bags', type=str, nargs='+', help='bagfiles to merge')
+    merge_parser.add_argument('-o', '--output', type=str, default='merged.bag', help='name of output bagfile')
+
+    # parsing
+    stats_parser = subparsers.add_parser('stats', help='compute protocol statistics')
+    stats_parser.add_argument('bag', type=str, help='bagfile to parse')
+
+    # print bag contents
+    print_parser = subparsers.add_parser('print', help='print contents of bag in a human readable fashion')
+    print_parser.add_argument('bag', type=str, help='bagfile to print')
+    print_parser.add_argument('-t', '--type', type=str, help='only print messages of a particular type',
+                              choices=['STATUS', 'PAYLOAD', 'PING_REQ', 'PING_RES', 'ACK'])
+    print_parser.add_argument('-a', '--action', type=str, help='only print messages of a particular action',
+                              choices=['RECEIVE', 'SEND', 'RELAY', 'RETRY'])
+    print_parser.add_argument('-n', '--count', type=int, help='number of messages to print')
+    print_parser.add_argument('-q', '--quiet', action='store_true', help='only print the message count')
+
+    args = parser.parse_args()
+
+    if args.command == 'merge':
+        merge(args)
+    elif args.command == 'stats':
+        stats(args)
+    elif args.command == 'print':
+        print_main(args)
