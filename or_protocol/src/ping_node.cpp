@@ -13,7 +13,7 @@
 
 volatile bool run = true;
 int recv_msgs = 0;
-
+std::vector<double> rtts_ms;
 
 void ping_recv(ros::Time recv_time, or_protocol_msgs::Packet& msg, int node_id, int bytes)
 {
@@ -32,6 +32,7 @@ void ping_recv(ros::Time recv_time, or_protocol_msgs::Packet& msg, int node_id, 
   printf("%d bytes from 192.168.0.%d: seq=%d, hops=%d, time=%.2f ms\n",
          bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
 
+  rtts_ms.push_back(ms);
   recv_msgs++;
 }
 
@@ -85,14 +86,37 @@ int main(int argc, char** argv)
     ping_seq.data = sent_msgs;
     or_protocol::pack_msg(msg, ping_seq);
 
+    // pad the message so that it's the same size as a normal ping (64 bytes)
+    msg.data.insert(msg.data.end(), 22, 1);
+
     or_node.send(msg);
     sent_msgs++;
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
+  printf("\n--- 192.168.0.%d ping statistics ---\n", msg.header.dest_id);
   int total_time = (ros::Time::now() - start).toSec() * 1000;
-  printf("\n%d packets transmitted, %d packets received, %d%% packet loss, %d ms\n",
+  printf("%d packets transmitted, %d packets received, %d%% packet loss, %d ms\n",
          sent_msgs, recv_msgs, (sent_msgs - recv_msgs) * 100 / sent_msgs,
          total_time);
+
+  if (rtts_ms.size() == 0)
+    return 0;
+
+  double min = *std::min_element(rtts_ms.begin(), rtts_ms.end());
+  double max = *std::max_element(rtts_ms.begin(), rtts_ms.end());
+
+  double sum = 0;
+  for (double num : rtts_ms)
+    sum += num;
+  double mean = sum / rtts_ms.size();
+
+  double sq_sum = 0;
+  for (double num : rtts_ms)
+    sq_sum += (num - mean) * (num - mean);
+  double std = sqrt(sq_sum / rtts_ms.size());
+
+  printf("rtt min/avg/max/std = %.3f/%.3f/%.3f/%.3f ms\n", min, mean, max, std);
+
   return 0;
 }
