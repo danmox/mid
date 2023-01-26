@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include <or_protocol/bcast_socket.h>
+#include <or_protocol/constants.h>
 #include <or_protocol/node_state.h>
 #include <rosbag/bag.h>
 
@@ -41,17 +42,6 @@ class ORNode
     void register_recv_func(msg_recv_func fcn);
 
   private:
-    // minimum unit of delay for enforcing relay priority in nanoseconds
-    static const uint32_t UNIT_DELAY = 10000000;  // 10ms
-
-    // duration of time in nanoseconds to wait for an ACK before re-transmitting
-    // a reliable packet, taking into account the worst case forwarding path for
-    // the packet and ACK
-    static const uint32_t RETRY_DELAY = 13 * UNIT_DELAY;
-
-    // maximum number of times a reliable packet should be re-transmitted
-    static const int MAX_RETRY_COUNT = 2;
-
     // socket used for broadcasting to peers, implementing the lower level
     // broadcast socket setup / cleanup and usage
     std::shared_ptr<BCastSocket> bcast_socket;
@@ -82,7 +72,6 @@ class ORNode
     std::deque<std::shared_ptr<PacketQueueItem>> packet_queue;
 
     // sequence numbers of unACKed reliable messages
-    // TODO make thread safe
     std::unordered_set<uint32_t> retransmission_set;
 
     // processing the packet queue, logging, and updating the retransmission set

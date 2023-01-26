@@ -6,10 +6,26 @@
 #include <deque>
 #include <unordered_map>
 
+#include <or_protocol/constants.h>
+
 #include <or_protocol_msgs/Header.h>
 
 
 namespace or_protocol {
+
+
+struct AttemptPriorityPair
+{
+    unsigned int attempt;
+    unsigned int priority;
+};
+
+
+struct SeqAttemptPair
+{
+    uint32_t seq;
+    unsigned int attempt;
+};
 
 
 class NodeState
@@ -38,14 +54,8 @@ class NodeState
     // the oldest message in the queue and as a map for quickly determining if a
     // message has been received before and the highest received priority; these
     // two data structures are kept synchronized
-    std::unordered_map<uint32_t, unsigned int> msg_hist_map;
-    std::deque<uint32_t> msg_hist_deque;
-
-    // maximum number of messages to keep in the queue - at some point messages
-    // reach their intended destinations and aren't being relayed any longer and
-    // don't need to be tracked anymore
-    // TODO also remove messages that have been acknowledged
-    const size_t buff_capacity = 200;
+    std::unordered_map<uint32_t, AttemptPriorityPair> msg_hist_map;
+    std::deque<SeqAttemptPair> msg_hist_deque;
 };
 
 
