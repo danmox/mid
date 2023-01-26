@@ -2,10 +2,11 @@
 #include <filesystem>
 #include <iostream>
 
+#include <or_protocol/constants.h>
 #include <or_protocol/or_node.h>
+#include <or_protocol/utils.h>
 #include <ros/serialization.h>
 
-#include <or_protocol/utils.h>
 #include <or_protocol_msgs/Log.h>
 #include <or_protocol_msgs/Packet.h>
 #include <std_msgs/UInt32.h>
@@ -116,6 +117,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
   msg.header.curr_id = node_id;
   msg.header.seq = getSeqNum();
   msg.header.hops++;
+  msg.header.attempt = 0;
 
   // manually serialize message so that we can keep a copy of buffer_ptr around
   // for later retransmission of reliable messages (i.e. reimplement
@@ -232,14 +234,10 @@ void ORNode::process_packets()
       } else if (item->retransmission) {
         retrans_mutex.lock();
         if (retransmission_set.count(item->header.seq) > 0) {
-          // retransmitted messages need new sequence numbers in order to avoid
-          // being filtered as duplicates during relaying
-          retransmission_set.erase(item->header.seq);
-          item->header.seq = getSeqNum();
-          retransmission_set.emplace(item->header.seq);
           retrans_mutex.unlock();
-          update_msg_header(item->buffer(), item->header);
 
+          item->header.attempt++;
+          update_msg_header(item->buffer(), item->header);
           send(item->buffer(), item->size);
 
           ros::Time now = ros::Time::now();
@@ -355,8 +353,8 @@ void ORNode::process_packets()
 
     // process received acknowledgements
     if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
+      uint32_t ack_seq = extract_ack(item);
       {
-        uint32_t ack_seq = extract_ack(item);
         std::lock_guard<std::mutex> lock(retrans_mutex);
         if (retransmission_set.count(ack_seq) > 0)
           retransmission_set.erase(ack_seq);

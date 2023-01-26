@@ -12,6 +12,7 @@ uint8 src_id   # the source node IPv4 address digits identified by the subnet ma
 uint8 curr_id  # the transmitting node IPv4 address...
 uint8 dest_id  # the destination node IPv4 address...
 uint32 seq     # the unique (to the source node) packet sequence number
+uint8 attempt  # how many attempts the source node has made to transmit the message
 
 # packet trip information
 uint8 hops       # relays traversed to current node
