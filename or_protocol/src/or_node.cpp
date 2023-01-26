@@ -102,9 +102,12 @@ void ORNode::print_msg_info(const std::string& msg,
                             bool total)
 {
   std::string data_type = total ? "bytes" : "data bytes";
-  OR_DEBUG("%s: [%d] %d > %d via %d, %d %s, seq=%d, type=%s", msg.c_str(),
-           node_id, header.src_id, header.dest_id, header.curr_id, size,
-           data_type.c_str(), header.seq, packet_type_string(header).c_str());
+  std::string rel_str = header.reliable ? ", REL" : "";
+  std::string type_str = packet_type_string(header);
+  OR_DEBUG("%s: [%d] %d > %d via %d, %d %s, seq=%d, try=%d, %s%s",
+           msg.c_str(), node_id, header.src_id, header.dest_id, header.curr_id,
+           size, data_type.c_str(), header.seq, header.attempt, type_str.c_str(),
+           rel_str.c_str());
 }
 
 
