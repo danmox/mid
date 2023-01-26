@@ -112,15 +112,12 @@ void ORNode::print_msg_info(const std::string& msg,
 
 
 // assuming node specific message header information has not been completed
-bool ORNode::send(or_protocol_msgs::Packet& msg, bool fill_src)
+bool ORNode::send(or_protocol_msgs::Packet& msg)
 {
-  if (fill_src) {
-    msg.header.src_id = node_id;
-  }
+  msg.header.src_id = node_id;
   msg.header.curr_id = node_id;
   msg.header.seq = getSeqNum();
   msg.header.hops++;
-  msg.header.attempt = 0;
 
   // manually serialize message so that we can keep a copy of buffer_ptr around
   // for later retransmission of reliable messages (i.e. reimplement
