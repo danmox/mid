@@ -30,7 +30,7 @@ class ORNode
     ~ORNode();
 
     // the send interface between higher level application nodes and ORNode
-    bool send(or_protocol_msgs::Packet& msg, bool fill_src = true);
+    bool send(or_protocol_msgs::Packet& msg);
 
     // checks if this node and the underlying socket is ready for use
     bool is_running() const { return run && bcast_socket->is_running(); }
