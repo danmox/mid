@@ -5,6 +5,19 @@ __error_msg_exit() {
 	exit
 }
 
+__user_query() {
+  while true; do
+    echo -n $1" (Y/n) "
+    read res
+
+    if [[ "$res" == "y" ]] || [[ "$res" == "Y" ]] || [ -z "$res" ]; then
+      return 0
+    elif [[ "$res" == "n" ]]; then
+      return 1
+    fi
+  done
+}
+
 # parse inputs
 
 if [[ $# -ne 2 ]]; then
@@ -16,16 +29,9 @@ ip_addr=192.168.0.$2
 
 # double check that everything looks right with user before installing
 
-while true; do
-  echo -n "Configure ad-hoc network for interface '$iface' with IP '$ip_addr' (Y/n)? "
-  read res
-
-  if [[ "$res" == "y" ]] || [[ "$res" == "Y" ]] || [ -z "$res" ]; then
-    break
-  elif [[ "$res" == "n" ]]; then
-    exit
-  fi
-done
+if ! __user_query "Configure ad-hoc network for interface $iface with IP $ip_addr"; then
+  exit
+fi
 
 # correct absolute paths in mid-adhoc@.service
 
@@ -54,9 +60,12 @@ echo "[Match]
 Name=$iface
 
 [Network]
-Address=$ip_addr/24
-Gateway=192.168.0.101
-DNS=8.8.8.8" > 25-mid-adhoc.network
+Address=$ip_addr/24" > 25-mid-adhoc.network
+
+if __user_query "Configure gateway/DNS for mid-adhoc"; then
+  echo "Gateway=192.168.0.101
+DNS=8.8.8.8" >> 25-mid-adhoc.network
+fi
 
 # copy service files to system folder
 
