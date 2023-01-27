@@ -33,7 +33,7 @@ fi
 iface=$1
 ip_addr=192.168.0.$2
 
-ifaces=$(ip a | sed -nE 's/^[0-9]+: ([a-z0-9]+):.*/\1/p' | grep -v "en.*\|lo" | tr '\n' ' ')
+ifaces=$(ip a | sed -nE 's/^[0-9]+: ([a-z0-9]+):.*/\1/p' | grep -vE "^wl.*" | tr '\n' ' ')
 if ! echo $ifaces | grep -qw $iface; then
   echo "'$iface' not in list of wireless interfaces: $ifaces"
   exit
@@ -43,23 +43,20 @@ fi
 
 current_timezone=$(sudo timedatectl show | sed -nE 's/^Timezone=(.*)$/\1/p')
 desired_timezone=America/New_York
-if [[ ! "$current_timezone" == "$desired_timezone" ]]; then
+if [[ "$current_timezone" != "$desired_timezone" ]]; then
   echo "updating timezone to $timez"
   sudo timedatectl set-timezone $timez || __error_msg_ext "failed to update timezone"
 else
   echo "timezone already $desired_timezone"
 fi
 
-if ! __user_query "Configure ad-hoc network for interface '$iface' with IP '$ip_addr'?"; then
-  exit
-fi
-
 # ignore wireless device in network manager
 
 nmignorefile=/etc/NetworkManager/conf.d/99-unmanaged-devices.conf
 if [[ -e $nmignorefile ]]; then
-  if ! grep -q $iface $nmignorefile; then
+  if ! grep -qw $iface $nmignorefile; then
     __error_msg_exit "$nmignorefile already exists but not configured for device '$iface'"
+    exit
   else
     echo "$nmignorefile already configured to ignore device '$iface'"
   fi
@@ -94,8 +91,12 @@ if [[ ! -e /opt/ros/noetic ]]; then
 else
   rcfile=~/.ros/rosconsole.config
   if [[ -e $rcfile ]]; then
-    echo "$rcfile exists, appending or_protocol settings"
-    echo "log4j.logger.ros.or_protocol=DEBUG" >> $rcfile
+    if grep -qE "^log4j\.logger\.ros\.or_protocol" $rcfile; then
+      echo "$rcfile already configured for or_protocol"
+    else
+      echo "$rcfile exists, appending or_protocol settings"
+      echo "log4j.logger.ros.or_protocol=DEBUG" >> $rcfile
+    fi
   else
     echo "creating $rcfile"
     mv rosconsole.config ~/.ros
@@ -108,4 +109,4 @@ if [[ -e ~/mid_ws/devel/setup.bash ]]; then
   source ~/mid_ws/devel/setup.bash
 fi" >> ~/.bashrc
 
-echo "sudo apt install curl fish tmux python3-catkin-tools gdb"
+# echo "sudo apt install curl fish tmux python3-catkin-tools gdb"
