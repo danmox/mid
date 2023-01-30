@@ -76,50 +76,46 @@ def stats(args):
     total_relay_msgs = np.zeros((N,))
     total_relay_bytes = np.zeros((N,))
 
-    flows = {}
-
     for topic, msg, t in bag.read_messages(topics=nodes):
         if msg.action == Log.RECEIVE:
-            if topic_to_index[topic] == id_to_index[msg.header.dest_id]:
-                if msg.header.src_id not in flows:
-                    flows[msg.header.src_id] = {msg.header.dest_id: {'send': [], 'retry': [],
-                                                                     'recv': set(), 'rel': 0, 'ack': 0}}
-                flows[msg.header.src_id][msg.header.dest_id]['recv'].add(msg.header.seq)
             sender = id_to_index[msg.header.curr_id]
             receiver = topic_to_index[topic]
             pairwise_recv_msgs[sender, receiver] += 1
             pairwise_recv_bytes[sender, receiver] += msg.size
             total_recv_msgs[receiver] += 1
             total_recv_bytes[receiver] += msg.size
-        elif msg.action == Log.SEND or msg.action == Log.RETRY:
-            if topic_to_index[topic] == id_to_index[msg.header.src_id]:
-                if msg.header.src_id not in flows:
-                    flows[msg.header.src_id] = {msg.header.dest_id: {'send': [], 'retry': [],
-                                                                     'recv': set(), 'rel': 0, 'ack': 0}}
-                if msg.action == Log.SEND:
-                    flows[msg.header.src_id][msg.header.dest_id]['send'].append(msg.header.seq)
-                if msg.action == Log.RETRY:
-                    flows[msg.header.src_id][msg.header.dest_id]['retry'].append(msg.header.seq)
-                if msg.header.reliable:
-                    flows[msg.header.src_id][msg.header.dest_id]['rel'] += 1
-                if msg.header.msg_type == Header.ACK:
-                    flows[msg.header.src_id][msg.header.dest_id]['ack'] += 1
+        elif msg.action == Log.SEND:
             sender = id_to_index[msg.header.curr_id]
-            if msg.action == Log.SEND:
-                total_sent_msgs[sender] += 1
-                total_sent_bytes[sender] += msg.size
-            if msg.action == Log.RETRY:
-                total_retry_msgs[sender] += 1
-                total_retry_bytes[sender] += msg.size
+            total_sent_msgs[sender] += 1
+            total_sent_bytes[sender] += msg.size
+        elif msg.action == Log.RETRY:
+            sender = id_to_index[msg.header.curr_id]
+            total_retry_msgs[sender] += 1
+            total_retry_bytes[sender] += msg.size
         elif msg.action == Log.RELAY:
             sender = id_to_index[msg.header.curr_id]
             total_relay_msgs[sender] += 1
             total_relay_bytes[sender] += msg.size
 
-    # printing settings
-    spaces = 2
+    def print_table(tab):
+        spaces = 2
+        col_size = [max(len(tab[i][j]) for i in range(len(tab))) for j in range(len(tab[0]))]
+        for row in tab:
+            padded_row = [(col_size[i] + spaces - len(row[i]))*' ' + row[i] for i in range(len(row))]
+            print(''.join(padded_row))
+        print('')
 
-    # delivery probability
+    # transmission statistics
+    cells = [[''] + nodes]
+    cells.append(['sent'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_sent_msgs])
+    cells.append(['retry'] + [f'{int(n)}' if int(n) > 0 else '-' for n in total_retry_msgs])
+    cells.append(['relay'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_relay_msgs])
+    cells.append(['recv'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_recv_msgs])
+
+    print('totals:')
+    print_table(cells)
+
+    # SEND, RETRY delivery probability
 
     delivery_prob = np.zeros((N, N))
     for i in range(N):
@@ -132,13 +128,27 @@ def stats(args):
         nums = [f'{row[j]*100:.1f}' if row[j] > 1e-3 else '-' for j in range(N)]
         cells.append([nodes[i]] + nums + [f'{int(total_sent_msgs[i] + total_retry_msgs[i])}'])
     cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
-    cell_size = spaces + max(max(len(c) for c in cells[i]) for i in range(len(cells)))
 
     print('delivery probability (SEND, RETRY only):')
-    for row in cells:
-        padded_row = [(cell_size - len(cell))*' ' + cell for cell in row]
-        print(''.join(padded_row))
-    print('')
+    print_table(cells)
+
+    # all messages delivery probability
+
+    total_trans_msgs = total_sent_msgs + total_relay_msgs + total_retry_msgs
+    all_prob = np.zeros((N, N))
+    for i in range(N):
+        if total_trans_msgs[i] > 0:
+            all_prob[i] = pairwise_recv_msgs[i] / total_trans_msgs[i]
+
+    cells = [[''] + nodes + ['sent']]
+    for i in range(N):
+        row = all_prob[i]
+        nums = [f'{row[j]*100:.1f}' if row[j] > 1e-3 else '-' for j in range(N)]
+        cells.append([nodes[i]] + nums + [f'{int(total_trans_msgs[i])}'])
+    cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
+
+    print('delivery probability (all messages):')
+    print_table(cells)
 
     # received messages
 
@@ -146,35 +156,43 @@ def stats(args):
     for i in range(N):
         row = pairwise_recv_msgs[i]
         nums = [f'{int(row[j])}' if row[j] > 0 else '-' for j in range(N)]
-        total_transmitted_msgs = int(total_sent_msgs[i] + total_retry_msgs[i] + total_relay_msgs[i])
-        cells.append([nodes[i]] + nums + [f'{total_transmitted_msgs}'])
+        total_trans_msgs = int(total_sent_msgs[i] + total_retry_msgs[i] + total_relay_msgs[i])
+        cells.append([nodes[i]] + nums + [f'{total_trans_msgs}'])
     cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
-    cell_size = spaces + max(max(len(c) for c in cells[i]) for i in range(len(cells)))
 
     print('received messages (all messages):')
-    for row in cells:
-        padded_row = [(cell_size - len(cell))*' ' + cell for cell in row]
-        print(''.join(padded_row))
-    print('')
+    print_table(cells)
 
     # flows
 
-    print('flows:')
+    flows = {}
+    for topic, msg, t in bag.read_messages(topics=nodes):
+        if ((msg.action == Log.SEND or msg.action == Log.RETRY) and msg.header.src_id == msg.header.curr_id) \
+           or (msg.action == Log.RECEIVE and id_to_index[msg.header.dest_id] == topic_to_index[topic]):
+
+            src = msg.header.src_id
+            dest = msg.header.dest_id
+            msg_type = msg.header.msg_type
+
+            if src not in flows:
+                flows[src] = {dest: {msg_type: {Log.SEND: [], Log.RECEIVE: [], Log.RETRY: []}}}
+            elif dest not in flows[src]:
+                flows[src][dest] = {msg_type: {Log.SEND: [], Log.RECEIVE: [], Log.RETRY: []}}
+            elif msg_type not in flows[src][dest]:
+                flows[src][dest][msg_type] = {Log.SEND: [], Log.RECEIVE: [], Log.RETRY: []}
+
+            flows[src][dest][msg_type][msg.action].append(msg.header.seq)
+
     for src in flows:
         for dest in flows[src]:
-            sent = len(flows[src][dest]['send'])
-            recv = len(flows[src][dest]['recv'])
-            retry = len(flows[src][dest]['retry'])
-            drop = sent - recv
-            dp = recv / sent * 100.0
-            flow_desc = f'  '
-
-            flow_type = ''
-            if flows[src][dest]['ack'] / sent > 0.8:
-                flow_type = '(ACK)'
-            if flows[src][dest]['rel'] / sent > 0.8:
-                flow_type = '(RELIABLE)'
-            print(f'  {src} -> {dest}: {sent} sent, {retry} retries, {drop} dropped, {dp:.1f}% delivered {flow_type}')
+            for msg_type in flows[src][dest]:
+                sent_count  = len(set(flows[src][dest][msg_type][Log.SEND]))
+                retry_count = len(set(flows[src][dest][msg_type][Log.RETRY]))
+                recv_count  = len(set(flows[src][dest][msg_type][Log.RECEIVE]))
+                delivery_prob = recv_count / sent_count * 100
+                print(f'flow: {src} > {dest} [{msg_type_str_dict[msg_type]}]: '
+                      f'{sent_count} sent, {recv_count} received, {retry_count} retried'
+                      f', {delivery_prob:.1f}% delivery rate')
 
 
 def msg_type_str(msg):
