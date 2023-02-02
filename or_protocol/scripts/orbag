@@ -20,6 +20,67 @@ str_msg_type_dict = {'STATUS': Header.STATUS, 'PAYLOAD': Header.PAYLOAD, 'PING_R
 msg_type_str_dict = {str_msg_type_dict[key]: key for key in str_msg_type_dict}
 
 
+def synchronize(messages):
+
+    def get_key(msg):
+        if msg.action == Log.RECEIVE:
+            return 'RECV'
+        else:
+            return 'SEND'
+
+    message_dict = {}
+    topics = set()
+    for i, tup in enumerate(messages):
+        topic, msg, t = tup
+        if not hasattr(msg, 'header') or not hasattr(msg, 'action'):
+            continue
+
+        topics.add(topic)
+
+        seq = msg.header.seq
+        attempt = msg.header.attempt
+        curr_id = msg.header.curr_id
+        src_id = msg.header.src_id
+
+        if src_id not in message_dict:
+            message_dict[src_id] = {seq: {attempt: {curr_id: {'SEND': (0, ''), 'RECV': []}}}}
+        elif seq not in message_dict[src_id]:
+            message_dict[src_id][seq] =  {attempt: {curr_id: {'SEND': (0, ''), 'RECV': []}}}
+        elif attempt not in message_dict[src_id][seq]:
+            message_dict[src_id][seq][attempt] =   {curr_id: {'SEND': (0, ''), 'RECV': []}}
+        elif curr_id not in message_dict[src_id][seq][attempt]:
+            message_dict[src_id][seq][attempt][curr_id] =    {'SEND': (0, ''), 'RECV': []}
+
+        if msg.action == Log.RECEIVE:
+            message_dict[src_id][seq][attempt][curr_id]['RECV'].append((t.to_sec(), topic, i))
+        else:
+            message_dict[src_id][seq][attempt][curr_id]['SEND'] = (t.to_sec(), topic, i)
+
+    clock_offsets = {topic: 0.0 for topic in topics}
+    clock_diffs = {t: {h: [] for h in topics} for t in topics}
+    for src_id in message_dict:
+        for seq in message_dict[src_id]:
+            for attempt in message_dict[src_id][seq]:
+                for curr_id in message_dict[src_id][seq][attempt]:
+                    send_t, send_topic, send_idx = message_dict[src_id][seq][attempt][curr_id]['SEND']
+                    for recv_t, recv_topic, recv_idx in message_dict[src_id][seq][attempt][curr_id]['RECV']:
+                        clock_diffs[send_topic][recv_topic].append(recv_t - send_t)
+                        skewed_diff =  (recv_t + clock_offsets[recv_topic]) - (send_t + clock_offsets[send_topic])
+                        if skewed_diff < 0.0:
+                            clock_offsets[recv_topic] -= skewed_diff - 1e-9  # nudge it off of equivalence
+
+    clock_diff_stats = {t: {h: [] for h in topics} for t in topics}
+    for send_node in clock_diffs:
+        for recv_node in clock_diffs[send_node]:
+            clock_diff_stats[send_node][recv_node] = (0.0, 0.0)
+            if len(clock_diffs[send_node][recv_node]) > 0:
+                mean = np.mean(np.asarray(clock_diffs[send_node][recv_node]))
+                std = np.std(np.asarray(clock_diffs[send_node][recv_node]))
+                clock_diff_stats[send_node][recv_node] = (mean, std)
+
+    return clock_diffs, clock_diff_stats
+
+
 def merge(args):
 
     if len(args.bags) < 2:
