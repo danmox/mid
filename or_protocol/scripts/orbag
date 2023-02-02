@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import matplotlib.pyplot as plt
 import numpy as np
 import re
 try:
@@ -96,15 +97,20 @@ def merge(args):
     print(f"merging: {', '.join(args.bags)}")
     bags = [rosbag.Bag(f, 'r', allow_unindexed=True) for f in bag_filenames]
 
+    # TODO the clocks on each node are slightly different, which can result in
+    # messages being out of order according to reality (i.e. receiver gets
+    # message before transmitter sends); one could correct for this issue by
+    # computing clock offsets given fixed events like original node
+    # transmissions
     messages = []
     for bag in bags:
         for topic, msg, t in bag:
-            messages.append((t, topic, msg))
-    messages.sort(key=lambda msg: msg[0])
+            messages.append((topic, msg, t))
+    messages.sort(key=lambda msg: msg[2])
 
     outbagfilename = args.output
     with rosbag.Bag(outbagfilename, 'w') as outbag:
-        for t, topic, msg in messages:
+        for topic, msg, t in messages:
             outbag.write(topic, msg, t)
 
     print(f'wrote contents to: {outbagfilename}')
@@ -137,7 +143,14 @@ def stats(args):
     total_relay_msgs = np.zeros((N,))
     total_relay_bytes = np.zeros((N,))
 
+    message_list = []
+    source_nodes = set(id_to_index.keys()) if args.node is None else set((args.node,))
     for topic, msg, t in bag.read_messages(topics=nodes):
+        if msg.header.src_id in source_nodes:
+            message_list.append((topic, msg, t))
+    message_list.sort(key=lambda msg: msg[2])
+
+    for topic, msg, t in message_list:
         if msg.action == Log.RECEIVE:
             sender = id_to_index[msg.header.curr_id]
             receiver = topic_to_index[topic]
@@ -167,16 +180,17 @@ def stats(args):
         print('')
 
     # transmission statistics
+
     cells = [[''] + nodes]
-    cells.append(['sent'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_sent_msgs])
+    cells.append(['sent']  + [f'{int(n)}' if int(n) > 0 else '-' for n in total_sent_msgs])
     cells.append(['retry'] + [f'{int(n)}' if int(n) > 0 else '-' for n in total_retry_msgs])
-    cells.append(['relay'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_relay_msgs])
-    cells.append(['recv'] + [f'{int(n)}' if int(n) > 0 else '-'  for n in total_recv_msgs])
+    cells.append(['relay'] + [f'{int(n)}' if int(n) > 0 else '-' for n in total_relay_msgs])
+    cells.append(['recv']  + [f'{int(n)}' if int(n) > 0 else '-' for n in total_recv_msgs])
 
     print('totals:')
     print_table(cells)
 
-    # SEND, RETRY delivery probability
+    # SEND, RETRY delivery percentage
 
     delivery_prob = np.zeros((N, N))
     for i in range(N):
@@ -190,10 +204,10 @@ def stats(args):
         cells.append([nodes[i]] + nums + [f'{int(total_sent_msgs[i] + total_retry_msgs[i])}'])
     cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
 
-    print('delivery probability (SEND, RETRY only):')
+    print('delivery percentage (SEND, RETRY only):')
     print_table(cells)
 
-    # all messages delivery probability
+    # all messages delivery percentage
 
     total_trans_msgs = total_sent_msgs + total_relay_msgs + total_retry_msgs
     all_prob = np.zeros((N, N))
@@ -208,7 +222,7 @@ def stats(args):
         cells.append([nodes[i]] + nums + [f'{int(total_trans_msgs[i])}'])
     cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
 
-    print('delivery probability (all messages):')
+    print('delivery percentage (all messages):')
     print_table(cells)
 
     # received messages
@@ -224,10 +238,10 @@ def stats(args):
     print('received messages (all messages):')
     print_table(cells)
 
-    # flows
+    # flow statistics
 
     flows = {}
-    for topic, msg, t in bag.read_messages(topics=nodes):
+    for topic, msg, t in message_list:
         if ((msg.action == Log.SEND or msg.action == Log.RETRY) and msg.header.src_id == msg.header.curr_id) \
            or (msg.action == Log.RECEIVE and id_to_index[msg.header.dest_id] == topic_to_index[topic]):
 
@@ -242,18 +256,83 @@ def stats(args):
             elif msg_type not in flows[src][dest]:
                 flows[src][dest][msg_type] = {Log.SEND: [], Log.RECEIVE: [], Log.RETRY: []}
 
-            flows[src][dest][msg_type][msg.action].append(msg.header.seq)
+            flows[src][dest][msg_type][msg.action].append((msg.header.seq, t.to_sec(), msg.header.hops, msg.header.attempt))
 
+    diffs, diff_stats = synchronize(message_list)
+
+    def create_msg_dict(tuple_list):
+        d = {}
+        for seq, t, hops, attempt in tuple_list:
+            if seq not in d:
+                d[seq] = {attempt: {'ts': t, 'hops': hops}}
+            elif attempt not in d[seq]:
+                d[seq][attempt] = {'ts': t, 'hops': hops}
+            elif d[seq][attempt]['ts'] > t and d[seq][attempt]['hops'] >= hops:
+                import pdb;pdb.set_trace()
+                d[seq][attempt] = {'ts': t, 'hops': hops}
+        return d
+
+    histograms = []
     for src in flows:
         for dest in flows[src]:
             for msg_type in flows[src][dest]:
-                sent_count  = len(set(flows[src][dest][msg_type][Log.SEND]))
-                retry_count = len(set(flows[src][dest][msg_type][Log.RETRY]))
-                recv_count  = len(set(flows[src][dest][msg_type][Log.RECEIVE]))
+
+                # compute hops and estimate delay
+                send_dict  = create_msg_dict(flows[src][dest][msg_type][Log.SEND])
+                retry_dict = create_msg_dict(flows[src][dest][msg_type][Log.RETRY])
+                recv_dict  = create_msg_dict(flows[src][dest][msg_type][Log.RECEIVE])
+                hops = []
+                delay = []
+                for seq in recv_dict:
+                    for attempt in recv_dict[seq]:
+                        if seq in send_dict and attempt in send_dict[seq]:
+                            compare_item = send_dict[seq][attempt]
+                        elif seq in retry_dict and attempt in retry_dict[seq]:
+                            compare_item = retry_dict[seq][attempt]
+
+                        hops.append(recv_dict[seq][attempt]['hops'] - compare_item['hops'] + 1)
+                        delay.append(recv_dict[seq][attempt]['ts'] - compare_item['ts'])
+
+                sent_count  = len(flows[src][dest][msg_type][Log.SEND])
+                retry_count = len(flows[src][dest][msg_type][Log.RETRY])
+                recv_count  = len(set([item[0] for item in flows[src][dest][msg_type][Log.RECEIVE]]))
                 delivery_prob = recv_count / sent_count * 100
+                avg_hops, std_hops, min_hops, max_hops = np.mean(hops), np.std(hops), min(hops), max(hops)
+                est_delays = np.asarray(delay) - diff_stats['node'+str(src)]['node'+str(dest)][0]
+
+                # adjust delay so that minimum is 1ms
+                est_delays_ms = (est_delays - est_delays.min() + 1e-3) * 1e3
+                avg_delay, std_delay = np.mean(est_delays_ms), np.std(est_delays_ms)
+                min_delay, max_delay = est_delays_ms.min(), est_delays_ms.max()
+
+                histograms.append((src, dest, est_delays_ms, hops))
+
                 print(f'flow: {src} > {dest} [{msg_type_str_dict[msg_type]}]: '
-                      f'{sent_count} sent, {recv_count} received, {retry_count} retried'
-                      f', {delivery_prob:.1f}% delivery rate')
+                      f'{sent_count} sent, {recv_count} received, {retry_count} retried, '
+                      f'{delivery_prob:.1f}% delivery rate')
+                print(f'    hops  min/avg/max/std = {int(min_hops)}/{avg_hops:.2f}/{int(max_hops)}/{std_hops:.2f}')
+                print(f'    delay min/avg/max/std = {min_delay:.2f}/{avg_delay:.2f}/{max_delay:.2f}/{std_delay:.2f} ms')
+
+    if len(histograms) > 0:
+        figs = []
+        axs = []
+        for i, data in enumerate(histograms):
+            fig, ax = plt.subplots(1, 1, tight_layout=True)
+            ax.hist(data[2], bins=20)
+            ax.set_xlabel('delay (ms)')
+            ax.set_ylabel('count')
+            ax.set_title(f'node{data[0]} -> node{data[1]}')
+            figs.append(fig)
+            axs.append(ax)
+            fig, ax = plt.subplots(1, 1, tight_layout=True)
+            hop_values = np.arange(min(data[3]), max(data[3])+1)
+            hop_counts = [np.count_nonzero(np.asarray(data[3]) == i) for i in hop_values]
+            ax.bar(hop_values, hop_counts)
+            ax.set_xlabel('hops')
+            ax.set_ylabel('count')
+            ax.set_title(f'node{data[0]} -> node{data[1]}')
+            ax.set_xticks(hop_values)
+        plt.show()
 
 
 def msg_type_str(msg):
@@ -332,8 +411,8 @@ def print_main(args):
             node_id = int(re.match('^node([0-9]+)$', topic).group(1))
             print(f'[{time_str}] {msg_type_str(msg)}[{node_id}]: {msg_type_str(msg.header)}:'
                   f' {msg.header.src_id} > {msg.header.dest_id} via {msg.header.curr_id}, '
-                  f'{msg.size} bytes, seq={msg.header.seq}, try={msg.header.attempt}, '
-                  f' rel={1 if msg.header.reliable else 0}')
+                  f'{msg.size} bytes, seq={msg.header.seq}, try={msg.header.attempt},'
+                  f' hops={msg.header.hops}, rel={msg.header.reliable}')
 
     print(f'{print_count} messages')
 
@@ -350,6 +429,7 @@ if __name__ == '__main__':
     # parsing
     stats_parser = subparsers.add_parser('stats', help='compute protocol statistics')
     stats_parser.add_argument('bag', type=str, help='bagfile to parse')
+    stats_parser.add_argument('-n', '--node', type=int, help='print statistics for messages originating at the given node')
 
     # print bag contents
     print_parser = subparsers.add_parser('print', help='print contents of bag in a human readable fashion')
@@ -358,10 +438,10 @@ if __name__ == '__main__':
                               choices=['STATUS', 'PAYLOAD', 'PING_REQ', 'PING_RES', 'ACK'])
     print_parser.add_argument('-a', '--action', type=str, help='only print messages of a particular action',
                               choices=['RECEIVE', 'SEND', 'RELAY', 'RETRY'])
-    print_parser.add_argument('-n', '--count', type=int, help='number of messages to print')
+    print_parser.add_argument('-c', '--count', type=int, help='number of messages to print')
     print_parser.add_argument('-q', '--quiet', action='store_true', help='only print the message count')
     print_parser.add_argument('-s', '--seq', type=int, help='print messages related to a given seq number')
-    print_parser.add_argument('-i', '--node', type=int, help='print messages processed at the given ID')
+    print_parser.add_argument('-n', '--node', type=int, help='print messages processed at the given ID')
     print_parser.add_argument('--start', type=float, help='print messages after given start time (s)')
     print_parser.add_argument('--end', type=float, help='print messages until given end time (s)')
 
