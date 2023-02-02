@@ -49,13 +49,16 @@ int main(int argc, char** argv)
   // build message
   or_protocol_msgs::Packet msg;
   msg.header.msg_type = or_protocol_msgs::Header::PAYLOAD;
-  msg.header.dest_id = 6;
-  msg.header.relays = {5, 4, 3, 2};
+  msg.header.dest_id = 46;
+  msg.header.relays = {45, 44, 42, 41};
   msg.header.reliable = true;
 
   std_msgs::UInt32 ping_seq;
   ping_seq.data = 0;
-  while (run && or_node.is_running() && ping_seq.data < 100) {
+  size_t total_msgs = 200;
+  ROS_INFO("[main] sending %ld messages", total_msgs);
+  while (run && or_node.is_running() && ping_seq.data < total_msgs) {
+    msg.header.hops = 0;
     msg.data.clear();
     or_protocol::pack_msg(msg, ping_seq);
     msg.data.insert(msg.data.end(), 92, 1);  // pad the array to 100 elements
