@@ -13,8 +13,8 @@ __error_msg_exit() {
 
 __user_query() {
   while true; do
-    echo -n $1" (Y/n) "
-    read res
+    echo -n "$1 (Y/n) "
+    read -r res
 
     if [[ "$res" == "y" ]] || [[ "$res" == "Y" ]] || [ -z "$res" ]; then
       return 0
@@ -31,10 +31,9 @@ if [[ $# -ne 2 ]]; then
   exit 1
 fi
 iface=$1
-ip_addr=192.168.0.$2
 
 ifaces=$(ip a | sed -nE 's/^[0-9]+: ([a-z0-9]+):.*/\1/p' | grep -vE "^wl.*" | tr '\n' ' ')
-if ! echo $ifaces | grep -qw $iface; then
+if ! echo "$ifaces" | grep -qw "$iface"; then
   echo "'$iface' not in list of wireless interfaces: $ifaces"
   exit
 fi
@@ -44,8 +43,8 @@ fi
 current_timezone=$(sudo timedatectl show | sed -nE 's/^Timezone=(.*)$/\1/p')
 desired_timezone=America/New_York
 if [[ "$current_timezone" != "$desired_timezone" ]]; then
-  echo "updating timezone to $timez"
-  sudo timedatectl set-timezone $timez || __error_msg_ext "failed to update timezone"
+  echo "updating timezone to $desired_timezone"
+  sudo timedatectl set-timezone $desired_timezone || __error_msg_ext "failed to update timezone"
 else
   echo "timezone already $desired_timezone"
 fi
@@ -54,7 +53,7 @@ fi
 
 nmignorefile=/etc/NetworkManager/conf.d/99-unmanaged-devices.conf
 if [[ -e $nmignorefile ]]; then
-  if ! grep -qw $iface $nmignorefile; then
+  if ! grep -qw "$iface" $nmignorefile; then
     __error_msg_exit "$nmignorefile already exists but not configured for device '$iface'"
     exit
   else
@@ -77,7 +76,7 @@ fi
 
 # create connection to mid-adhoc network
 
-./install.sh $iface $2 || __error_msg_exit "./install.sh script failed"
+./install.sh "$iface" "$2" || __error_msg_exit "./install.sh script failed"
 
 # ROS setup
 

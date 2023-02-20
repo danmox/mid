@@ -9,8 +9,8 @@ __error_msg_exit() {
 
 __user_query() {
   while true; do
-    echo -n $1" (Y/n) "
-    read res
+    echo -n "$1 (Y/n) "
+    read -r res
 
     if [[ "$res" == "y" ]] || [[ "$res" == "Y" ]] || [ -z "$res" ]; then
       return 0
@@ -30,11 +30,11 @@ iface=$1
 name=$2
 
 ifaces=$(ip a | sed -nE 's/^[0-9]+: ([a-z0-9]+):.*/\1/p' | tr '\n' ' ')
-if ! echo $ifaces | grep -qw $iface; then
+if ! echo "$ifaces" | grep -qw "$iface"; then
   echo "'$iface' not in list of wireless interfaces: $ifaces"
   exit
 fi
-if echo $ifaces | grep -qw $name; then
+if echo "$ifaces" | grep -qw "$name"; then
   echo "'$name' already exists!"
   exit
 fi
@@ -43,7 +43,7 @@ if ! __user_query "rename $iface to $name?"; then
   exit
 fi
 
-mac=$(iw dev $iface info | sed -nE 's/^.*addr ([a-z0-9:]+)$/\1/p')
+mac=$(iw dev "$iface" info | sed -nE 's/^.*addr ([a-z0-9:]+)$/\1/p')
 if [[ -z "$mac" ]]; then
   echo "failed to fetch MAC address for $iface"
   exit
