@@ -290,8 +290,8 @@ void ORNode::process_packets()
 
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
-    bool new_msg = node_states[item->header.src_id].update_queue(item->header);
-    if (!new_msg) {
+    MsgStatus msg_status = node_states[item->header.src_id].update_queue(item->header);
+    if (!msg_status.is_new_msg) {
       print_msg_info("dupe (drop)", item->header, item->size);
       continue;
     }
@@ -380,7 +380,7 @@ void ORNode::process_packets()
       send(ack);  // calls print_msg_info and log_message internally
     }
 
-    if (recv_handle) {
+    if (recv_handle && msg_status.is_new_seq) {
       // deserialize entire message
       or_protocol_msgs::Packet msg;
       deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
