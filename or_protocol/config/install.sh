@@ -35,10 +35,11 @@ fi
 
 # correct absolute paths in mid-adhoc@.service
 
-rm_name=$(which rm 2>/dev/null) || __error_msg_exit "'rm' not found"
-rfkill_name=$(which rfkill 2>/dev/null) || __error_msg_exit "'rfkill' not found"
-ip_name=$(which ip 2>/dev/null) || __error_msg_exit "'ip' not found"
-wpa_name=$(which wpa_supplicant 2>/dev/null) || __error_msg_exit "'wpa_supplicant' not found"
+rm_path=$(which rm 2>/dev/null) || __error_msg_exit "'rm' not found"
+rfkill_path=$(which rfkill 2>/dev/null) || __error_msg_exit "'rfkill' not found"
+ip_path=$(which ip 2>/dev/null) || __error_msg_exit "'ip' not found"
+wpa_path=$(which wpa_supplicant 2>/dev/null) || __error_msg_exit "'wpa_supplicant' not found"
+iw_path=$(which iw 2>/dev/null) || __error_msg_exit "'iw' not found"
 
 if [[ -e mid-adhoc@.service ]]; then
   cp mid-adhoc@.service tmp@.service
@@ -47,11 +48,11 @@ else
   exit
 fi
 
-
-sed -i "s|rm_path|$rm_name|" tmp@.service
-sed -i "s|rfkill_path|$rfkill_name|" tmp@.service
-sed -i "s|ip_path|$ip_name|" tmp@.service
-sed -i "s|wpa_supplicant_path|$wpa_name|" tmp@.service
+sed -i "s|rm_path|$rm_path|" tmp@.service
+sed -i "s|rfkill_path|$rfkill_path|" tmp@.service
+sed -i "s|ip_path|$ip_path|" tmp@.service
+sed -i "s|wpa_supplicant_path|$wpa_path|" tmp@.service
+sed -i "s|iw_path|$iw_path|" tmp@.service
 
 # generate config file
 
