@@ -5,6 +5,8 @@
 # a script used to update the or_protocol running on one of the nodes in the
 # mesh network testbed remotely
 
+argparse 'd/debug' 't/test' -- $argv
+
 if test -z "$OR_PROTOCOL_DIR"
     echo "OR_PROTOCOL_DIR not set, exiting."
     exit
@@ -23,6 +25,15 @@ if not test -d .catkin_tools
     end
 end
 
+if not set -q _flag_debug
+    catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release
+else
+    catkin config --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+end
+
 catkin clean -y
 catkin build or_protocol
-# catkin run_tests
+
+if set -q _flag_test
+   catkin run_tests
+end
