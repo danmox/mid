@@ -7,8 +7,8 @@ __error_msg_exit() {
 
 __user_query() {
   while true; do
-    echo -n $1" (Y/n) "
-    read res
+    echo -n "$1 (Y/n) "
+    read -r res
 
     if [[ "$res" == "y" ]] || [[ "$res" == "Y" ]] || [ -z "$res" ]; then
       return 0
