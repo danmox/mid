@@ -28,6 +28,13 @@ struct SeqAttemptPair
 };
 
 
+struct MsgStatus
+{
+    bool is_new_msg;
+    bool is_new_seq;
+};
+
+
 class NodeState
 {
   public:
@@ -35,7 +42,7 @@ class NodeState
     // 1) already been received and doesn't need to be processed again or 2) has
     // already been relayed by a higher priority node; returns if the message is
     // new
-    bool update_queue(const or_protocol_msgs::Header& header);
+    MsgStatus update_queue(const or_protocol_msgs::Header& header);
 
     // updated the received message queue when an ACK has been received (i.e.
     // zero out the priority simulating the reception of a relay a higher

@@ -5,7 +5,7 @@
 namespace or_protocol {
 
 
-bool NodeState::update_queue(const or_protocol_msgs::Header& header)
+MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header)
 {
   if (msg_hist_map.size() > MSG_BUFFER_CAPACITY) {
     SeqAttemptPair& oldest = msg_hist_deque.back();
@@ -18,17 +18,26 @@ bool NodeState::update_queue(const or_protocol_msgs::Header& header)
 
   unsigned int priority = relay_priority(header.curr_id, header);
 
-  bool first = false;
-  if (msg_hist_map.count(header.seq) == 0 ||
-      header.attempt > msg_hist_map[header.seq].attempt) {
-    first = true;
+  // NOTE ACK transmissions may fail, resulting in the source node transmitting
+  // another attempt when the original message and information was actually
+  // received. To avoid passing redundant information to the application we
+  // distinguish between new messages that should be routed/ACKed accordingly
+  // and new information that should also be passed to the application.
+  MsgStatus status{false, false};
+  if (msg_hist_map.count(header.seq) == 0) {
+    status.is_new_msg = true;
+    status.is_new_seq = true;
+    msg_hist_deque.push_front(SeqAttemptPair{header.seq, header.attempt});
+    msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
+  } else if (msg_hist_map[header.seq].attempt < header.attempt) {
+    status.is_new_msg = true;
     msg_hist_deque.push_front(SeqAttemptPair{header.seq, header.attempt});
     msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
   } else if (msg_hist_map[header.seq].priority > priority) {
     msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
   }
 
-  return first;
+  return status;
 }
 
 
