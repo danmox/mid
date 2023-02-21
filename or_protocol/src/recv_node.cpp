@@ -54,7 +54,7 @@ int main(int argc, char** argv)
     ROS_INFO("[main] logging received messages to %s", log_file.c_str());
   }
 
-  or_protocol::ORNode or_node(argv[1], 4568);
+  or_protocol::ORNode or_node(argv[1]);
   or_node.register_recv_func(msg_cb);
   while (run && or_node.is_running()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));

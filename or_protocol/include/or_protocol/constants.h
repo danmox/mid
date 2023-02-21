@@ -5,6 +5,9 @@
 namespace or_protocol {
 
 
+// port used by the OR protocol
+const int OR_PROTOCOL_PORT = 4568;
+
 // minimum unit of delay for enforcing relay priority in nanoseconds
 #define UNIT_DELAY 10000000
 

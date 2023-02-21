@@ -18,11 +18,11 @@ namespace or_protocol {
 using or_protocol_msgs::Log;
 
 
-ORNode::ORNode(std::string _IP, int _port)
+ORNode::ORNode(std::string _IP)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
-  OR_INFO("starting ORNode @ %s:%d", _IP.c_str(), _port);
+  OR_INFO("starting ORNode @ %s:%d", _IP.c_str(), OR_PROTOCOL_PORT);
 
   std::string id_str = _IP.substr(_IP.find_last_of('.') + 1);
   node_id = std::stoi(id_str);
@@ -30,7 +30,7 @@ ORNode::ORNode(std::string _IP, int _port)
   // initialize BCastSocket and register recv function handle
   namespace ph = std::placeholders;
   buff_recv_func fcn = std::bind(&ORNode::recv, this, ph::_1, ph::_2);
-  bcast_socket.reset(new BCastSocket(_IP, _port, fcn));
+  bcast_socket.reset(new BCastSocket(_IP, OR_PROTOCOL_PORT, fcn));
 
   run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
 

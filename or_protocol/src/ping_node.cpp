@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 
   ros::Time::init();
 
-  or_protocol::ORNode or_node(argv[1], 4568);
+  or_protocol::ORNode or_node(argv[1]);
   or_node.register_recv_func(ping_recv);
 
   // build message

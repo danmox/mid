@@ -21,10 +21,8 @@ namespace or_protocol {
 class ORNode
 {
   public:
-    // initializes ORNode with an IPv4 address (must be unique to the current
-    // node) and a port to transmit to (must be shared by all nodes in the
-    // network)
-    ORNode(std::string _IP, int _port);
+    // initializes ORNode with a unique IPv4 address
+    ORNode(std::string _IP);
 
     // destructor required for thread cleanup logic
     ~ORNode();

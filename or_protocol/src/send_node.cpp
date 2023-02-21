@@ -44,7 +44,7 @@ int main(int argc, char** argv)
     ROS_INFO("[main] logging received messages to %s", log_file.c_str());
   }
 
-  or_protocol::ORNode or_node(argv[1], 4568);
+  or_protocol::ORNode or_node(argv[1]);
 
   // build message
   or_protocol_msgs::Packet msg;
