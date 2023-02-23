@@ -1,4 +1,4 @@
-#include <or_protocol/node_state.h>
+#include <or_protocol/network_state.h>
 #include <or_protocol/utils.h>
 
 
@@ -57,6 +57,25 @@ void NodeState::ack_msg(const uint32_t seq)
 int NodeState::priority(const int seq)
 {
   return msg_hist_map[seq].priority;
+}
+
+
+MsgStatus NetworkState::update_queue(const int node_id,
+                                     const or_protocol_msgs::Header &header)
+{
+  return node_states[node_id].update_queue(header);
+}
+
+
+void NetworkState::ack_msg(const int node_id, const uint32_t seq)
+{
+  node_states[node_id].ack_msg(seq);
+}
+
+
+int NetworkState::priority(const int node_id, const int seq)
+{
+  return node_states[node_id].priority(seq);
 }
 
 

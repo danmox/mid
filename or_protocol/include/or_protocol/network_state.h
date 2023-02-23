@@ -66,6 +66,26 @@ class NodeState
 };
 
 
+class NetworkState
+{
+  public:
+    // update the received message queue for the given node
+    MsgStatus update_queue(const int node_id, const or_protocol_msgs::Header& header);
+
+    // updated the received message queue when an ACK has been received
+    void ack_msg(const int dest_id, const uint32_t seq);
+
+    // return message priority
+    int priority(const int node_id, const int seq);
+
+    void update_stats(const int node_id, const or_protocol_msgs::Header& header);
+
+  private:
+    // the state of each node in the network
+    std::unordered_map<int, NodeState> node_states;
+};
+
+
 }  // namespace or_protocol
 
 

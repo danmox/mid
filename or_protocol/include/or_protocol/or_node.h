@@ -11,7 +11,7 @@
 
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/constants.h>
-#include <or_protocol/node_state.h>
+#include <or_protocol/network_state.h>
 #include <rosbag/bag.h>
 
 
@@ -60,10 +60,9 @@ class ORNode
     // current node is the intended destination
     msg_recv_func recv_handle = nullptr;
 
-    // a map of node states that keep track of messages received, allowing for
-    // quickly determining if a message has already been received and processed,
-    // as well as network statistics for each node
-    std::unordered_map<int, NodeState> node_states;
+    // a class keeping track of the current state of the network, including
+    // received messages and estimated ETX values for each node
+    NetworkState network_state;
 
     // the main packet queue processed by this node; incoming messages are
     // pushed onto this queue for processing by the process thread
@@ -112,7 +111,7 @@ class ORNode
     // message associated with header
     inline int msg_priority(const or_protocol_msgs::Header& header)
     {
-      return node_states[header.src_id].priority(header.seq);
+      return network_state.priority(header.src_id, header.seq);
     };
 
     inline void push_packet_queue(PacketQueueItemPtr& ptr)

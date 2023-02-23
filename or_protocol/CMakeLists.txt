@@ -29,7 +29,7 @@ include_directories(
 
 set(LIBRARY_FILES
   src/bcast_socket.cpp
-  src/node_state.cpp
+  src/network_state.cpp
   src/or_node.cpp
   src/utils.cpp
 )

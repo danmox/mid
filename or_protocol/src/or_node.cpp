@@ -279,7 +279,7 @@ void ORNode::process_packets()
     // new packet processing
     //
 
-    // TODO update statistics: node_states[header.curr_id].update_stats(header);
+    // TODO update statistics: network_state.update_stats(header.curr_id, header);
 
     // filter out messages that originated from the current node (i.e. echoed
     // back from an intermediate relay)
@@ -290,8 +290,8 @@ void ORNode::process_packets()
 
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
-    MsgStatus msg_status = node_states[item->header.src_id].update_queue(item->header);
-    if (!msg_status.is_new_msg) {
+    MsgStatus ms = network_state.update_queue(item->header.src_id, item->header);
+    if (!ms.is_new_msg) {
       print_msg_info("dupe (drop)", item->header, item->size);
       continue;
     }
@@ -299,11 +299,11 @@ void ORNode::process_packets()
     // relay message
     if (item->header.dest_id != node_id) {
 
-      // update ACKed message in node_states so that no more relays are sent
+      // update ACKed message in network_state so that no more relays are sent
       if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
         uint32_t ack_seq = extract_ack(item);
         // the source of the original message is the destination of the ACK
-        node_states[item->header.dest_id].ack_msg(ack_seq);
+        network_state.ack_msg(item->header.dest_id, ack_seq);
       }
 
       unsigned int sender_priority = relay_priority(item->header.curr_id, item->header);
@@ -380,7 +380,7 @@ void ORNode::process_packets()
       send(ack);  // calls print_msg_info and log_message internally
     }
 
-    if (recv_handle && msg_status.is_new_seq) {
+    if (recv_handle && ms.is_new_seq) {
       // deserialize entire message
       or_protocol_msgs::Packet msg;
       deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
