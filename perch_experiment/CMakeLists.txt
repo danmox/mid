@@ -3,7 +3,15 @@ cmake_minimum_required(VERSION 2.8.3)
 project(perch_experiment)
 # Load catkin and all dependencies required for this package
 # TODO: remove all from COMPONENTS that are not catkin packages.
-find_package(catkin REQUIRED COMPONENTS)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  tf
+  gazebo_ros
+)
 
 
 # TODO: fill in what other packages will need to use this package
@@ -16,4 +24,6 @@ catkin_package(
   #  CATKIN_DEPENDS # TODO
   #  INCLUDE_DIRS # TODO include
   #  LIBRARIES # TODO
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs geometry_msgs nav_msgs tf gazebo_ros
+  # DEPENDS GAZEBO
 )
