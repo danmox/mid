@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <or_protocol/constants.h>
 
@@ -66,6 +67,11 @@ class NodeState
 };
 
 
+typedef std::unordered_map<int, std::unordered_map<int, double>> ETXMap;
+typedef std::unordered_map<int, std::vector<int>> IntVectorMap;
+typedef std::unordered_map<int, IntVectorMap> RoutingMap;
+
+
 class NetworkState
 {
   public:
@@ -75,14 +81,26 @@ class NetworkState
     // updated the received message queue when an ACK has been received
     void ack_msg(const int dest_id, const uint32_t seq);
 
-    // return message priority
     int priority(const int node_id, const int seq);
 
     void update_stats(const int node_id, const or_protocol_msgs::Header& header);
 
+    void set_etx_map(const ETXMap& map) { link_etx = map; }
+
+    // compute relays for a given node to every other node in the network
+    RoutingMap find_routes(const int root);
+
   private:
     // the state of each node in the network
     std::unordered_map<int, NodeState> node_states;
+
+    // estimated ETX for each node in the network
+    // NOTE we assume the network is connected in find_routes; link_etx_map must
+    // be constructed accordintly
+    ETXMap link_etx;
+
+    // path for each node in the network
+    RoutingMap routing_map;
 };
 
 
