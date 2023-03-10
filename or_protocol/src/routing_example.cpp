@@ -47,20 +47,27 @@ int routing_example()
       route_relays.emplace(relay, relays);
     }
 
+    std::cout << file << std::endl;
+
     uint8_t src = sample["src"].as<uint8_t>();
     uint8_t dest = sample["dest"].as<uint8_t>();
     for (const auto& item : route_relays) {
       or_protocol::NetworkState ns;
       ns.set_etx_map(sample_link_etx);
-      or_protocol::RoutingMap routing_map = ns.find_routes(item.first);
+      ns.update_routes(item.first);
+      or_protocol::FixedRoutingMap routing_map = ns.get_routing_map();
 
-      std::cout << "NetworkState: " << std::endl << "  ";
-      for (const int relay : routing_map[src][dest])
-        std::cout << relay << ", ";
-      std::cout << std::endl;
-      std::cout << "Sample: " << std::endl << "  ";
-      for (const int relay : route_relays[item.first])
-        std::cout << relay << ", ";
+      std::cout << "  NetworkState: " << std::endl << "    ";
+      const or_protocol::RelayArray& ns_relays = routing_map[src][dest];
+      for (size_t i = 0; i < ns_relays.size() - 1; i++)
+        std::cout << int(ns_relays[i]) << ", ";
+      std::cout << int(ns_relays.back()) << std::endl;
+
+      std::cout << "  Sample: " << std::endl << "    ";
+      const std::vector<int>& s_relays = route_relays[item.first];
+      for (size_t i = 0; i < s_relays.size() - 1; i++)
+        std::cout << s_relays[i] << ", ";
+      std::cout << s_relays.back() << std::endl;
       std::cout << std::endl;
     }
   }
