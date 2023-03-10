@@ -31,12 +31,12 @@ int serialization()
   header_in.src_id = 25;
   header_in.curr_id = 24;
   header_in.relays[2] = 28;
-  header_in.relays[4] = 29;
+  header_in.relays[3] = 29;
 
   msg_in.header.src_id = 25;
   msg_in.header.curr_id = 24;
   msg_in.header.relays[2] = 28;
-  msg_in.header.relays[4] = 29;
+  msg_in.header.relays[3] = 29;
 
   or_protocol_msgs::Header header_out;
   ros::SerializedMessage sheader_out = ros::serialization::serializeMessage(header_in);
