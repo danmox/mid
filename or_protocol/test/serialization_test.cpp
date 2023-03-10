@@ -1,10 +1,17 @@
+#include <filesystem>
 #include <gtest/gtest.h>
+#include <yaml-cpp/yaml.h>
 
 #include <or_protocol/types.h>
 #include <or_protocol/utils.h>
+#include <or_protocol/network_state.h>
 
+#include <ros/package.h>
 #include <std_msgs/Time.h>
 #include <std_msgs/UInt32.h>
+
+
+using or_protocol::PacketQueueItem;
 
 
 /* test header manipulation */
@@ -100,15 +107,71 @@ TEST(TestSuite, ack_serialization)
   ros::serialization::serialize(s, msg_len - 4);
   ros::serialization::serialize(s, msg_in);
 
-  or_protocol::PacketQueueItemPtr item;
-  item->header = msg_in.header;
-  item->buff_ptr = buff_ptr;
-  item->size = msg_len;
+  // create PacketQueueItem
+  ros::Time dummy_time = ros::Time(0);
+  or_protocol::PacketQueueItemPtr item(new PacketQueueItem(buff_ptr,
+                                                           size_t(msg_len),
+                                                           msg_in.header,
+                                                           dummy_time));
 
   std_msgs::UInt32 seq_out;
   seq_out.data = or_protocol::extract_ack(item);
 
   EXPECT_EQ(seq_in, seq_out);
+}
+
+
+namespace fs = std::filesystem;
+
+
+/* test automatic route selection */
+TEST(TestSuite, route_selection)
+{
+  std::string package_path = ros::package::getPath("or_protocol");
+  fs::path sample_dir = fs::path(package_path) / "test" / "samples";
+
+  if (!fs::exists(sample_dir) || !fs::is_directory(sample_dir))
+    ASSERT_TRUE(false) << "directory: " << sample_dir << " does not exist";
+
+  std::vector<fs::path> sample_files;
+  for (const auto& file : fs::directory_iterator(sample_dir))
+    if (fs::is_regular_file(file) && file.path().extension() == ".yaml")
+      sample_files.push_back(file.path());
+
+  for (const fs::path& file : sample_files) {
+    YAML::Node sample = YAML::LoadFile(file.string());
+
+    or_protocol::ETXMap sample_link_etx;
+    for (const auto& node : sample["link_etx"]) {
+      const int& tx_node = node.first.as<int>();
+      const YAML::Node& map_node = node.second;
+
+      std::unordered_map<int, double> inner_map;
+      for (auto& inner_node : map_node) {
+        const int& rx_node = inner_node.first.as<int>();
+        const double& etx = inner_node.second.as<double>();
+        inner_map.emplace(rx_node, etx);
+      }
+
+      sample_link_etx.emplace(tx_node, inner_map);
+    }
+
+    or_protocol::IntVectorMap route_relays;
+    for (const auto& node : sample["relay_map"]) {
+      const int& relay = node.first.as<int>();
+      const std::vector<int>& relays = node.second.as<std::vector<int>>();
+      route_relays.emplace(relay, relays);
+    }
+
+    uint8_t src = sample["src"].as<uint8_t>();
+    uint8_t dest = sample["dest"].as<uint8_t>();
+    for (const auto& item : route_relays) {
+      or_protocol::NetworkState ns;
+      ns.set_etx_map(sample_link_etx);
+      or_protocol::RoutingMap routing_map = ns.find_routes(item.first);
+      EXPECT_EQ(routing_map[src][dest], route_relays[item.first]);
+    }
+  }
 }
 
 
