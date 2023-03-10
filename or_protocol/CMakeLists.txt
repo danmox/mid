@@ -53,7 +53,7 @@ target_link_libraries(serialization_example ${catkin_LIBRARIES} ${PROJECT_NAME})
 add_executable(routing_example src/routing_example.cpp)
 target_link_libraries(routing_example ${catkin_LIBRARIES} yaml-cpp ${PROJECT_NAME})
 
-catkin_add_gtest(${PROJECT_NAME}-test test/serialization_test.cpp)
+catkin_add_gtest(${PROJECT_NAME}-test test/test.cpp)
 if (TARGET ${PROJECT_NAME}-test)
   target_link_libraries(${PROJECT_NAME}-test ${catkin_LIBRARIES} yaml-cpp ${PROJECT_NAME})
 endif()
