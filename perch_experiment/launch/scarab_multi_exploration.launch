@@ -27,7 +27,7 @@
   <include file="$(find perch_experiment)/launch/individual_scarab.launch">
     <arg name="agent"        value="scarab40"/>
     <arg name="rviz"         value="true"/>
-    <arg name="ground_truth" value="true"/>
+    <arg name="ground_truth" value="false"/>
     <arg name="x_pos"        value="5"/>
     <arg name="y_pos"        value="5"/>
   </include>
@@ -35,7 +35,7 @@
   <include file="$(find perch_experiment)/launch/individual_scarab.launch">
     <arg name="agent"        value="scarab41"/>
     <arg name="rviz"         value="false"/>
-    <arg name="ground_truth" value="true"/>
+    <arg name="ground_truth" value="false"/>
     <arg name="x_pos"        value="-5"/>
     <arg name="y_pos"        value="-5"/>
   </include>
@@ -43,7 +43,7 @@
   <include file="$(find perch_experiment)/launch/individual_scarab.launch">
     <arg name="agent"        value="scarab42"/>
     <arg name="rviz"         value="false"/>
-    <arg name="ground_truth" value="true"/>
+    <arg name="ground_truth" value="false"/>
     <arg name="x_pos"        value="5"/>
     <arg name="y_pos"        value="-5"/>
   </include>
@@ -51,7 +51,7 @@
   <include file="$(find perch_experiment)/launch/individual_scarab.launch">
     <arg name="agent"        value="scarab43"/>
     <arg name="rviz"         value="false"/>
-    <arg name="ground_truth" value="true"/>
+    <arg name="ground_truth" value="false"/>
     <arg name="x_pos"        value="-5"/>
     <arg name="y_pos"        value="5"/>
   </include>
