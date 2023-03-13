@@ -112,13 +112,14 @@ void ORNode::print_msg_info(const std::string& msg,
 
 
 // assuming node specific message header information has not been completed
-bool ORNode::send(or_protocol_msgs::Packet& msg)
+bool ORNode::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
   msg.header.src_id = node_id;
   msg.header.curr_id = node_id;
   msg.header.seq = getSeqNum();
   msg.header.hops++;
-  msg.header.relays = network_state.relays(msg.header);
+  if (set_relays)
+    msg.header.relays = network_state.relays(msg.header);
 
   // manually serialize message so that we can keep a copy of buffer_ptr around
   // for later retransmission of reliable messages (i.e. reimplement
@@ -369,20 +370,21 @@ void ORNode::process_packets()
       continue;
     }
 
-    // send acknowledgement, if required
+    // if reliable, send full acknowledgement (with routing), otherwise send a
+    // one-time ACK (will not get relayed) to terminate cooperative relaying
+    // (this will prevent the highest priority relay from always transmitting
+    // even if the destination receives the packet)
+    or_protocol_msgs::Packet ack;
+    std_msgs::UInt32 ack_seq;
+    ack_seq.data = item->header.seq;
+    pack_msg(ack, ack_seq);
+    ack.header.msg_type = or_protocol_msgs::Header::ACK;
+    ack.header.dest_id = item->header.src_id;
+    ack.header.reliable = false;
     if (item->header.reliable) {
-      or_protocol_msgs::Packet ack;
-
-      std_msgs::UInt32 ack_seq;
-      ack_seq.data = item->header.seq;
-      pack_msg(ack, ack_seq);
-
-      ack.header.msg_type = or_protocol_msgs::Header::ACK;
-      ack.header.dest_id = item->header.src_id;
-      ack.header.reliable = false;
-      send(ack);  // calls print_msg_info and log_message internally
+      send(ack);  // send ACK with routing
     } else {
-      // TODO send mini ACK
+      send(ack, false);  // send one-time ACK broadcast
     }
 
     if (recv_handle && ms.is_new_seq) {
