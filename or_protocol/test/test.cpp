@@ -156,10 +156,13 @@ TEST(TestSuite, route_selection)
       sample_link_etx.emplace(tx_node, inner_map);
     }
 
-    or_protocol::IntVectorMap route_relays;
+    or_protocol::IntArrayMap route_relays;
     for (const auto& node : sample["relay_map"]) {
       const int& relay = node.first.as<int>();
-      const std::vector<int>& relays = node.second.as<std::vector<int>>();
+      const std::vector<int>& relays_vec = node.second.as<std::vector<int>>();
+      or_protocol::RelayArray relays = {0, 0, 0, 0};
+      for (size_t i = 0; i < relays_vec.size(); ++i)
+        relays[i] = relays_vec[i];
       route_relays.emplace(relay, relays);
     }
 
@@ -168,7 +171,8 @@ TEST(TestSuite, route_selection)
     for (const auto& item : route_relays) {
       or_protocol::NetworkState ns;
       ns.set_etx_map(sample_link_etx);
-      or_protocol::RoutingMap routing_map = ns.find_routes(item.first);
+      ns.update_routes(item.first);
+      or_protocol::FixedRoutingMap routing_map = ns.get_routing_map();
       EXPECT_EQ(routing_map[src][dest], route_relays[item.first]);
     }
   }

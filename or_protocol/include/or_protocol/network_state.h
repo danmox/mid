@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -69,7 +70,13 @@ class NodeState
 
 typedef std::unordered_map<int, std::unordered_map<int, double>> ETXMap;
 typedef std::unordered_map<int, std::vector<int>> IntVectorMap;
-typedef std::unordered_map<int, IntVectorMap> RoutingMap;
+typedef or_protocol_msgs::Header::_relays_type RelayArray;
+typedef std::unordered_map<int, RelayArray> IntArrayMap;
+typedef std::unordered_map<int, IntVectorMap> VariableRoutingMap;
+typedef std::unordered_map<int, IntArrayMap> FixedRoutingMap;
+
+
+const int MAX_RELAY_COUNT = RelayArray::max_size();
 
 
 class NetworkState
@@ -78,17 +85,23 @@ class NetworkState
     // update the received message queue for the given node
     MsgStatus update_queue(const int node_id, const or_protocol_msgs::Header& header);
 
-    // updated the received message queue when an ACK has been received
+    // update the received message queue when an ACK has been received
     void ack_msg(const int dest_id, const uint32_t seq);
 
+    // returns the highest priority heard so far for message seq originating
+    // from node_id
     int priority(const int node_id, const int seq);
 
     void update_stats(const int node_id, const or_protocol_msgs::Header& header);
 
     void set_etx_map(const ETXMap& map) { link_etx = map; }
+    FixedRoutingMap get_routing_map() { return routing_map; }
 
-    // compute relays for a given node to every other node in the network
-    RoutingMap find_routes(const int root);
+    // compute relays root should use for every possible flow in the network
+    void update_routes(const int root);
+
+    // query the routing table for the relays to use for the given src, dest
+    RelayArray relays(const or_protocol_msgs::Header& header);
 
   private:
     // the state of each node in the network
@@ -96,11 +109,14 @@ class NetworkState
 
     // estimated ETX for each node in the network
     // NOTE we assume the network is connected in find_routes; link_etx_map must
-    // be constructed accordintly
+    // be constructed accordingly
     ETXMap link_etx;
 
     // path for each node in the network
-    RoutingMap routing_map;
+    FixedRoutingMap routing_map;
+
+    // synchronize access to the routing and link ETX maps during reads/writes
+    std::mutex routing_map_mutex, link_etx_mutex;
 };
 
 
