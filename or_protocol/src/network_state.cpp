@@ -77,9 +77,18 @@ void NetworkState::ack_msg(const int node_id, const uint32_t seq)
 }
 
 
+// TODO is it possible this gets called before a message has been received? This
+// would result in a priority of 0 (the highest) and possible inapropriate
+// inaction
 int NetworkState::priority(const int node_id, const int seq)
 {
   return node_states[node_id].priority(seq);
+}
+
+
+RelayArray NetworkState::relays(const or_protocol_msgs::Header& header)
+{
+  return routing_map[header.src_id][header.dest_id];
 }
 
 
@@ -97,7 +106,7 @@ typedef std::priority_queue<NodeCostPair,
                             NodeETXPairGreater> PriorityQueue;
 
 
-RoutingMap NetworkState::find_routes(const int root)
+void NetworkState::update_routes(const int root)
 {
   //
   // compute path_etx and default_paths
@@ -113,7 +122,7 @@ RoutingMap NetworkState::find_routes(const int root)
 
   // find the shortest path between each pair of nodes in the network
   ETXMap path_etx;
-  RoutingMap default_paths;
+  VariableRoutingMap default_paths;
   for (const int node : node_ids) {
 
     PriorityQueue frontier;
@@ -200,7 +209,7 @@ RoutingMap NetworkState::find_routes(const int root)
 
   // compute the full routing table; loosly based on the rules presented in
   // SOAR: https://ieeexplore.ieee.org/document/4912211
-  RoutingMap new_routing_map;
+  VariableRoutingMap new_routing_map;
   for (const int src : node_ids) {
     for (const int dest : node_ids) {
       bool found_root_relays = false;
@@ -289,7 +298,29 @@ RoutingMap NetworkState::find_routes(const int root)
     }
   }
 
-  return new_routing_map;
+  // convert to fixed relay arrays used in or_protocol_msgs::Header and add
+  // direct routing for any src, dest pairs for which root does not participate
+  // NOTE this may occur when network state information on each node is out of
+  // sync (i.e. node Y thinks node X should participate but node X does not)
+  FixedRoutingMap new_fixed_routing_map;
+  for (const int src : node_ids) {
+    for (const int dest: node_ids) {
+      if (src == dest)
+        continue;
+      if (new_routing_map[src][dest].size() == 0) {
+        new_fixed_routing_map[src][dest] = {static_cast<uint8_t>(dest), 0, 0, 0};
+      } else {
+        const std::vector<int>& relays = new_routing_map[src][dest];
+        for (size_t i = 0; i < relays.size(); i++)
+          new_fixed_routing_map[src][dest][i] = relays[i];
+        for (size_t i = relays.size(); i < MAX_RELAY_COUNT; i++)
+          new_fixed_routing_map[src][dest][i] = 0;
+      }
+    }
+  }
+
+  std::lock_guard<std::mutex> lock(routing_map_mutex);
+  routing_map = new_fixed_routing_map;
 }
 
 

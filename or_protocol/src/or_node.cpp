@@ -118,6 +118,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg)
   msg.header.curr_id = node_id;
   msg.header.seq = getSeqNum();
   msg.header.hops++;
+  msg.header.relays = network_state.relays(msg.header);
 
   // manually serialize message so that we can keep a copy of buffer_ptr around
   // for later retransmission of reliable messages (i.e. reimplement
@@ -237,6 +238,7 @@ void ORNode::process_packets()
           retrans_mutex.unlock();
 
           item->header.attempt++;
+          item->header.relays = network_state.relays(item->header);
           update_msg_header(item->buffer(), item->header);
           send(item->buffer(), item->size);
 
@@ -259,7 +261,7 @@ void ORNode::process_packets()
           print_msg_info("canceled retry", item->header, item->size);
         }
       } else if (item->priority < msg_priority(item->header)) {
-        send(item->buffer(), item->size);
+        send(item->buffer(), item->size);  // TODO update relays here too?
         ros::Time now = ros::Time::now();
         double actual_dt = (now - item->recv_time).toSec() * 1000;
         double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
@@ -306,32 +308,35 @@ void ORNode::process_packets()
         network_state.ack_msg(item->header.dest_id, ack_seq);
       }
 
-      unsigned int sender_priority = relay_priority(item->header.curr_id, item->header);
-      unsigned int current_priority = relay_priority(node_id, item->header);
+      const int tx_priority = relay_priority(item->header.curr_id, item->header);
+      const int rx_priority = relay_priority(node_id, item->header);
 
-      if (current_priority == item->header.relays.size()) {
+      if (rx_priority == item->header.relays.size()) {
         print_msg_info("not relay (drop)", item->header, item->size);
-      } else if (current_priority > sender_priority) {
+      } else if (rx_priority > tx_priority) {
         print_msg_info("low priority (drop)", item->header, item->size);
       } else {
 
         // update current transmitting node and packet hop count
         item->header.curr_id = node_id;
         item->header.hops++;
+        item->header.relays = network_state.relays(item->header);
         update_msg_header(item->buffer(), item->header);
 
-        // requeue relay with a delay to allow for the reception of ACKs
-        // TODO if we expect the destination to receive the original
-        // transmission, we should delay the relay to allow for ACKs to be
-        // received to avoid unnecessary relays; however, if it is unlikely the
-        // destination will receive the original transmission then we are adding
-        // unnecessary latency and shouldn't wait to relay
-        const ros::Duration delay(0, UNIT_DELAY * (current_priority + 1));
-        item->send_time = item->recv_time + delay;
-        item->priority = current_priority;
-        item->processed = true;
-        push_packet_queue(item);
-        print_msg_info("queue", item->header, item->size);
+        // relay immediately or with some delay
+        if (rx_priority == 0) {
+          send(item->buffer(), item->size);
+          ros::Time now = ros::Time::now();
+          print_msg_info("relay", item->header, item->size);
+          log_message(item->header, Log::RELAY, item->size, now);
+        } else {
+          const ros::Duration delay(0, UNIT_DELAY * rx_priority);
+          item->send_time = item->recv_time + delay;
+          item->priority = rx_priority;
+          item->processed = true;
+          push_packet_queue(item);
+          print_msg_info("queue", item->header, item->size);
+        }
       }
       continue;
     }
@@ -344,6 +349,7 @@ void ORNode::process_packets()
       item->header.src_id = node_id;
       item->header.seq = getSeqNum();
       item->header.hops++;
+      item->header.relays = network_state.relays(item->header);
       update_msg_header(item->buffer(), item->header);
       send(item->buffer(), item->size);
       print_msg_info("reply ping", item->header, item->size);
@@ -374,10 +380,9 @@ void ORNode::process_packets()
       ack.header.msg_type = or_protocol_msgs::Header::ACK;
       ack.header.dest_id = item->header.src_id;
       ack.header.reliable = false;
-      std::reverse_copy(item->header.relays.begin(),
-                        item->header.relays.end(),
-                        ack.header.relays.begin());
       send(ack);  // calls print_msg_info and log_message internally
+    } else {
+      // TODO send mini ACK
     }
 
     if (recv_handle && ms.is_new_seq) {

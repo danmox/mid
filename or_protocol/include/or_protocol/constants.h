@@ -34,9 +34,6 @@ namespace or_protocol {
 // path
 #define NEAR_PATH_THRESHOLD 2.0
 
-// the maximum number of relays to use at each hop
-#define MAX_RELAY_COUNT 4
-
 // the maximum allowable ETX between relays of the same transmitter
 #define RELAY_ETX_THRESHOLD 2.0
 
