@@ -20,7 +20,7 @@
     <node pkg="tf2_ros"
           type="static_transform_publisher"
           name="world_static_tf_broadcaster"
-          args="0 0 0 0 0 0 $(arg world_frame) $(arg map_frame)"
+          args="$(arg x_pos) $(arg y_pos) 0 0 0 0 $(arg world_frame) $(arg map_frame)"
           if="$(arg publish_world)"/>
 
     <node pkg="tf2_ros"
@@ -41,12 +41,11 @@
             args="-d $(find scarab)/rviz/$(arg agent)_sim.rviz"/>
     </group>
 
-    <!-- load robot urdf to param -->
     <param name="robot_description"
            command="$(find xacro)/xacro '$(find scarab_description)/urdf/scarab.xacro'" />
 
     <!-- spawn robot in gazebo -->
-    <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" output="screen"
+    <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" output="screen" 
           args="-urdf -model $(arg agent) -param /$(arg agent)/robot_description -x $(arg x_pos) -y $(arg y_pos) -z 2"/>
 
     <!-- hack to get laser frame correct -->
