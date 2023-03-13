@@ -88,6 +88,8 @@ int NetworkState::priority(const int node_id, const int seq)
 
 RelayArray NetworkState::relays(const or_protocol_msgs::Header& header)
 {
+  // NOTE returns all 0s (the default construction) if the given src, dest pair
+  // is not in the routing table
   return routing_map[header.src_id][header.dest_id];
 }
 

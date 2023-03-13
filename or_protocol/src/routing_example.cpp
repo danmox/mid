@@ -72,6 +72,18 @@ int routing_example()
     }
   }
 
+  // default route test
+  or_protocol_msgs::Header header;
+  header.src_id = 1;
+  header.dest_id = 2;
+  or_protocol::NetworkState ns;
+  or_protocol::RelayArray default_route = ns.relays(header);
+  // print default route
+  std::cout << std::endl << "Default route: " << std::endl;
+  for (size_t i = 0; i < default_route.size() - 1; i++)
+    std::cout << int(default_route[i]) << ", ";
+  std::cout << int(default_route.back()) << std::endl;
+
   return 0;
 }
 
