@@ -1,0 +1,22 @@
+<package>
+  <name>perch_experiment</name>
+  <version>0.1.0</version>
+  <description>perch_experiment</description>
+  <maintainer email="mox@seas.upenn.edu">Daniel Mox</maintainer>
+
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <run_depend>hfn</run_depend>
+  <run_depend>gazebo_ros</run_depend>
+  <run_depend>gmapping</run_depend>
+  <run_depend>robot_state_publisher</run_depend>
+  <run_depend>joint_state_publisher</run_depend>
+  <run_depend>scarab_description</run_depend>
+  <run_depend>scarab_gazebo</run_depend>
+  <run_depend>tf2_ros</run_depend>
+
+  <export>
+  </export>
+</package>
