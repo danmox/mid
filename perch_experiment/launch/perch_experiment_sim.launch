@@ -1,0 +1,62 @@
+<launch>
+
+  <!-- gazebo args -->
+  <arg name="world_name"  default="$(find scarab_gazebo)/worlds/perch.world"/>
+  <arg name="verbose"     default="false"/>
+  <arg name="debug"       default="false"/>
+  <arg name="gazebo_gui"  default="true"/>
+
+  <arg name="rviz"         default="true"/>
+
+  <!-- SIMULATION -->
+
+  <!-- start gazebo -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name"   value="$(arg world_name)"/>
+    <arg name="gui"          value="$(arg gazebo_gui)"/>
+    <arg name="debug"        value="$(arg debug)"/>
+    <arg name="verbose"      value="$(arg verbose)"/>
+    <arg name="paused"       value="false"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <!-- start rviz -->
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find perch_experiment)/rviz/perch_experiment_sim.rviz"/>
+
+  <!-- load perch world -->
+  <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-sdf -model perch -file $(find scarab_gazebo)/models/perch/model.sdf"/>
+
+  <!-- ROBOTS -->
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab40"/>
+  </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab41"/>
+    <arg name="spawn_x" value="1.0"/>
+  </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab42"/>
+    <arg name="spawn_x" value="2.0"/>
+  </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab43"/>
+    <arg name="spawn_x" value="3.0"/>
+  </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab44"/>
+    <arg name="spawn_x" value="4.0"/>
+  </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="agent"   value="scarab45"/>
+    <arg name="spawn_x" value="5.0"/>
+  </include>
+
+</launch>

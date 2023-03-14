@@ -1,19 +1,12 @@
 <launch>
 
   <arg name="agent"        default="scarab40"/>
-  <arg name="rviz"         default="true"/>
   <arg name="ground_truth" default="true"/> <!-- publish ground truth tf tree -->
 
   <!-- robot spawn args -->
   <arg name="spawn_x" default="0.0"/>
   <arg name="spawn_y" default="0.0"/>
   <arg name="spawn_z" default="1.0"/>
-
-  <!-- gazebo args -->
-  <arg name="world_name"  default="$(find scarab_gazebo)/worlds/perch.world"/>
-  <arg name="verbose"     default="false"/>
-  <arg name="debug"       default="false"/>
-  <arg name="gazebo_gui"  default="true"/>
 
   <!-- tf args -->
   <arg name="base_frame"    default="$(arg agent)/base_footprint" />
@@ -22,48 +15,30 @@
   <arg name="world_frame"   default="world"/>
   <arg name="publish_world" default="true"/>
 
-  <!-- start gazebo -->
-  <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name"   value="$(arg world_name)"/>
-    <arg name="gui"          value="$(arg gazebo_gui)"/>
-    <arg name="debug"        value="$(arg debug)"/>
-    <arg name="verbose"      value="$(arg verbose)"/>
-    <arg name="paused"       value="false"/>
-    <arg name="use_sim_time" value="true"/>
-  </include>
-
-  <!-- start rviz -->
-  <node name="rviz" pkg="rviz" type="rviz"
-        args="-d $(find scarab)/rviz/$(arg agent)_sim.rviz"/>
-
-  <!-- static transform between world_frame and map_frame -->
-  <node pkg="tf2_ros"
-        type="static_transform_publisher"
-        name="world_static_tf_broadcaster"
-        args="0 0 0 0 0 0 $(arg world_frame) $(arg map_frame)"
-        if="$(arg publish_world)"/>
-
-  <!-- static transform between odom_frame and ground truth odom frame published
-       by gazebo -->
-  <node pkg="tf2_ros"
-        type="static_transform_publisher"
-        name="odom_static_tf_broadcaster"
-        args="0 0 0 0 0 0 $(arg odom_frame) $(arg agent)/ground_truth/odom"
-        if="$(arg ground_truth)"/>
-
-  <!-- static transform between ground truth base link frame published by gazebo
-       and base_frame -->
-  <node pkg="tf2_ros"
-        type="static_transform_publisher"
-        name="base_static_tf_broadcaster"
-        args="0 0 0 0 0 0 $(arg agent)/ground_truth/base_link $(arg base_frame)"
-        if="$(arg ground_truth)"/>
-
-  <!-- load perch world -->
-  <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
-        args="-sdf -model perch -file $(find scarab_gazebo)/models/perch/model.sdf"/>
-
   <group ns="$(arg agent)">
+
+    <!-- static transform between world_frame and map_frame -->
+    <node pkg="tf2_ros"
+          type="static_transform_publisher"
+          name="world_static_tf_broadcaster"
+          args="0 0 0 0 0 0 $(arg world_frame) $(arg map_frame)"
+          if="$(arg publish_world)"/>
+
+    <!-- static transform between odom_frame and ground truth odom frame published
+         by gazebo -->
+    <node pkg="tf2_ros"
+          type="static_transform_publisher"
+          name="odom_static_tf_broadcaster"
+          args="0 0 0 0 0 0 $(arg odom_frame) $(arg agent)/ground_truth/odom"
+          if="$(arg ground_truth)"/>
+
+    <!-- static transform between ground truth base link frame published by gazebo
+         and base_frame -->
+    <node pkg="tf2_ros"
+          type="static_transform_publisher"
+          name="base_static_tf_broadcaster"
+          args="0 0 0 0 0 0 $(arg agent)/ground_truth/base_link $(arg base_frame)"
+          if="$(arg ground_truth)"/>
 
     <!-- load robot urdf to param -->
     <param name="robot_description"
@@ -108,7 +83,7 @@
       <param name="safety_margin"      value="0.1" />
       <param name="social_margin"      value="0.2" />
       <param name="goal_tolerance_ang" value=".05"/> <!--default 2pi-->
-      <param name="goal_tolerance"     value=".05"/>     <!--default .2m-->
+      <param name="goal_tolerance"     value=".05"/> <!--default .2m-->
     </node>
 
     <!-- slam for localization -->
