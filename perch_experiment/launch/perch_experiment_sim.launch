@@ -30,31 +30,31 @@
 
   <!-- ROBOTS -->
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab40"/>
   </include>
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab41"/>
     <arg name="spawn_x" value="1.0"/>
   </include>
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab42"/>
     <arg name="spawn_x" value="2.0"/>
   </include>
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab43"/>
     <arg name="spawn_x" value="3.0"/>
   </include>
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab44"/>
     <arg name="spawn_x" value="4.0"/>
   </include>
 
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+  <include file="$(find scarab)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab45"/>
     <arg name="spawn_x" value="5.0"/>
   </include>
