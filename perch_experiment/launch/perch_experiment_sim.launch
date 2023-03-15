@@ -28,35 +28,25 @@
   <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
         args="-sdf -model perch -file $(find scarab_gazebo)/models/perch/model.sdf"/>
 
+  <!-- SWRI console -->
+  <node pkg="swri_console" name="swri_console" type="swri_console"/>
+
   <!-- ROBOTS -->
 
-  <include file="$(find scarab)/launch/scarab_sim.launch">
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab40"/>
   </include>
 
-  <include file="$(find scarab)/launch/scarab_sim.launch">
+  <!--
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab41"/>
     <arg name="spawn_x" value="1.0"/>
   </include>
 
-  <include file="$(find scarab)/launch/scarab_sim.launch">
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="agent"   value="scarab42"/>
     <arg name="spawn_x" value="2.0"/>
   </include>
-
-  <include file="$(find scarab)/launch/scarab_sim.launch">
-    <arg name="agent"   value="scarab43"/>
-    <arg name="spawn_x" value="3.0"/>
-  </include>
-
-  <include file="$(find scarab)/launch/scarab_sim.launch">
-    <arg name="agent"   value="scarab44"/>
-    <arg name="spawn_x" value="4.0"/>
-  </include>
-
-  <include file="$(find scarab)/launch/scarab_sim.launch">
-    <arg name="agent"   value="scarab45"/>
-    <arg name="spawn_x" value="5.0"/>
-  </include>
+  -->
 
 </launch>

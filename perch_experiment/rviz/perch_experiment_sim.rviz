@@ -3,8 +3,7 @@ Panels:
     Help Height: 138
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Global Options1
+      Expanded: ~
       Splitter Ratio: 0.5765306353569031
     Tree Height: 1522
   - Class: rviz/Selection
@@ -234,6 +233,38 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab40/frontier_centroid_marker
+      Name: FrontierCentroid
+      Namespaces:
+        centroids: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab40/frontier_goal_marker
+      Name: FrontierGoal
+      Namespaces:
+        goal: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab40/frontier_marker
+      Name: Frontier
+      Namespaces:
+        frontier_markers: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab40/frontier_path_marker
+      Name: FrontierPath
+      Namespaces:
+        centroids: true
+      Queue Size: 100
+      Value: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -244,156 +275,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        scarab41/base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab41/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab41/camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab41/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab41/camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab41/caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/laser:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab41/wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: scarab41
       Robot Description: scarab41/robot_description
       TF Prefix: ""
@@ -428,156 +309,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        scarab42/base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab42/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab42/camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab42/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab42/camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab42/caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/laser:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab42/wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: scarab42
       Robot Description: scarab42/robot_description
       TF Prefix: ""
@@ -612,156 +343,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        scarab43/base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab43/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab43/camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab43/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab43/camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab43/caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/laser:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab43/wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: scarab43
       Robot Description: scarab43/robot_description
       TF Prefix: ""
@@ -796,156 +377,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        scarab44/base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab44/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab44/camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab44/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab44/camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab44/caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/laser:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab44/wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: scarab44
       Robot Description: scarab44/robot_description
       TF Prefix: ""
@@ -980,156 +411,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        scarab45/base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab45/base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab45/camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab45/camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab45/camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        scarab45/caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/laser:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        scarab45/wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: scarab45
       Robot Description: scarab45/robot_description
       TF Prefix: ""
@@ -1182,7 +463,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 22.106815338134766
+      Distance: 39.42204284667969
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1198,9 +479,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6297968626022339
+      Pitch: 0.5897969007492065
       Target Frame: <Fixed Frame>
-      Yaw: 1.5303964614868164
+      Yaw: 4.703575611114502
     Saved: ~
 Window Geometry:
   Displays:
