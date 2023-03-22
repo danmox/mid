@@ -39,6 +39,8 @@ class ORNode
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
 
+    friend class ORNodeTest;
+
   private:
     // socket used for broadcasting to peers, implementing the lower level
     // broadcast socket setup / cleanup and usage
@@ -118,6 +120,16 @@ class ORNode
     {
       std::lock_guard<std::mutex> lock(queue_mutex);
       packet_queue.push_back(ptr);
+    }
+};
+
+
+class ORNodeTest
+{
+  public:
+    void initializeORNode(ORNode& node, const ETXMap& etx_map) {
+      node.network_state.set_etx_map(etx_map);
+      node.network_state.update_routes(node.node_id);
     }
 };
 
