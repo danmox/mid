@@ -6,7 +6,7 @@
 #include <mutex>
 #include <yaml-cpp/yaml.h>
 
-#include <or_protocol/or_node.h>
+#include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
 #include <or_protocol_msgs/Packet.h>
 #include <ros/console.h>
@@ -118,8 +118,8 @@ int main(int argc, char** argv)
     ROS_INFO("[main] logging received messages to %s", log_file.c_str());
   }
 
-  or_protocol::ORNode or_node(argv[1]);
-  or_protocol::ORNodeTest or_node_test;
+  or_protocol::ORProtocol or_node(argv[1]);
+  or_protocol::ORProtocolTest or_node_test;
   or_node_test.initializeORNode(or_node, sample_link_etx);
   or_node.register_recv_func(msg_cb);
 

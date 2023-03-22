@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 
-#include <or_protocol/or_node.h>
+#include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
 #include <or_protocol_msgs/Packet.h>
 #include <ros/ros.h>
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 
   ros::Time::init();
 
-  or_protocol::ORNode or_node(argv[1]);
+  or_protocol::ORProtocol or_node(argv[1]);
   or_node.register_recv_func(ping_recv);
 
   // build message

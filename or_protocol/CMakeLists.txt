@@ -31,18 +31,15 @@ include_directories(
 set(LIBRARY_FILES
   src/bcast_socket.cpp
   src/network_state.cpp
-  src/or_node.cpp
+  src/or_protocol.cpp
   src/utils.cpp
 )
 
 add_library(${PROJECT_NAME} ${LIBRARY_FILES})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} Threads::Threads)
 
-add_executable(send_node src/send_node.cpp)
-target_link_libraries(send_node ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
-
-add_executable(recv_node src/recv_node.cpp)
-target_link_libraries(recv_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+add_executable(test_node src/test_node.cpp)
+target_link_libraries(test_node ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
 
 add_executable(ping_node src/ping_node.cpp)
 target_link_libraries(ping_node ${catkin_LIBRARIES} ${PROJECT_NAME})
