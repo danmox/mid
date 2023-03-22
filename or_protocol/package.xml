@@ -12,5 +12,6 @@
   <depend>or_protocol_msgs</depend>
   <depend>roscpp</depend>
   <depend>rosbag</depend>
+  <depend>yaml-cpp</depend>
 
 </package>

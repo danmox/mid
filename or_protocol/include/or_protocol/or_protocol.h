@@ -18,14 +18,14 @@
 namespace or_protocol {
 
 
-class ORNode
+class ORProtocol
 {
   public:
     // initializes ORNode with a unique IPv4 address
-    ORNode(std::string _IP);
+    ORProtocol(std::string _IP);
 
     // destructor required for thread cleanup logic
-    ~ORNode();
+    ~ORProtocol();
 
     // the send interface between higher level application nodes and ORNode
     bool send(or_protocol_msgs::Packet& msg, const bool set_relays = true);
@@ -39,7 +39,7 @@ class ORNode
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
 
-    friend class ORNodeTest;
+    friend class ORProtocolTest;
 
   private:
     // socket used for broadcasting to peers, implementing the lower level
@@ -124,10 +124,10 @@ class ORNode
 };
 
 
-class ORNodeTest
+class ORProtocolTest
 {
   public:
-    void initializeORNode(ORNode& node, const ETXMap& etx_map) {
+    void initializeORNode(ORProtocol& node, const ETXMap& etx_map) {
       node.network_state.set_etx_map(etx_map);
       node.network_state.update_routes(node.node_id);
     }

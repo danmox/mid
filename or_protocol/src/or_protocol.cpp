@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include <or_protocol/constants.h>
-#include <or_protocol/or_node.h>
+#include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
 #include <ros/serialization.h>
 
@@ -18,7 +18,7 @@ namespace or_protocol {
 using or_protocol_msgs::Log;
 
 
-ORNode::ORNode(std::string _IP)
+ORProtocol::ORProtocol(std::string _IP)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
@@ -29,7 +29,7 @@ ORNode::ORNode(std::string _IP)
 
   // initialize BCastSocket and register recv function handle
   namespace ph = std::placeholders;
-  buff_recv_func fcn = std::bind(&ORNode::recv, this, ph::_1, ph::_2);
+  buff_recv_func fcn = std::bind(&ORProtocol::recv, this, ph::_1, ph::_2);
   bcast_socket.reset(new BCastSocket(_IP, OR_PROTOCOL_PORT, fcn));
 
   run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
@@ -59,11 +59,11 @@ ORNode::ORNode(std::string _IP)
   }
 
   // start main packet processing thread
-  process_thread = std::thread(&ORNode::process_packets, this);
+  process_thread = std::thread(&ORProtocol::process_packets, this);
 }
 
 
-ORNode::~ORNode()
+ORProtocol::~ORProtocol()
 {
   run = false;
   process_thread.join();
@@ -71,7 +71,7 @@ ORNode::~ORNode()
 }
 
 
-void ORNode::register_recv_func(msg_recv_func fcn)
+void ORProtocol::register_recv_func(msg_recv_func fcn)
 {
   recv_handle = fcn;
 }
@@ -96,10 +96,10 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
 }
 
 
-void ORNode::print_msg_info(const std::string& msg,
-                            const or_protocol_msgs::Header& header,
-                            int size,
-                            bool total)
+void ORProtocol::print_msg_info(const std::string& msg,
+                                const or_protocol_msgs::Header& header,
+                                int size,
+                                bool total)
 {
   std::string data_type = total ? "bytes" : "data bytes";
   std::string rel_str = header.reliable ? ", REL" : "";
@@ -112,7 +112,7 @@ void ORNode::print_msg_info(const std::string& msg,
 
 
 // assuming node specific message header information has not been completed
-bool ORNode::send(or_protocol_msgs::Packet& msg, const bool set_relays)
+bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
   msg.header.src_id = node_id;
   msg.header.curr_id = node_id;
@@ -159,7 +159,7 @@ bool ORNode::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 }
 
 
-bool ORNode::send(const char* buff, size_t size)
+bool ORProtocol::send(const char* buff, size_t size)
 {
   if (!bcast_socket->send(buff, size)) {
     OR_ERROR("failed to send message");
@@ -169,7 +169,7 @@ bool ORNode::send(const char* buff, size_t size)
 }
 
 
-void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
+void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
 {
   ros::Time now = ros::Time::now();
 
@@ -186,10 +186,10 @@ void ORNode::recv(buffer_ptr& buff_ptr, size_t size)
 
 
 // TODO move logging to a separate thread?
-void ORNode::log_message(const or_protocol_msgs::Header& header,
-                         const int action,
-                         const int size,
-                         const ros::Time& time)
+void ORProtocol::log_message(const or_protocol_msgs::Header& header,
+                             const int action,
+                             const int size,
+                             const ros::Time& time)
 {
   static const std::string topic = "node" + std::to_string(node_id);
   Log msg;
@@ -201,7 +201,7 @@ void ORNode::log_message(const or_protocol_msgs::Header& header,
 }
 
 
-void ORNode::process_packets()
+void ORProtocol::process_packets()
 {
   // TODO reduce time spent busy waiting?
   while (run) {
