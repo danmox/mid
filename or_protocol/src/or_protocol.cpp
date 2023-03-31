@@ -151,7 +151,7 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
       item->retransmission = true;
       item->retries = MAX_RETRY_COUNT;
 
-      push_packet_queue(item);
+      packet_queue.push(item);
     }
     return true;
   }
@@ -178,7 +178,7 @@ void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
   deserialize(header, reinterpret_cast<uint8_t*>(buff_ptr.get()), size);
 
   PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
-  push_packet_queue(item);
+  packet_queue.push(item);
 
   print_msg_info("recv", header, size);
   log_message(header, Log::RECEIVE, size, now);
@@ -207,14 +207,7 @@ void ORProtocol::process_packets()
   while (run) {
 
     std::shared_ptr<PacketQueueItem> item;
-    {
-      std::lock_guard<std::mutex> queue_lock(queue_mutex);
-      if (packet_queue.size() > 0) {
-        item = packet_queue.front();
-        packet_queue.pop_front();
-      }
-    }
-    if (!item)
+    if (!packet_queue.pop(item))
       continue;
 
     // TODO check packet queue for overflow?
@@ -232,7 +225,7 @@ void ORProtocol::process_packets()
       // delayed unnecessarily (step through queue and insert packet before
       // others with more recent send_time?)
       if (item->send_time > ros::Time::now()) {
-        push_packet_queue(item);
+        packet_queue.push(item);
       } else if (item->retransmission) {
         retrans_mutex.lock();
         if (retransmission_set.count(item->header.seq) > 0) {
@@ -255,7 +248,7 @@ void ORProtocol::process_packets()
           item->retries--;
           if (item->retries > 0) {
             item->send_time += ros::Duration(0, RETRY_DELAY);
-            push_packet_queue(item);
+            packet_queue.push(item);
           }
         } else {
           retrans_mutex.unlock();
@@ -335,7 +328,7 @@ void ORProtocol::process_packets()
           item->send_time = item->recv_time + delay;
           item->priority = rx_priority;
           item->processed = true;
-          push_packet_queue(item);
+          packet_queue.push(item);
           print_msg_info("queue", item->header, item->size);
         }
       }

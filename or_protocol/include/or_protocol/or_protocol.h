@@ -2,7 +2,6 @@
 #define OR_PROTOCOL_OR_NODE_H_
 
 #include <atomic>
-#include <deque>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -12,6 +11,7 @@
 #include <or_protocol/bcast_socket.h>
 #include <or_protocol/constants.h>
 #include <or_protocol/network_state.h>
+#include <or_protocol/utils.h>
 #include <rosbag/bag.h>
 
 
@@ -68,14 +68,14 @@ class ORProtocol
 
     // the main packet queue processed by this node; incoming messages are
     // pushed onto this queue for processing by the process thread
-    std::deque<std::shared_ptr<PacketQueueItem>> packet_queue;
+    SafeFIFOQueue<std::shared_ptr<PacketQueueItem>> packet_queue;
 
     // sequence numbers of unACKed reliable messages
     std::unordered_set<uint32_t> retransmission_set;
 
     // processing the packet queue, logging, and updating the retransmission set
     // occur across threads and must be protected
-    std::mutex queue_mutex, log_mutex, retrans_mutex;
+    std::mutex log_mutex, retrans_mutex;
 
     // packet processing thread
     std::thread process_thread;
@@ -115,12 +115,6 @@ class ORProtocol
     {
       return network_state.priority(header.src_id, header.seq);
     };
-
-    inline void push_packet_queue(PacketQueueItemPtr& ptr)
-    {
-      std::lock_guard<std::mutex> lock(queue_mutex);
-      packet_queue.push_back(ptr);
-    }
 };
 
 
