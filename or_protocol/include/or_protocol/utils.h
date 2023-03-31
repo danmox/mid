@@ -1,6 +1,8 @@
 #ifndef OR_PROTOCOL_UTILS_H_
 #define OR_PROTOCOL_UTILS_H_
 
+#include <deque>
+#include <mutex>
 
 #include <or_protocol/types.h>
 #include <ros/console.h>
@@ -50,6 +52,34 @@ void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
   ros::serialization::IStream s(buff + offset, size - offset);
   ros::serialization::deserialize(s, msg);
 }
+
+
+// thread safe queue
+template <typename T>
+class SafeFIFOQueue
+{
+  public:
+    bool pop(T& item)
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex);
+      if (queue.size() > 0) {
+        item = queue.front();
+        queue.pop_front();
+        return true;
+      }
+      return false;
+    }
+
+    void push(const T& item)
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex);
+      queue.push_back(item);
+    }
+
+  private:
+    std::mutex queue_mutex;
+    std::deque<T> queue;
+};
 
 
 }  // namespace or_protocol
