@@ -38,6 +38,9 @@ set(LIBRARY_FILES
 add_library(${PROJECT_NAME} ${LIBRARY_FILES})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} Threads::Threads)
 
+add_executable(or_node src/or_node.cpp)
+target_link_libraries(or_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
 add_executable(test_node src/test_node.cpp)
 target_link_libraries(test_node ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
 
