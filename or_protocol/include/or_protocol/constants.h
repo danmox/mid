@@ -37,6 +37,21 @@ namespace or_protocol {
 // the maximum allowable ETX between relays of the same transmitter
 #define RELAY_ETX_THRESHOLD 2.0
 
+// the beacon interval in milliseconds
+#define BEACON_INTERVAL 1000
+
+// jitter to inject into beacon interval in milliseconds
+#define BEACON_JITTER 100
+
+// moving average constant used in ETX estimation:
+// etx{t} = (1 - alpha) * etx{t-1} + alpha * etx_sample{t}
+#define ETX_ALPHA 0.3
+
+// a large value for ETX used in cases where links have a delivery probability
+// of zero
+// TODO what are the implications of this?
+#define ETX_MAX 1e9
+
 
 }  // namespace or_protocol
 

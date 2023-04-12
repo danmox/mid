@@ -53,7 +53,7 @@ void msg_cb(ros::Time recv_time, or_protocol_msgs::Packet& pkt, int node_id, int
 int main(int argc, char** argv)
 {
   if (argc != 3) {
-    std::cout << "[main] usage: or_test <ip address> <sample.yalm>" << std::endl;
+    std::cout << "[main] usage: or_test <ip address> <sample.yaml>" << std::endl;
     return 0;
   }
 

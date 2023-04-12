@@ -9,11 +9,17 @@
 #include <unordered_set>
 
 #include <or_protocol/constants.h>
+#include <or_protocol/types.h>
+#include <or_protocol/utils.h>
 
 #include <or_protocol_msgs/Header.h>
+#include <or_protocol_msgs/NetworkStatus.h>
 
 
 namespace or_protocol {
+
+
+using or_protocol_msgs::ETXEntry;
 
 
 struct AttemptPriorityPair
@@ -51,24 +57,32 @@ class NodeState
     // priority node)
     void ack_msg(const uint32_t seq);
 
-    // TODO compute transmission statistics
-    void update_stats(const or_protocol_msgs::Header& header);
-
     // return the priority of a message (assumes a message with the same source
     // and sequence number has already been added to the queue)
     int priority(const int seq);
 
+    // update delivery probability estimate
+    void update_link_state(const PacketQueueItemPtr& beacon = nullptr);
+
+    ETXEntry get_etx_entry(const int dest) const;
+
   private:
     // the history of messages received kept as a deque for quickly determining
     // the oldest message in the queue and as a map for quickly determining if a
-    // message has been received before and the highest received priority; these
-    // two data structures are kept synchronized
+    // message has been received before and if so the highest received priority;
+    // these two data structures are kept synchronized
     std::unordered_map<uint32_t, AttemptPriorityPair> msg_hist_map;
     std::deque<SeqAttemptPair> msg_hist_deque;
+
+    // variables for estimating the delivery probability from this node
+    ros::Time last_beacon_stamp{0};
+    double delivery_probability{0.0};
+    uint16_t etx_seq{0};
 };
 
 
 typedef std::unordered_map<int, std::unordered_map<int, double>> ETXMap;
+typedef std::unordered_map<int, std::unordered_map<int, ETXEntry>> ETXEntryMap;
 typedef std::unordered_map<int, std::vector<int>> IntVectorMap;
 typedef or_protocol_msgs::Header::_relays_type RelayArray;
 typedef std::unordered_map<int, RelayArray> IntArrayMap;
@@ -92,8 +106,16 @@ class NetworkState
     // from node_id
     int priority(const int node_id, const int seq);
 
-    void update_stats(const int node_id, const or_protocol_msgs::Header& header);
+    // add beacon (NetworkStatus) frame to queue
+    void push_beacon_queue(const PacketQueueItemPtr& item) { beacon_queue.push(item); }
 
+    // process beacon (NetworkStatus) frames in queue
+    void process_beacon_queue(const int root);
+
+    // generate beacon (NetworkStatus) message to be sent to other nodes
+    or_protocol_msgs::NetworkStatus::Ptr generate_beacon();
+
+    // NOTE not thread safe but is meant only for testing
     void set_etx_map(const ETXMap& map) { link_etx = map; }
     FixedRoutingMap get_routing_map() { return routing_map; }
 
@@ -104,19 +126,29 @@ class NetworkState
     RelayArray relays(const or_protocol_msgs::Header& header);
 
   private:
-    // the state of each node in the network
+    // the message history of each node in the network used for determining
+    // if/when to relay received messages
     std::unordered_map<int, NodeState> node_states;
 
+    // beacon (NetworkState) frame queue; frames are pushed here by the main
+    // packet thread for eventual processing in a separate worker thread
+    SafeFIFOQueue<PacketQueueItemPtr> beacon_queue;
+
     // estimated ETX for each node in the network
-    // NOTE we assume the network is connected in find_routes; link_etx_map must
-    // be constructed accordingly
+    // NOTE we assume the network is connected in find_routes; link_etx must be
+    // constructed accordingly
+    // TODO merge these two maps
     ETXMap link_etx;
+    ETXEntryMap link_etx_table;
+
+    // positions of each robot in the network
+    std::unordered_map<int, or_protocol_msgs::Point> node_positions;
 
     // path for each node in the network
     FixedRoutingMap routing_map;
 
     // synchronize access to the routing and link ETX maps during reads/writes
-    std::mutex routing_map_mutex, link_etx_mutex;
+    std::mutex routing_map_mutex, status_mutex;
 };
 
 
