@@ -26,6 +26,10 @@ add_message_files(
     Header.msg
     Log.msg
     Packet.msg
+    ETXEntry.msg
+    ETXList.msg
+    NetworkStatus.msg
+    Point.msg
 )
 
 generate_messages()

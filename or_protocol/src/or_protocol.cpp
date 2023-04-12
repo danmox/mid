@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <random>
 
 #include <or_protocol/constants.h>
 #include <or_protocol/or_protocol.h>
@@ -58,8 +59,10 @@ ORProtocol::ORProtocol(std::string _IP)
     OR_INFO("logging to: %s", log_file.c_str());
   }
 
-  // start main packet processing thread
+  // start packet processing and beacon processing / broadcast threads
   process_thread = std::thread(&ORProtocol::process_packets, this);
+  beacon_rx_thread = std::thread(&ORProtocol::process_beacons, this);
+  beacon_tx_thread = std::thread(&ORProtocol::transmit_beacons, this);
 }
 
 
@@ -67,6 +70,8 @@ ORProtocol::~ORProtocol()
 {
   run = false;
   process_thread.join();
+  beacon_rx_thread.join();
+  beacon_tx_thread.join();
   bag.close();
 }
 
@@ -275,7 +280,12 @@ void ORProtocol::process_packets()
     // new packet processing
     //
 
-    // TODO update statistics: network_state.update_stats(header.curr_id, header);
+    // status messages are pushed onto a queue for processing by a separate
+    // thread and are not routed / processed further in this thread
+    if (item->header.msg_type == or_protocol_msgs::Header::STATUS) {
+      network_state.push_beacon_queue(item);
+      continue;
+    }
 
     // filter out messages that originated from the current node (i.e. echoed
     // back from an intermediate relay)
@@ -388,6 +398,56 @@ void ORProtocol::process_packets()
       print_msg_info("deliver", item->header, item->size);
       recv_handle(item->recv_time, msg, node_id, item->size);
     }
+  }
+}
+
+
+void ORProtocol::process_beacons()
+{
+  while (run) {
+    network_state.process_beacon_queue(node_id);
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  }
+}
+
+
+void ORProtocol::transmit_beacons()
+{
+  or_protocol_msgs::Packet beacon;
+  beacon.header.msg_type = or_protocol_msgs::Header::STATUS;
+  beacon.header.hops = 0;
+  beacon.header.attempt = 0;
+  beacon.header.reliable = false;
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> jitter_dist(-BEACON_JITTER, BEACON_JITTER);
+
+  unsigned int it = 1;
+  ros::Time t0 = ros::Time::now();
+  while (run) {
+    beacon.header.hops = 0;
+    beacon.data.clear();
+
+    or_protocol_msgs::NetworkStatusPtr ptr = network_state.generate_beacon();
+    pack_msg(beacon, *ptr);
+
+    const bool set_routes = false;
+    send(beacon, set_routes);
+
+    int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
+    ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
+    int sleep_duration_ms = (t0 + offset - ros::Time::now()).toSec() * 1e3;
+
+    if (sleep_duration_ms > 0) {
+      OR_DEBUG("beacon thread: sleeping for %dms", sleep_duration_ms);
+      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_duration_ms));
+    } else {
+      OR_WARN("negative sleep_duration_ms (%dms)!", sleep_duration_ms);
+      std::this_thread::sleep_for(std::chrono::milliseconds(int(BEACON_INTERVAL / 2.0)));
+    }
+
+    it++;
   }
 }
 

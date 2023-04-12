@@ -5,6 +5,9 @@
 #include <or_protocol/network_state.h>
 #include <or_protocol/utils.h>
 
+#include <or_protocol_msgs/NetworkStatus.h>
+#include <ros/console.h>
+
 
 namespace or_protocol {
 
@@ -61,6 +64,37 @@ void NodeState::ack_msg(const uint32_t seq)
 int NodeState::priority(const int seq)
 {
   return msg_hist_map[seq].priority;
+}
+
+
+void NodeState::update_link_state(const PacketQueueItemPtr& beacon)
+{
+  // updates without a beacon frame, used to update the delivery probability
+  // when beacon frames are dropped
+  if (!beacon) {
+    if (last_beacon_stamp.toSec() > 1.2 * BEACON_INTERVAL * BEACON_JITTER) {
+      last_beacon_stamp += ros::Duration(0, BEACON_INTERVAL * 1e6);
+      delivery_probability *= 1.0 - ETX_ALPHA;
+      etx_seq++;
+    }
+  } else {
+    last_beacon_stamp = beacon->recv_time;
+    delivery_probability = (1.0 - ETX_ALPHA) * delivery_probability + ETX_ALPHA;
+    etx_seq++;
+  }
+}
+
+
+or_protocol_msgs::ETXEntry NodeState::get_etx_entry(const int dest) const
+{
+  or_protocol_msgs::ETXEntry entry;
+  entry.node = dest;
+  entry.seq = etx_seq;
+  if (delivery_probability > 1.0 / ETX_MAX)
+    entry.etx = 1.0 / delivery_probability;
+  else
+    entry.etx = ETX_MAX;
+  return entry;
 }
 
 
@@ -323,6 +357,82 @@ void NetworkState::update_routes(const int root)
 
   std::lock_guard<std::mutex> lock(routing_map_mutex);
   routing_map = new_fixed_routing_map;
+}
+
+
+void NetworkState::process_beacon_queue(const int root)
+{
+  // TODO handling adding new nodes?
+
+  ETXEntryMap new_link_etx_table;
+  std::unordered_map<int, or_protocol_msgs::Point> new_node_positions;
+  {
+    std::lock_guard<std::mutex> lock(status_mutex);
+    new_link_etx_table = link_etx_table;
+    new_node_positions = node_positions;
+  }
+
+  PacketQueueItemPtr item;
+  while (beacon_queue.pop(item)) {
+    or_protocol_msgs::Packet pkt;
+    deserialize(pkt, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
+    or_protocol_msgs::NetworkStatus status_msg;
+    deserialize(status_msg, pkt.data.data(), pkt.data.size());
+
+    for (const or_protocol_msgs::Point& point : status_msg.positions) {
+      if (point.seq > new_node_positions[point.node].seq)
+        new_node_positions[point.node] = point;
+    }
+
+    node_states[item->header.curr_id].update_link_state(item);
+
+    for (const or_protocol_msgs::ETXList& list : status_msg.etx_table) {
+      const int tx_node = list.node;
+      for (const or_protocol_msgs::ETXEntry& entry : list.etx_list) {
+        if (entry.seq > new_link_etx_table[tx_node][entry.node].seq) {
+          new_link_etx_table[tx_node][entry.node] = entry;
+        }
+      }
+    }
+  }
+
+  // update ETX table with most recent ETXs in node_states
+  // NOTE the ETX values held in node_states are guaranteed to be the most
+  // recent and thus we don't need to check for increasing sequence numbers here
+  for (const auto& item : node_states) {
+    new_link_etx_table[item.first][root] = item.second.get_etx_entry(root);
+  }
+
+  std::lock_guard<std::mutex> lock(status_mutex);
+  link_etx_table = new_link_etx_table;
+  node_positions = new_node_positions;
+}
+
+
+or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
+{
+  ETXEntryMap link_etx;
+  std::unordered_map<int, or_protocol_msgs::Point> positions;
+  {
+    std::lock_guard<std::mutex> lock(status_mutex);
+    link_etx = link_etx_table;
+    positions = node_positions;
+  }
+
+  or_protocol_msgs::NetworkStatus::Ptr msg(new or_protocol_msgs::NetworkStatus());
+
+  for (const auto& point : positions)
+    msg->positions.push_back(point.second);
+
+  for (const auto& list : link_etx) {
+    or_protocol_msgs::ETXList etx_list;
+    etx_list.node = list.first;
+    for (const auto& item : list.second)
+      etx_list.etx_list.push_back(item.second);
+    msg->etx_table.push_back(etx_list);
+  }
+
+  return msg;
 }
 
 

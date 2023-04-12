@@ -80,6 +80,13 @@ class ORProtocol
     // packet processing thread
     std::thread process_thread;
 
+    // threads for transmitting beacons frames at a regular interval and
+    // processing received beacon frames
+    std::thread beacon_tx_thread, beacon_rx_thread;
+
+    // thread for recomputing the routing table
+    std::thread routing_thead;
+
     // bagfile used for logging packet statistics
     rosbag::Bag bag;
 
@@ -92,6 +99,13 @@ class ORProtocol
 
     // main thread processing packet_queue and making forwarding decisions
     void process_packets();
+
+    // all received beacon frames are pushed onto a queue for processing by a
+    // separate thread to avoid blocking in the main packet processing thread
+    void process_beacons();
+
+    // thread for transmitting beacon frames at a regular interval
+    void transmit_beacons();
 
     // a helper function for logging information about a message
     void print_msg_info(const std::string& msg,
