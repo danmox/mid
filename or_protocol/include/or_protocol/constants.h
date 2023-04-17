@@ -49,7 +49,7 @@ namespace or_protocol {
 
 // a large value for ETX used in cases where links have a delivery probability
 // of zero
-// TODO what are the implications of this?
+// TODO what are the implications of this? should it be lower?
 #define ETX_MAX 1e9
 
 

@@ -21,6 +21,7 @@ using ros::serialization::serializationLength;
 volatile bool run = true;
 rosbag::Bag bag;
 std::mutex bag_mutex;
+std::shared_ptr<or_protocol::ORProtocol> or_node;
 
 
 struct FlowSpec
@@ -46,7 +47,7 @@ void msg_cb(ros::Time recv_time, or_protocol_msgs::Packet& pkt, int node_id, int
   or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
 
   std::lock_guard<std::mutex> lock(bag_mutex);
-  bag.write("/recv_seq_numbers", recv_time, seq);
+  or_node->log_ros_msg("recv_seq_numbers", recv_time, seq);
 }
 
 
@@ -120,15 +121,15 @@ int main(int argc, char** argv)
   siginthandler.sa_flags = 0;
   sigaction(SIGINT, &siginthandler, NULL);
 
-  or_protocol::ORProtocol or_node(argv[1]);
-  or_node.register_recv_func(msg_cb);
+  or_node.reset(new or_protocol::ORProtocol(argv[1]));
+  or_node->register_recv_func(msg_cb);
 
   bag.open("test_node.bag", rosbag::bagmode::Write);
 
   if (total_msgs != 0)
     ROS_INFO("[main] sending %d messages", total_msgs);
   int sent_msgs = 0;
-  while (run && or_node.is_running()) {
+  while (run && or_node->is_running()) {
     for (auto& src : flows) {
       for (auto& dest : src.second) {
         FlowSpec& flow = dest.second;
@@ -140,10 +141,10 @@ int main(int argc, char** argv)
         const int pad_bytes = flow.total_size - serializationLength(flow.packet);
         flow.packet.data.insert(flow.packet.data.end(), pad_bytes, 1);
 
-        or_node.send(flow.packet);
+        or_node->send(flow.packet);
         {
           std::lock_guard<std::mutex> lock(bag_mutex);
-          bag.write("/send_seq_numbers", ros::Time::now(), flow.seq);
+          or_node->log_ros_msg("send_seq_numbers", ros::Time::now(), flow.seq);
         }
         flow.seq.data++;
       }

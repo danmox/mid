@@ -36,6 +36,18 @@ class ORProtocol
     // TODO implement: shut down the node
     void shutdown();
 
+    template <typename T>
+    void log_ros_msg(const std::string &topic, const ros::Time &time, const T &msg)
+    {
+      static const std::string prefix = "/node" + std::to_string(node_id) + "/";
+      if (bag.isOpen()) {
+        std::lock_guard<std::mutex> lock(log_mutex);
+        bag.write(prefix + topic, time, msg);
+      } else {
+        OR_ERROR("cannot write msg to bag! bag not open!");
+      }
+    }
+
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
 
