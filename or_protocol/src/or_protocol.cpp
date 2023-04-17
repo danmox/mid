@@ -196,7 +196,7 @@ void ORProtocol::log_message(const or_protocol_msgs::Header& header,
                              const int size,
                              const ros::Time& time)
 {
-  static const std::string topic = "node" + std::to_string(node_id);
+  static const std::string topic = "/node" + std::to_string(node_id) + "/log";
   Log msg;
   msg.header = header;
   msg.action = action;

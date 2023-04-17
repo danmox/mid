@@ -352,6 +352,10 @@ def print_main(args):
     msg_type = None if args.type not in str_msg_type_dict else str_msg_type_dict[args.type]
 
     bag = rosbag.Bag(bag_filename, 'r')
+
+    tti = bag.get_type_and_topic_info().topics
+    topics = [t for t in tti if tti[t].msg_type == 'or_protocol_msgs/Log']
+
     bag_start = bag.get_start_time()
     start_time = bag_start
     bag_end = bag.get_end_time()
@@ -371,44 +375,43 @@ def print_main(args):
     time_str_len = len(f'{bag_end - bag_start:.0f}') + 9
     t0 = bag.get_start_time()
     print_count = 0
-    for topic, msg, t in bag:
+    for topic, msg, t in bag.read_messages(topics=topics):
 
         if t.to_sec() < start_time:
             continue
         if t.to_sec() > end_time:
             break
 
-        if hasattr(msg, 'action'):
+        node = int(re.match('^/node([0-9]+)/log$', topic).group(1))
+        if args.node is not None and topic[:4] == 'node' and node != args.node:
+            continue
+        if args.seq is not None and msg.header.seq != args.seq:
+            continue
+        if action is not None and msg.action != action:
+            continue
+        if msg_type is not None and msg.header.msg_type != msg_type:
+            continue
+        if args.count is not None and print_count + 1 > args.count:
+            break
 
-            if args.node is not None and topic[:4] == 'node' and int(re.match('^node([0-9]+)$', topic).group(1)) != args.node:
-                continue
-            if args.seq is not None and msg.header.seq != args.seq:
-                continue
-            if action is not None and msg.action != action:
-                continue
-            if msg_type is not None and msg.header.msg_type != msg_type:
-                continue
-            if args.count is not None and print_count + 1 > args.count:
-                break
 
+        print_count += 1
+        if args.quiet:
+            continue
 
-            print_count += 1
-            if args.quiet:
-                continue
+        time_str = ''
+        if int(t.to_sec() - t0) > 0:
+            time_str = f'{t.to_sec() - bag_start:.6f} s'
+            t0 = t.to_sec()
+        else:
+            time_str = f'+{(t.to_sec() - t0)*1000:.2f} ms'
+        time_str = (time_str_len - len(time_str))*' ' + time_str
 
-            time_str = ''
-            if int(t.to_sec() - t0) > 0:
-                time_str = f'{t.to_sec() - bag_start:.6f} s'
-                t0 = t.to_sec()
-            else:
-                time_str = f'+{(t.to_sec() - t0)*1000:.2f} ms'
-            time_str = (time_str_len - len(time_str))*' ' + time_str
-
-            node_id = int(re.match('^node([0-9]+)$', topic).group(1))
-            print(f'[{time_str}] {msg_type_str(msg)}[{node_id}]: {msg_type_str(msg.header)}:'
-                  f' {msg.header.src_id} > {msg.header.dest_id} via {msg.header.curr_id}, '
-                  f'{msg.size} bytes, seq={msg.header.seq}, try={msg.header.attempt},'
-                  f' hops={msg.header.hops}, rel={msg.header.reliable}')
+        node_id = int(re.match('^/node([0-9]+)/log$', topic).group(1))
+        print(f'[{time_str}] {msg_type_str(msg)}[{node_id}]: {msg_type_str(msg.header)}:'
+              f' {msg.header.src_id} > {msg.header.dest_id} via {msg.header.curr_id}, '
+              f'{msg.size} bytes, seq={msg.header.seq}, try={msg.header.attempt},'
+              f' hops={msg.header.hops}, rel={msg.header.reliable}')
 
     print(f'{print_count} messages')
 
