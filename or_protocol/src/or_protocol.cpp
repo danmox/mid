@@ -25,8 +25,7 @@ ORProtocol::ORProtocol(std::string _IP)
 
   OR_INFO("starting ORNode @ %s:%d", _IP.c_str(), OR_PROTOCOL_PORT);
 
-  std::string id_str = _IP.substr(_IP.find_last_of('.') + 1);
-  node_id = std::stoi(id_str);
+  node_id = std::stoi(_IP.substr(_IP.find_last_of('.') + 1));
 
   // initialize BCastSocket and register recv function handle
   namespace ph = std::placeholders;
@@ -434,6 +433,8 @@ void ORProtocol::transmit_beacons()
 
     const bool set_routes = false;
     send(beacon, set_routes);
+
+    log_ros_msg("beacons", ros::Time::now(), *ptr);
 
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
