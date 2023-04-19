@@ -97,7 +97,7 @@ class ORProtocol
     std::thread beacon_tx_thread, beacon_rx_thread;
 
     // thread for recomputing the routing table
-    std::thread routing_thead;
+    std::thread routing_thread;
 
     // bagfile used for logging packet statistics
     rosbag::Bag bag;
@@ -118,6 +118,9 @@ class ORProtocol
 
     // thread for transmitting beacon frames at a regular interval
     void transmit_beacons();
+
+    // thread for recomputing the routing table
+    void compute_routes();
 
     // a helper function for logging information about a message
     void print_msg_info(const std::string& msg,

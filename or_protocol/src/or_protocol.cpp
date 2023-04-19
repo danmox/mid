@@ -58,10 +58,11 @@ ORProtocol::ORProtocol(std::string _IP)
     OR_INFO("logging to: %s", log_file.c_str());
   }
 
-  // start packet processing and beacon processing / broadcast threads
+  // start worker threads
   process_thread = std::thread(&ORProtocol::process_packets, this);
   beacon_rx_thread = std::thread(&ORProtocol::process_beacons, this);
   beacon_tx_thread = std::thread(&ORProtocol::transmit_beacons, this);
+  routing_thread = std::thread(&ORProtocol::compute_routes, this);
 }
 
 
@@ -71,6 +72,7 @@ ORProtocol::~ORProtocol()
   process_thread.join();
   beacon_rx_thread.join();
   beacon_tx_thread.join();
+  routing_thread.join();
   bag.close();
 }
 
@@ -438,17 +440,38 @@ void ORProtocol::transmit_beacons()
 
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
-    int sleep_duration_ms = (t0 + offset - ros::Time::now()).toSec() * 1e3;
+    int sleep_ms = (t0 + offset - ros::Time::now()).toSec() * 1e3;
 
-    if (sleep_duration_ms > 0) {
-      OR_DEBUG("beacon thread: sleeping for %dms", sleep_duration_ms);
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_duration_ms));
+    if (sleep_ms > 0) {
+      OR_DEBUG("beacon thread: sleeping for %dms", sleep_ms);
+      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     } else {
-      OR_WARN("negative sleep_duration_ms (%dms)!", sleep_duration_ms);
+      OR_WARN("negative sleep_duration_ms (%dms) in transmit_beacons()!", sleep_ms);
       std::this_thread::sleep_for(std::chrono::milliseconds(int(BEACON_INTERVAL / 2.0)));
     }
 
     it++;
+  }
+}
+
+
+void ORProtocol::compute_routes()
+{
+  static double period = 1.0; // period to recompute routes in seconds
+
+  ros::Time target_time = ros::Time::now();
+  while (run) {
+    network_state.update_routes(node_id);
+
+    target_time += ros::Duration(period);
+    int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;
+    if (sleep_ms > 0) {
+      OR_DEBUG("routes thread: sleeping for %dms", sleep_ms);
+      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    } else {
+      OR_WARN("negative sleep_duration_ms (%dms) in compute_routes()!", sleep_ms);
+      std::this_thread::sleep_for(std::chrono::milliseconds(int(period / 2.0 * 1e3)));
+    }
   }
 }
 
