@@ -116,7 +116,7 @@ class NetworkState
     or_protocol_msgs::NetworkStatus::Ptr generate_beacon();
 
     // NOTE not thread safe but is meant only for testing
-    void set_etx_map(const ETXMap& map) { link_etx = map; }
+    void set_etx_map(const ETXMap& map);
     FixedRoutingMap get_routing_map() { return routing_map; }
 
     // compute relays root should use for every possible flow in the network
@@ -134,11 +134,7 @@ class NetworkState
     // packet thread for eventual processing in a separate worker thread
     SafeFIFOQueue<PacketQueueItemPtr> beacon_queue;
 
-    // estimated ETX for each node in the network
-    // NOTE we assume the network is connected in find_routes; link_etx must be
-    // constructed accordingly
-    // TODO merge these two maps
-    ETXMap link_etx;
+    // estimated ETX for each node in the network computed via beaconing
     ETXEntryMap link_etx_table;
 
     // positions of each robot in the network
