@@ -144,22 +144,36 @@ typedef std::priority_queue<NodeCostPair,
 
 void NetworkState::update_routes(const int root)
 {
+  std::unordered_set<int> ids;
+  ETXEntryMap local_link_etx_table;
+  {
+    std::lock_guard<std::mutex> lock(status_mutex);
+    ids = node_ids;
+    local_link_etx_table = link_etx_table;
+  }
+
+  // build link_etx used in packet route planning
+
+  // NOTE link_etx augments link_etx_table to include self etx links and fills
+  // in any missing links with ETX_MAX
+  ETXMap link_etx;
+  for (const int src : ids) {
+    for (const int dest : ids) {
+      if (local_link_etx_table[src].count(dest) == 0)
+        link_etx[src][dest] = src == dest ? 0.0 : ETX_MAX;
+      else
+        link_etx[src][dest] = local_link_etx_table[src][dest].etx;
+    }
+  }
+
   //
   // compute path_etx and default_paths
   //
 
-  std::unordered_set<int> node_ids;
-  for (const auto& id_map_pair : link_etx) {
-    node_ids.insert(id_map_pair.first);
-    for (const auto& id_etx_pair : id_map_pair.second)
-      node_ids.insert(id_etx_pair.first);
-  }
-  node_ids.insert(root);
-
   // find the shortest path between each pair of nodes in the network
   ETXMap path_etx;
   VariableRoutingMap default_paths;
-  for (const int node : node_ids) {
+  for (const int node : ids) {
 
     PriorityQueue frontier;
     std::unordered_map<int, int> parent;
@@ -186,13 +200,13 @@ void NetworkState::update_routes(const int root)
     }
 
     // path ETX for the shortest paths from node to all other nodes
-    for (const int dest : node_ids)
+    for (const int dest : ids)
       path_etx[node][dest] = cost[dest];
 
     // reconstruct default paths
     // NOTE assumes a connected network!!
     // TODO handle disconnected networks
-    for (const int dest : node_ids) {
+    for (const int dest : ids) {
       int current = dest;
       std::vector<int>& path = default_paths[node][dest];
       while (current != parent[current]) {
@@ -207,9 +221,9 @@ void NetworkState::update_routes(const int root)
   // compute default path ETX (i.e. for every default path, the shortest
   // distance from every node in the network to the destination along the path)
   std::unordered_map<int, ETXMap> default_path_etx;
-  for (const int s : node_ids) {
-    for (const int d : node_ids) {
-      for (const int n : node_ids) {
+  for (const int s : ids) {
+    for (const int d : ids) {
+      for (const int n : ids) {
         double min_etx = std::numeric_limits<double>::max();
         for (const int p : default_paths[s][d])
           min_etx = std::min(min_etx, link_etx[n][p] + path_etx[p][d]);
@@ -246,8 +260,8 @@ void NetworkState::update_routes(const int root)
   // compute the full routing table; loosly based on the rules presented in
   // SOAR: https://ieeexplore.ieee.org/document/4912211
   VariableRoutingMap new_routing_map;
-  for (const int src : node_ids) {
-    for (const int dest : node_ids) {
+  for (const int src : ids) {
+    for (const int dest : ids) {
       bool found_root_relays = false;
       const std::vector<int>& path = default_paths[src][dest];
       auto& default_path_i_etx = default_path_etx[src][dest];
@@ -339,8 +353,8 @@ void NetworkState::update_routes(const int root)
   // NOTE this may occur when network state information on each node is out of
   // sync (i.e. node Y thinks node X should participate but node X does not)
   FixedRoutingMap new_fixed_routing_map;
-  for (const int src : node_ids) {
-    for (const int dest: node_ids) {
+  for (const int src : ids) {
+    for (const int dest: ids) {
       if (src == dest)
         continue;
       if (new_routing_map[src][dest].size() == 0) {
@@ -357,6 +371,22 @@ void NetworkState::update_routes(const int root)
 
   std::lock_guard<std::mutex> lock(routing_map_mutex);
   routing_map = new_fixed_routing_map;
+}
+
+
+// NOTE not thread safe! only intended for testing
+void NetworkState::set_etx_map(const ETXMap& map)
+{
+  for (const auto& list : map) {
+    int tx_node = list.first;
+    node_ids.insert(tx_node);
+    for (const auto& item : list.second) {
+      or_protocol_msgs::ETXEntry entry;
+      entry.node = item.first;
+      entry.etx = item.second;
+      link_etx_table[tx_node][entry.node] = entry;
+    }
+  }
 }
 
 
