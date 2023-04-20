@@ -83,25 +83,6 @@ void ORProtocol::register_recv_func(msg_recv_func fcn)
 }
 
 
-std::string packet_type_string(const or_protocol_msgs::Header& header)
-{
-  switch (header.msg_type) {
-    case or_protocol_msgs::Header::STATUS:
-      return std::string("STATUS");
-    case or_protocol_msgs::Header::PAYLOAD:
-      return std::string("PAYLOAD");
-    case or_protocol_msgs::Header::PING_REQ:
-      return std::string("PING_REQ");
-    case or_protocol_msgs::Header::PING_RES:
-      return std::string("PING_RES");
-    case or_protocol_msgs::Header::ACK:
-      return std::string("ACK");
-    default:
-      return std::string("UNKNOWN");
-  }
-}
-
-
 void ORProtocol::print_msg_info(const std::string& msg,
                                 const or_protocol_msgs::Header& header,
                                 int size,

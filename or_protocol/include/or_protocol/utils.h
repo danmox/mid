@@ -32,6 +32,10 @@ uint32_t extract_ack(const PacketQueueItemPtr& ptr);
 void update_msg_header(char*, const or_protocol_msgs::Header&);
 
 
+// returns the message type as a string
+std::string packet_type_string(const or_protocol_msgs::Header& header);
+
+
 // serializes a ROS message and inserts it into the payload of an
 // or_protocol_msgs::Packet message
 template <typename M>
