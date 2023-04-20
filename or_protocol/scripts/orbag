@@ -393,6 +393,10 @@ def print_main(args):
             continue
         if args.count is not None and print_count + 1 > args.count:
             break
+        if args.src is not None and msg.header.src_id != args.src:
+            continue
+        if args.dest is not None and msg.header.dest_id != args.dest:
+            continue
 
 
         print_count += 1
@@ -441,6 +445,8 @@ if __name__ == '__main__':
     print_parser.add_argument('-q', '--quiet', action='store_true', help='only print the message count')
     print_parser.add_argument('-s', '--seq', type=int, help='print messages related to a given seq number')
     print_parser.add_argument('-n', '--node', type=int, help='print messages processed at the given ID')
+    print_parser.add_argument('--src', type=int, help='print messages originating at the given src node')
+    print_parser.add_argument('--dest', type=int, help='print messages intended for the given dest node')
     print_parser.add_argument('--start', type=float, help='print messages after given start time (s)')
     print_parser.add_argument('--end', type=float, help='print messages until given end time (s)')
 
