@@ -69,13 +69,18 @@ int NodeState::priority(const int seq)
 
 void NodeState::update_link_state(const PacketQueueItemPtr& beacon)
 {
-  // updates without a beacon frame, used to update the delivery probability
+  // TODO switch to a moving average with a window
+  // updates without a beacon frame are used to update the delivery probability
   // when beacon frames are dropped
   if (!beacon) {
-    if (last_beacon_stamp.toSec() > 1.2 * BEACON_INTERVAL * BEACON_JITTER) {
+    double elapsed_ms = (ros::Time::now() - last_beacon_stamp).toSec() * 1e3;
+    if (elapsed_ms > 1.2 * (BEACON_INTERVAL + 2*BEACON_JITTER)) {
       last_beacon_stamp += ros::Duration(0, BEACON_INTERVAL * 1e6);
       delivery_probability *= 1.0 - ETX_ALPHA;
       etx_seq++;
+      OR_DEBUG("updating with no beacon received");
+    } else {
+      OR_DEBUG("elapsed_ms = %.2f", elapsed_ms);
     }
   } else {
     last_beacon_stamp = beacon->recv_time;
@@ -396,18 +401,23 @@ void NetworkState::process_beacon_queue(const int root)
 
   ETXEntryMap new_link_etx_table;
   std::unordered_map<int, or_protocol_msgs::Point> new_node_positions;
+  std::unordered_set<int> new_node_ids;
   {
     std::lock_guard<std::mutex> lock(status_mutex);
     new_link_etx_table = link_etx_table;
     new_node_positions = node_positions;
+    new_node_ids = node_ids;
   }
 
   PacketQueueItemPtr item;
+  std::unordered_set<int> beacon_ids;
   while (beacon_queue.pop(item)) {
     or_protocol_msgs::Packet pkt;
     deserialize(pkt, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
     or_protocol_msgs::NetworkStatus status_msg;
     deserialize(status_msg, pkt.data.data(), pkt.data.size());
+
+    beacon_ids.insert(item->header.curr_id);
 
     for (const or_protocol_msgs::Point& point : status_msg.positions) {
       if (point.seq > new_node_positions[point.node].seq)
@@ -418,24 +428,37 @@ void NetworkState::process_beacon_queue(const int root)
 
     for (const or_protocol_msgs::ETXList& list : status_msg.etx_table) {
       const int tx_node = list.node;
+      new_node_ids.insert(tx_node);
       for (const or_protocol_msgs::ETXEntry& entry : list.etx_list) {
-        if (entry.seq > new_link_etx_table[tx_node][entry.node].seq) {
+        new_node_ids.insert(entry.node);
+        if (new_link_etx_table[tx_node][entry.node].seq < entry.seq) {
           new_link_etx_table[tx_node][entry.node] = entry;
         }
       }
     }
   }
 
-  // update ETX table with most recent ETXs in node_states
+  // TODO how to handle nodes that leave the network? if a node becomes
+  // disconnected either temporarily or permanently the rest of the network
+  // stops receiving beacon frames from them - as a result their ETX values
+  // remain fixed resulting in inaccuracies in route setting. Enforce a timeout
+  // after which a link's ETX gets set to ETX_MAX?
+
+  // run through nodes that did not receive a beacon this iteration
+  for (const int id : new_node_ids)
+    if (beacon_ids.count(id) == 0 && id != root)
+      node_states[id].update_link_state();
+
+  // update ETX table with most recent ETX values in node_states
   // NOTE the ETX values held in node_states are guaranteed to be the most
   // recent and thus we don't need to check for increasing sequence numbers here
-  for (const auto& item : node_states) {
+  for (const auto& item : node_states)
     new_link_etx_table[item.first][root] = item.second.get_etx_entry(root);
-  }
 
   std::lock_guard<std::mutex> lock(status_mutex);
   link_etx_table = new_link_etx_table;
   node_positions = new_node_positions;
+  node_ids = new_node_ids;
 }
 
 

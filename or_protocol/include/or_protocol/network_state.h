@@ -76,7 +76,7 @@ class NodeState
 
     // variables for estimating the delivery probability from this node
     ros::Time last_beacon_stamp{0};
-    double delivery_probability{0.0};
+    double delivery_probability{1.0};
     uint16_t etx_seq{0};
 };
 
@@ -145,6 +145,9 @@ class NetworkState
 
     // synchronize access to the routing and link ETX maps during reads/writes
     std::mutex routing_map_mutex, status_mutex;
+
+    // list of node ids for convenience
+    std::unordered_set<int> node_ids;
 };
 
 
