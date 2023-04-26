@@ -69,14 +69,13 @@ int NodeState::priority(const int seq)
 
 void NodeState::update_link_state(const PacketQueueItemPtr& beacon)
 {
-  // TODO switch to a moving average with a window
   // updates without a beacon frame are used to update the delivery probability
   // when beacon frames are dropped
   if (!beacon) {
     double elapsed_ms = (ros::Time::now() - last_beacon_stamp).toSec() * 1e3;
     if (elapsed_ms > 1.2 * (BEACON_INTERVAL + 2*BEACON_JITTER)) {
       last_beacon_stamp += ros::Duration(0, BEACON_INTERVAL * 1e6);
-      delivery_probability *= 1.0 - ETX_ALPHA;
+      delivery_probability.update(0);
       etx_seq++;
       OR_DEBUG("updating with no beacon received");
     } else {
@@ -84,7 +83,7 @@ void NodeState::update_link_state(const PacketQueueItemPtr& beacon)
     }
   } else {
     last_beacon_stamp = beacon->recv_time;
-    delivery_probability = (1.0 - ETX_ALPHA) * delivery_probability + ETX_ALPHA;
+    delivery_probability.update(1);
     etx_seq++;
   }
 }
@@ -95,10 +94,8 @@ or_protocol_msgs::ETXEntry NodeState::get_etx_entry(const int dest) const
   or_protocol_msgs::ETXEntry entry;
   entry.node = dest;
   entry.seq = etx_seq;
-  if (delivery_probability > 1.0 / ETX_MAX)
-    entry.etx = 1.0 / delivery_probability;
-  else
-    entry.etx = ETX_MAX;
+  double dp = delivery_probability.get();
+  entry.etx = dp < 1.0 / ETX_MAX ? ETX_MAX : 1.0 / dp;
   return entry;
 }
 

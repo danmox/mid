@@ -77,7 +77,7 @@ class NodeState
 
     // variables for estimating the delivery probability from this node
     ros::Time last_beacon_stamp{0};
-    double delivery_probability{1.0};
+    MovingAverage<uint8_t, ETX_BUFFER_LEN> delivery_probability;
     uint16_t etx_seq{0};
 };
 
