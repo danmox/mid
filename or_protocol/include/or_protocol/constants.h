@@ -37,6 +37,9 @@ namespace or_protocol {
 // the maximum allowable ETX between relays of the same transmitter
 #define RELAY_ETX_THRESHOLD 2.0
 
+// the time in milliseconds to wait before recomputing the routing table
+#define ROUTING_UPDATE_INTERVAL 1000
+
 // the beacon interval in milliseconds
 #define BEACON_INTERVAL 1000
 

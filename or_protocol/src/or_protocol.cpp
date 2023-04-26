@@ -438,8 +438,6 @@ void ORProtocol::transmit_beacons()
 
 void ORProtocol::compute_routes()
 {
-  static double period = 1.0; // period to recompute routes in seconds
-
   ros::Time target_time = ros::Time::now();
   while (run) {
     network_state.update_routes(node_id);
@@ -447,14 +445,14 @@ void ORProtocol::compute_routes()
     or_protocol_msgs::RoutingTablePtr ptr = network_state.get_routing_table_msg(node_id);
     log_ros_msg("routes", ros::Time::now(), *ptr);
 
-    target_time += ros::Duration(period);
+    target_time += ros::Duration(ROUTING_UPDATE_INTERVAL * 1e-3);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;
     if (sleep_ms > 0) {
       OR_DEBUG("routes thread: sleeping for %dms", sleep_ms);
       std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     } else {
       OR_WARN("negative sleep_duration_ms (%dms) in compute_routes()!", sleep_ms);
-      std::this_thread::sleep_for(std::chrono::milliseconds(int(period / 2.0 * 1e3)));
+      std::this_thread::sleep_for(std::chrono::milliseconds(ROUTING_UPDATE_INTERVAL / 2));
     }
   }
 }
