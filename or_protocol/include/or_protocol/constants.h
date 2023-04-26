@@ -43,9 +43,8 @@ namespace or_protocol {
 // jitter to inject into beacon interval in milliseconds
 #define BEACON_JITTER 100
 
-// moving average constant used in ETX estimation:
-// etx{t} = (1 - alpha) * etx{t-1} + alpha * etx_sample{t}
-#define ETX_ALPHA 0.3
+// number of beacon intervals to average over when estimating ETX
+#define ETX_BUFFER_LEN 8
 
 // a large value for ETX used in cases where links have a delivery probability
 // of zero

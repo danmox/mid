@@ -3,6 +3,7 @@
 
 #include <deque>
 #include <mutex>
+#include <vector>
 
 #include <or_protocol/types.h>
 #include <ros/console.h>
@@ -83,6 +84,32 @@ class SafeFIFOQueue
   private:
     std::mutex queue_mutex;
     std::deque<T> queue;
+};
+
+
+// circular buffer for moving average
+template <typename T, unsigned int N>
+class MovingAverage
+{
+  public:
+    MovingAverage() : sum(0), idx(0) {}
+
+    void update(T val)
+    {
+      sum += val - buffer[idx];
+      buffer[idx] = val;
+      idx = (idx + 1) % N;
+    }
+
+    double get() const
+    {
+      return sum / N;
+    }
+
+  private:
+    T buffer[N];
+    double sum;
+    unsigned int idx;
 };
 
 
