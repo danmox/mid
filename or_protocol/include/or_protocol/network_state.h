@@ -14,6 +14,7 @@
 
 #include <or_protocol_msgs/Header.h>
 #include <or_protocol_msgs/NetworkStatus.h>
+#include <or_protocol_msgs/RoutingTable.h>
 
 
 namespace or_protocol {
@@ -118,6 +119,9 @@ class NetworkState
     // NOTE not thread safe but is meant only for testing
     void set_etx_map(const ETXMap& map);
     FixedRoutingMap get_routing_map() { return routing_map; }
+
+    // returns the routing map in the form of a ROS message
+    or_protocol_msgs::RoutingTable::Ptr get_routing_table_msg(int root);
 
     // compute relays root should use for every possible flow in the network
     void update_routes(const int root);

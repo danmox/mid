@@ -444,6 +444,9 @@ void ORProtocol::compute_routes()
   while (run) {
     network_state.update_routes(node_id);
 
+    or_protocol_msgs::RoutingTablePtr ptr = network_state.get_routing_table_msg(node_id);
+    log_ros_msg("routes", ros::Time::now(), *ptr);
+
     target_time += ros::Duration(period);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;
     if (sleep_ms > 0) {

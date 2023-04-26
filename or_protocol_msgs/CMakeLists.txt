@@ -30,6 +30,10 @@ add_message_files(
     ETXList.msg
     NetworkStatus.msg
     Point.msg
+    RoutingTable.msg
+    RoutingSrcEntry.msg
+    RoutingDestEntry.msg
+    RoutingRule.msg
 )
 
 generate_messages()
