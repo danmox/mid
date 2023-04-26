@@ -489,4 +489,35 @@ or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
 }
 
 
+or_protocol_msgs::RoutingTable::Ptr NetworkState::get_routing_table_msg(int root)
+{
+  FixedRoutingMap routing_map_copy;
+  {
+    std::lock_guard<std::mutex> lock(status_mutex);
+    routing_map_copy = routing_map;
+  }
+
+  or_protocol_msgs::RoutingTable::Ptr msg(new or_protocol_msgs::RoutingTable());
+
+  for (const auto& src_entry : routing_map_copy) {
+    or_protocol_msgs::RoutingSrcEntry src_entry_msg;
+    src_entry_msg.src_id = src_entry.first;
+    for (const auto& dest_entry : src_entry.second) {
+      or_protocol_msgs::RoutingDestEntry dest_entry_msg;
+      dest_entry_msg.dest_id = dest_entry.first;
+
+      or_protocol_msgs::RoutingRule rule;
+      rule.relay_id = root;
+      rule.relays = dest_entry.second;
+
+      dest_entry_msg.rules.push_back(rule);
+      src_entry_msg.entries.push_back(dest_entry_msg);
+    }
+    msg->entries.push_back(src_entry_msg);
+  }
+
+  return msg;
+}
+
+
 }  // namespace or_protocol
