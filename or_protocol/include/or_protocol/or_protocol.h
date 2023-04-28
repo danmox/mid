@@ -39,7 +39,7 @@ class ORProtocol
     template <typename T>
     void log_ros_msg(const std::string &topic, const ros::Time &time, const T &msg)
     {
-      static const std::string prefix = "/node" + std::to_string(node_id) + "/";
+      const std::string prefix = "/node" + std::to_string(node_id) + "/";
       if (bag.isOpen()) {
         std::lock_guard<std::mutex> lock(log_mutex);
         bag.write(prefix + topic, time, msg);
