@@ -26,7 +26,7 @@ namespace or_protocol {
 #define MSG_BUFFER_CAPACITY 200
 
 // thresholds for determining if a candidate relay node is "close" to the
-// current node in ETX
+// current node in terms of ETX
 #define CLOSENESS_FACTOR 2.0
 #define CLOSENESS_THRESHOLD 4.0
 
