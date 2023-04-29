@@ -63,6 +63,7 @@ ORProtocol::ORProtocol(std::string _IP)
   beacon_rx_thread = std::thread(&ORProtocol::process_beacons, this);
   beacon_tx_thread = std::thread(&ORProtocol::transmit_beacons, this);
   routing_thread = std::thread(&ORProtocol::compute_routes, this);
+  log_thread = std::thread(&ORProtocol::process_log_queue, this);
 }
 
 
@@ -73,6 +74,7 @@ ORProtocol::~ORProtocol()
   beacon_rx_thread.join();
   beacon_tx_thread.join();
   routing_thread.join();
+  log_thread.join();
   fclose(log_file);
 }
 
@@ -172,17 +174,12 @@ void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
 }
 
 
-// TODO move logging to a separate thread?
 void ORProtocol::log_message(const or_protocol_msgs::Header& header,
                              const PacketAction action,
                              const int size,
                              const ros::Time& time)
 {
-  const std::string topic = "/node" + std::to_string(node_id) + "/log";
-  const std::string rel_str = header.reliable ? ", REL" : "";
-  const std::string type_str = packet_type_string(header);
-  std::lock_guard<std::mutex> lock(log_mutex);
-  fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d, %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id, packet_action_string(action).c_str(), type_str.c_str(), header.src_id, header.dest_id, header.curr_id, size, header.relays[0], header.relays[1], header.relays[2], header.relays[3], header.seq, header.attempt, rel_str.c_str());
+  log_queue.push(std::make_tuple(header, action, size, time));
 }
 
 
@@ -449,6 +446,27 @@ void ORProtocol::compute_routes()
       OR_WARN("negative sleep_duration_ms (%dms) in compute_routes()!", sleep_ms);
       std::this_thread::sleep_for(std::chrono::milliseconds(ROUTING_UPDATE_INTERVAL / 2));
     }
+  }
+}
+
+
+void ORProtocol::process_log_queue()
+{
+  const std::string topic = "/node" + std::to_string(node_id) + "/log";
+
+  while (run) {
+
+    LogQueueItem item;
+    while (log_queue.pop(item)) {
+      const auto [header, action, size, time] = item;
+      const std::string rel_str = header.reliable ? ", REL" : "";
+      const std::string type_str = packet_type_string(header);
+
+      std::lock_guard<std::mutex> lock(log_mutex);
+      fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d, %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id, packet_action_string(action).c_str(), type_str.c_str(), header.src_id, header.dest_id, header.curr_id, size, header.relays[0], header.relays[1], header.relays[2], header.relays[3], header.seq, header.attempt, rel_str.c_str());
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
   }
 }
 

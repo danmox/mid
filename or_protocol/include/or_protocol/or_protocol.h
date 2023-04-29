@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_set>
 
 #include <or_protocol/bcast_socket.h>
@@ -87,6 +88,13 @@ class ORProtocol
     // thread for recomputing the routing table
     std::thread routing_thread;
 
+    // safe queue for log information to be processed by logging thread
+    typedef std::tuple<or_protocol_msgs::Header, PacketAction, int, ros::Time> LogQueueItem;
+    SafeFIFOQueue<LogQueueItem> log_queue;
+
+    // thread for logging protocol decisions in plain text
+    std::thread log_thread;
+
     // file used for packet routing and transmission logging
     std::FILE* log_file;
 
@@ -109,6 +117,9 @@ class ORProtocol
 
     // thread for recomputing the routing table
     void compute_routes();
+
+    // thread for processing the log_queue
+    void process_log_queue();
 
     // a helper function for logging information about a message
     void print_msg_info(const std::string& msg,
