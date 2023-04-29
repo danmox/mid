@@ -101,6 +101,10 @@ int main(int argc, char** argv)
   int total_msgs = 0;
   if (flows.size() > 0 && sample["total_msgs"])
     total_msgs = sample["total_msgs"].as<int>();
+  double rate = 10;
+  if (sample["rate"])
+    rate = sample["rate"].as<double>();
+  int sleep_ms = 1.0 / rate * 1000;
 
   if (flows.size() > 0) {
     for (auto& src : flows) {
@@ -159,7 +163,7 @@ int main(int argc, char** argv)
 
     ++sent_msgs;
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
   }
 
   ROS_INFO("[main] sleeping for 4 seconds to allow all messages to transmit");
