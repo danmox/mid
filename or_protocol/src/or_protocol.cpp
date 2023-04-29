@@ -49,13 +49,13 @@ ORProtocol::ORProtocol(std::string _IP)
     OR_WARN("unable to fetch HOME environment variable");
     log_dir = std::filesystem::path(".");
   }
-  std::filesystem::path log_file = log_dir / "or-protocol.bag";
-  bag.open(log_file.string(), rosbag::bagmode::Write);
-  if (!bag.isOpen()) {
-    OR_FATAL("failed to open log file: %s", log_file.c_str());
+  std::filesystem::path log_filename = log_dir / "or-protocol.txt";
+  log_file = fopen(log_filename.c_str(), "w");
+  if (log_file == NULL) {
+    OR_FATAL("failed to open log file: %s", log_filename.c_str());
     run = false;
   } else {
-    OR_INFO("logging to: %s", log_file.c_str());
+    OR_INFO("logging to: %s", log_filename.c_str());
   }
 
   // start worker threads
@@ -73,7 +73,7 @@ ORProtocol::~ORProtocol()
   beacon_rx_thread.join();
   beacon_tx_thread.join();
   routing_thread.join();
-  bag.close();
+  fclose(log_file);
 }
 
 
@@ -122,7 +122,7 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
   if (send(buff_ptr.get(), len)) {
     ros::Time now = ros::Time::now();
     print_msg_info("send", msg.header, len);
-    log_message(msg.header, Log::SEND, len, now);
+    log_message(msg.header, PacketAction::SEND, len, now);
 
     // queue message for re-transmission (will get cancelled if an ACK is
     // received within RETRY_DELAY)
@@ -168,23 +168,21 @@ void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
   packet_queue.push(item);
 
   print_msg_info("recv", header, size);
-  log_message(header, Log::RECEIVE, size, now);
+  log_message(header, PacketAction::RECEIVE, size, now);
 }
 
 
 // TODO move logging to a separate thread?
 void ORProtocol::log_message(const or_protocol_msgs::Header& header,
-                             const int action,
+                             const PacketAction action,
                              const int size,
                              const ros::Time& time)
 {
   const std::string topic = "/node" + std::to_string(node_id) + "/log";
-  Log msg;
-  msg.header = header;
-  msg.action = action;
-  msg.size = size;
+  const std::string rel_str = header.reliable ? ", REL" : "";
+  const std::string type_str = packet_type_string(header);
   std::lock_guard<std::mutex> lock(log_mutex);
-  bag.write(topic, time, msg);
+  fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d, %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id, packet_action_string(action).c_str(), type_str.c_str(), header.src_id, header.dest_id, header.curr_id, size, header.relays[0], header.relays[1], header.relays[2], header.relays[3], header.seq, header.attempt, rel_str.c_str());
 }
 
 
@@ -229,7 +227,7 @@ void ORProtocol::process_packets()
           char buff[33];
           snprintf(buff, 33, "retry (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
           print_msg_info(buff, item->header, item->size);
-          log_message(item->header, Log::RETRY, item->size, now);
+          log_message(item->header, PacketAction::RETRY, item->size, now);
 
           // add message back to queue if retries remain
           item->retries--;
@@ -249,7 +247,7 @@ void ORProtocol::process_packets()
         char buff[30];
         snprintf(buff, 30, "relay (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
         print_msg_info(buff, item->header, item->size);
-        log_message(item->header, Log::RELAY, item->size, now);
+        log_message(item->header, PacketAction::RELAY, item->size, now);
       } else {
         char buff[6];
         snprintf(buff, 6, "%d > %d", item->priority, msg_priority(item->header));
@@ -314,7 +312,7 @@ void ORProtocol::process_packets()
           send(item->buffer(), item->size);
           ros::Time now = ros::Time::now();
           print_msg_info("relay", item->header, item->size);
-          log_message(item->header, Log::RELAY, item->size, now);
+          log_message(item->header, PacketAction::RELAY, item->size, now);
         } else {
           const ros::Duration delay(0, UNIT_DELAY * rx_priority);
           item->send_time = item->recv_time + delay;
@@ -339,7 +337,7 @@ void ORProtocol::process_packets()
       update_msg_header(item->buffer(), item->header);
       send(item->buffer(), item->size);
       print_msg_info("reply ping", item->header, item->size);
-      log_message(item->header, Log::SEND, item->size, ros::Time::now());
+      log_message(item->header, PacketAction::SEND, item->size, ros::Time::now());
       continue;
     }
 
@@ -417,8 +415,6 @@ void ORProtocol::transmit_beacons()
     const bool set_routes = false;
     send(beacon, set_routes);
 
-    log_ros_msg("beacons", ros::Time::now(), *ptr);
-
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
     int sleep_ms = (t0 + offset - ros::Time::now()).toSec() * 1e3;
@@ -443,7 +439,6 @@ void ORProtocol::compute_routes()
     network_state.update_routes(node_id);
 
     or_protocol_msgs::RoutingTablePtr ptr = network_state.get_routing_table_msg(node_id);
-    log_ros_msg("routes", ros::Time::now(), *ptr);
 
     target_time += ros::Duration(ROUTING_UPDATE_INTERVAL * 1e-3);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;

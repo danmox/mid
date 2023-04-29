@@ -57,4 +57,21 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
 }
 
 
+std::string packet_action_string(const PacketAction action)
+{
+  switch (action) {
+    case PacketAction::RECEIVE:
+      return std::string("RECEIVE");
+    case PacketAction::RELAY:
+      return std::string("RELAY");
+    case PacketAction::RETRY:
+      return std::string("RETRY");
+    case PacketAction::SEND:
+      return std::string("SEND");
+    default:
+      return std::string("UNKNOWN");
+  }
+}
+
+
 } // namespace or_protocol
