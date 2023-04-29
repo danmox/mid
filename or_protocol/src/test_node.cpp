@@ -47,7 +47,7 @@ void msg_cb(ros::Time recv_time, or_protocol_msgs::Packet& pkt, int node_id, int
   or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
 
   std::lock_guard<std::mutex> lock(bag_mutex);
-  or_node->log_ros_msg("recv_seq_numbers", recv_time, seq);
+  bag.write("recv_seq_numbers", recv_time, seq);
 }
 
 
@@ -121,10 +121,14 @@ int main(int argc, char** argv)
   siginthandler.sa_flags = 0;
   sigaction(SIGINT, &siginthandler, NULL);
 
+  bag.open("test_node.bag", rosbag::bagmode::Write);
+
   or_node.reset(new or_protocol::ORProtocol(argv[1]));
   or_node->register_recv_func(msg_cb);
 
-  bag.open("test_node.bag", rosbag::bagmode::Write);
+  ROS_INFO("[main] sleeping for 10 seconds");
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+  ROS_INFO("[main] starting main loop");
 
   if (total_msgs != 0)
     ROS_INFO("[main] sending %d messages", total_msgs);
@@ -144,7 +148,7 @@ int main(int argc, char** argv)
         or_node->send(flow.packet);
         {
           std::lock_guard<std::mutex> lock(bag_mutex);
-          or_node->log_ros_msg("send_seq_numbers", ros::Time::now(), flow.seq);
+          bag.write("send_seq_numbers", ros::Time::now(), flow.seq);
         }
         flow.seq.data++;
       }

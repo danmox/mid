@@ -19,6 +19,15 @@ namespace or_protocol {
 #define OR_FATAL(fmt, ...) ROS_FATAL("[ORNode] " fmt, ##__VA_ARGS__)
 
 
+enum class PacketAction
+{
+  RECEIVE,
+  SEND,
+  RELAY,
+  RETRY
+};
+
+
 // searches through header.relays for id and returns its priority (i.e. position
 // in the array); if an occurence of id is not found then the size of the array
 // is returned, corresponding to the lowest priority
@@ -35,6 +44,10 @@ void update_msg_header(char*, const or_protocol_msgs::Header&);
 
 // returns the message type as a string
 std::string packet_type_string(const or_protocol_msgs::Header& header);
+
+
+// returns the message type as a string
+std::string packet_action_string(const PacketAction action);
 
 
 // serializes a ROS message and inserts it into the payload of an

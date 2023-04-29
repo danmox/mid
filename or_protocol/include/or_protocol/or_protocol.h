@@ -4,6 +4,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <stdio.h>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -12,7 +13,6 @@
 #include <or_protocol/constants.h>
 #include <or_protocol/network_state.h>
 #include <or_protocol/utils.h>
-#include <rosbag/bag.h>
 
 
 namespace or_protocol {
@@ -35,18 +35,6 @@ class ORProtocol
 
     // TODO implement: shut down the node
     void shutdown();
-
-    template <typename T>
-    void log_ros_msg(const std::string &topic, const ros::Time &time, const T &msg)
-    {
-      const std::string prefix = "/node" + std::to_string(node_id) + "/";
-      if (bag.isOpen()) {
-        std::lock_guard<std::mutex> lock(log_mutex);
-        bag.write(prefix + topic, time, msg);
-      } else {
-        OR_ERROR("cannot write msg to bag! bag not open!");
-      }
-    }
 
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
@@ -99,8 +87,8 @@ class ORProtocol
     // thread for recomputing the routing table
     std::thread routing_thread;
 
-    // bagfile used for logging packet statistics
-    rosbag::Bag bag;
+    // file used for packet routing and transmission logging
+    std::FILE* log_file;
 
     // a wrapper for BCastSocket::send(...)
     bool send(const char* buff, size_t size);
@@ -130,7 +118,7 @@ class ORProtocol
 
     // helper function for logging messages
     void log_message(const or_protocol_msgs::Header& header,
-                     const int action,
+                     const PacketAction action,
                      const int size,
                      const ros::Time& time);
 
