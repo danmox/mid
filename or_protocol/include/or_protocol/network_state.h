@@ -44,6 +44,13 @@ struct MsgStatus
 };
 
 
+struct ETXEntryStamped
+{
+    ETXEntry entry;
+    ros::Time stamp;
+};
+
+
 class NodeState
 {
   public:
@@ -66,6 +73,7 @@ class NodeState
     void update_link_state(const PacketQueueItemPtr& beacon = nullptr);
 
     ETXEntry get_etx_entry(const int dest) const;
+    ros::Time get_etx_stamp() const { return last_beacon_stamp; }
 
   private:
     // the history of messages received kept as a deque for quickly determining
@@ -83,7 +91,7 @@ class NodeState
 
 
 typedef std::unordered_map<int, std::unordered_map<int, double>> ETXMap;
-typedef std::unordered_map<int, std::unordered_map<int, ETXEntry>> ETXEntryMap;
+typedef std::unordered_map<int, std::unordered_map<int, ETXEntryStamped>> ETXEntryMap;
 typedef std::unordered_map<int, std::vector<int>> IntVectorMap;
 typedef or_protocol_msgs::Header::_relays_type RelayArray;
 typedef std::unordered_map<int, RelayArray> IntArrayMap;

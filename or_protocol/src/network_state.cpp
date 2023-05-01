@@ -164,7 +164,7 @@ void NetworkState::update_routes(const int root)
       if (local_link_etx_table[src].count(dest) == 0)
         link_etx[src][dest] = src == dest ? 0.0 : ETX_MAX;
       else
-        link_etx[src][dest] = local_link_etx_table[src][dest].etx;
+        link_etx[src][dest] = local_link_etx_table[src][dest].entry.etx;
     }
   }
 
@@ -386,7 +386,7 @@ void NetworkState::set_etx_map(const ETXMap& map)
       or_protocol_msgs::ETXEntry entry;
       entry.node = item.first;
       entry.etx = item.second;
-      link_etx_table[tx_node][entry.node] = entry;
+      link_etx_table[tx_node][entry.node].entry = entry;
     }
   }
 }
@@ -428,18 +428,13 @@ void NetworkState::process_beacon_queue(const int root)
       new_node_ids.insert(tx_node);
       for (const or_protocol_msgs::ETXEntry& entry : list.etx_list) {
         new_node_ids.insert(entry.node);
-        if (new_link_etx_table[tx_node][entry.node].seq < entry.seq) {
-          new_link_etx_table[tx_node][entry.node] = entry;
+        if (new_link_etx_table[tx_node][entry.node].entry.seq < entry.seq) {
+          new_link_etx_table[tx_node][entry.node].entry = entry;
+          new_link_etx_table[tx_node][entry.node].stamp = item->recv_time;
         }
       }
     }
   }
-
-  // TODO how to handle nodes that leave the network? if a node becomes
-  // disconnected either temporarily or permanently the rest of the network
-  // stops receiving beacon frames from them - as a result their ETX values
-  // remain fixed resulting in inaccuracies in route setting. Enforce a timeout
-  // after which a link's ETX gets set to ETX_MAX?
 
   // run through nodes that did not receive a beacon this iteration
   for (const int id : new_node_ids)
@@ -449,8 +444,27 @@ void NetworkState::process_beacon_queue(const int root)
   // update ETX table with most recent ETX values in node_states
   // NOTE the ETX values held in node_states are guaranteed to be the most
   // recent and thus we don't need to check for increasing sequence numbers here
-  for (const auto& item : node_states)
-    new_link_etx_table[item.first][root] = item.second.get_etx_entry(root);
+  for (const auto& item : node_states) {
+    new_link_etx_table[item.first][root].entry = item.second.get_etx_entry(root);
+    new_link_etx_table[item.first][root].stamp = item.second.get_etx_stamp();
+  }
+
+  // nodes that become disconnected from the network no longer provide ETX
+  // updates for links where they are the destination; after ETX_STALE_TIME
+  // those links should be marked as ETX_MAX locally; NOTE we don't iterate the
+  // sequence number so that if/when they return to the network the local ETX
+  // value will get overwritten accordingly
+  ros::Time now = ros::Time::now();
+  for (auto& list : new_link_etx_table) {
+    for (auto& entry : list.second) {
+      if ((now - entry.second.stamp).toSec() > ETX_STALE_TIME &&
+          entry.second.entry.etx < ETX_MAX) {
+        OR_DEBUG("marking ETX for %d > %d as stale (last update: %.2fs ago)",
+                 list.first, entry.first, (now - entry.second.stamp).toSec());
+        entry.second.entry.etx = ETX_MAX;
+      }
+    }
+  }
 
   std::lock_guard<std::mutex> lock(status_mutex);
   link_etx_table = new_link_etx_table;
@@ -478,7 +492,7 @@ or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
     or_protocol_msgs::ETXList etx_list;
     etx_list.node = list.first;
     for (const auto& item : list.second)
-      etx_list.etx_list.push_back(item.second);
+      etx_list.etx_list.push_back(item.second.entry);
     msg->etx_table.push_back(etx_list);
   }
 
