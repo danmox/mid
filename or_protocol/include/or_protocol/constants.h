@@ -49,6 +49,9 @@ namespace or_protocol {
 // number of beacon intervals to average over when estimating ETX
 #define ETX_BUFFER_LEN 8
 
+// the time in seconds before a link is considered stale and set to ETX_MAX
+#define ETX_STALE_TIME 10.0
+
 // a large value for ETX used in cases where links have a delivery probability
 // of zero
 // TODO what are the implications of this? should it be lower?
