@@ -412,6 +412,10 @@ void ORProtocol::transmit_beacons()
     const bool set_routes = false;
     send(beacon, set_routes);
 
+    if (recv_handle)
+      recv_handle(ros::Time::now(), beacon, node_id,
+                  ros::serialization::serializationLength(beacon));
+
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
     int sleep_ms = (t0 + offset - ros::Time::now()).toSec() * 1e3;
@@ -435,7 +439,16 @@ void ORProtocol::compute_routes()
   while (run) {
     network_state.update_routes(node_id);
 
-    or_protocol_msgs::RoutingTablePtr ptr = network_state.get_routing_table_msg(node_id);
+    if (recv_handle) {
+      or_protocol_msgs::Packet pkt;
+      pkt.header.msg_type = or_protocol_msgs::Header::ROUTING_TABLE;
+      pkt.header.curr_id = node_id;
+      pkt.header.src_id = node_id;
+      or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg(node_id);
+      pack_msg(pkt, *s);
+      recv_handle(ros::Time::now(), pkt, node_id,
+                  ros::serialization::serializationLength(pkt));
+    }
 
     target_time += ros::Duration(ROUTING_UPDATE_INTERVAL * 1e-3);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;
@@ -458,12 +471,16 @@ void ORProtocol::process_log_queue()
 
     LogQueueItem item;
     while (log_queue.pop(item)) {
-      const auto [header, action, size, time] = item;
-      const std::string rel_str = header.reliable ? ", REL" : "";
-      const std::string type_str = packet_type_string(header);
+      const auto [hdr, action, size, time] = item;
+      const std::string rel_str = hdr.reliable ? ", REL" : "";
+      const std::string type_str = packet_type_string(hdr);
 
       std::lock_guard<std::mutex> lock(log_mutex);
-      fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d, %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id, packet_action_string(action).c_str(), type_str.c_str(), header.src_id, header.dest_id, header.curr_id, size, header.relays[0], header.relays[1], header.relays[2], header.relays[3], header.seq, header.attempt, rel_str.c_str());
+      fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d"
+              ", %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id,
+              packet_action_string(action).c_str(), type_str.c_str(), hdr.src_id,
+              hdr.dest_id, hdr.curr_id, size, hdr.relays[0], hdr.relays[1],
+              hdr.relays[2], hdr.relays[3], hdr.seq, hdr.attempt, rel_str.c_str());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));

@@ -51,6 +51,8 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
       return std::string("PING_RES");
     case or_protocol_msgs::Header::ACK:
       return std::string("ACK");
+    case or_protocol_msgs::Header::ROUTING_TABLE:
+      return std::string("ROUTING_TABLE");
     default:
       return std::string("UNKNOWN");
   }

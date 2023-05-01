@@ -40,6 +40,8 @@ class ORProtocol
     // the receive interface between ORNode and higher level application nodes
     void register_recv_func(msg_recv_func fcn);
 
+    int get_node_id() const { return node_id; }
+
     friend class ORProtocolTest;
 
   private:
