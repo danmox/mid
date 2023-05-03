@@ -13,5 +13,6 @@
   <depend>roscpp</depend>
   <depend>rosbag</depend>
   <depend>yaml-cpp</depend>
+  <depend>fmt</depend>
 
 </package>

@@ -70,6 +70,22 @@ std::string packet_action_string(const PacketAction action)
       return std::string("RETRY");
     case PacketAction::SEND:
       return std::string("SEND");
+    case PacketAction::CANCEL_RETRY:
+      return std::string("CANCEL_RETRY");
+    case PacketAction::DROP_SUP:
+      return std::string("DROP_SUP");
+    case PacketAction::DROP_DUP:
+      return std::string("DROP_DUP");
+    case PacketAction::DROP_ECHO:
+      return std::string("DROP_ECHO");
+    case PacketAction::DROP_LOWPRI:
+      return std::string("DROP_LOWPRI");
+    case PacketAction::QUEUE:
+      return std::string("QUEUE");
+    case PacketAction::ACK:
+      return std::string("ACK");
+    case PacketAction::DELIVER:
+      return std::string("DELIVER");
     default:
       return std::string("UNKNOWN");
   }

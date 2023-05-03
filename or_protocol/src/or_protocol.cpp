@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <filesystem>
-#include <iostream>
+#include <fmt/format.h>
 #include <random>
 
 #include <or_protocol/constants.h>
@@ -8,7 +8,6 @@
 #include <or_protocol/utils.h>
 #include <ros/serialization.h>
 
-#include <or_protocol_msgs/Log.h>
 #include <or_protocol_msgs/Packet.h>
 #include <std_msgs/UInt32.h>
 
@@ -16,10 +15,10 @@
 namespace or_protocol {
 
 
-using or_protocol_msgs::Log;
+using std::string;
 
 
-ORProtocol::ORProtocol(std::string _IP)
+ORProtocol::ORProtocol(string _IP)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
@@ -85,21 +84,6 @@ void ORProtocol::register_recv_func(msg_recv_func fcn)
 }
 
 
-void ORProtocol::print_msg_info(const std::string& msg,
-                                const or_protocol_msgs::Header& header,
-                                int size,
-                                bool total)
-{
-  std::string data_type = total ? "bytes" : "data bytes";
-  std::string rel_str = header.reliable ? ", REL" : "";
-  std::string type_str = packet_type_string(header);
-  OR_DEBUG("%s: [%d] %d > %d via %d, %d %s, seq=%d, try=%d, %s%s",
-           msg.c_str(), node_id, header.src_id, header.dest_id, header.curr_id,
-           size, data_type.c_str(), header.seq, header.attempt, type_str.c_str(),
-           rel_str.c_str());
-}
-
-
 // assuming node specific message header information has not been completed
 bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
@@ -123,8 +107,7 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 
   if (send(buff_ptr.get(), len)) {
     ros::Time now = ros::Time::now();
-    print_msg_info("send", msg.header, len);
-    log_message(msg.header, PacketAction::SEND, len, now);
+    log_event(msg.header, PacketAction::SEND, len, now);
 
     // queue message for re-transmission (will get cancelled if an ACK is
     // received within RETRY_DELAY)
@@ -169,17 +152,26 @@ void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
   PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, size, header, now));
   packet_queue.push(item);
 
-  print_msg_info("recv", header, size);
-  log_message(header, PacketAction::RECEIVE, size, now);
+  log_event(header, PacketAction::RECEIVE, size, now);
 }
 
 
-void ORProtocol::log_message(const or_protocol_msgs::Header& header,
-                             const PacketAction action,
-                             const int size,
-                             const ros::Time& time)
+void ORProtocol::log_event(const or_protocol_msgs::Header& header,
+                           const PacketAction action,
+                           const int size,
+                           const ros::Time& time,
+                           const string& msg)
 {
-  log_queue.push(std::make_tuple(header, action, size, time));
+  log_queue.push(std::make_tuple(header, action, size, time, msg));
+}
+
+
+void ORProtocol::log_event(const PacketQueueItemPtr& item,
+                           const PacketAction action,
+                           const ros::Time& time,
+                           const std::string& msg)
+{
+  log_queue.push(std::make_tuple(item->header, action, item->size, time, msg));
 }
 
 
@@ -221,10 +213,8 @@ void ORProtocol::process_packets()
           ros::Time now = ros::Time::now();
           double actual_dt = (now - item->recv_time).toSec() * 1000;
           double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
-          char buff[33];
-          snprintf(buff, 33, "retry (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
-          print_msg_info(buff, item->header, item->size);
-          log_message(item->header, PacketAction::RETRY, item->size, now);
+          string msg = fmt::format("t={:.2f}ms a={:.2f}ms", target_dt, actual_dt);
+          log_event(item, PacketAction::RETRY, now, msg);
 
           // add message back to queue if retries remain
           item->retries--;
@@ -234,21 +224,18 @@ void ORProtocol::process_packets()
           }
         } else {
           retrans_mutex.unlock();
-          print_msg_info("canceled retry", item->header, item->size);
+          log_event(item->header, PacketAction::CANCEL_RETRY, item->size,
+                    ros::Time::now());
         }
       } else if (item->priority < msg_priority(item->header)) {
         send(item->buffer(), item->size);  // TODO update relays here too?
         ros::Time now = ros::Time::now();
         double actual_dt = (now - item->recv_time).toSec() * 1000;
         double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
-        char buff[30];
-        snprintf(buff, 30, "relay (t=%.2fms, a=%.2fms)", target_dt, actual_dt);
-        print_msg_info(buff, item->header, item->size);
-        log_message(item->header, PacketAction::RELAY, item->size, now);
+        string msg = fmt::format("t={:.2f}ms a={:.2f}ms", target_dt, actual_dt);
+        log_event(item->header, PacketAction::RELAY, item->size, now, msg);
       } else {
-        char buff[6];
-        snprintf(buff, 6, "%d > %d", item->priority, msg_priority(item->header));
-        print_msg_info("superseded (drop)", item->header, item->size);
+        log_event(item, PacketAction::DROP_SUP, ros::Time::now());
       }
       continue;
     }
@@ -267,7 +254,7 @@ void ORProtocol::process_packets()
     // filter out messages that originated from the current node (i.e. echoed
     // back from an intermediate relay)
     if (item->header.src_id == node_id) {
-      print_msg_info("echo (drop)", item->header, item->size);
+      log_event(item, PacketAction::DROP_ECHO, ros::Time::now());
       continue;
     }
 
@@ -275,7 +262,7 @@ void ORProtocol::process_packets()
     // and filter out any that have already been received/processed
     MsgStatus ms = network_state.update_queue(item->header.src_id, item->header);
     if (!ms.is_new_msg) {
-      print_msg_info("dupe (drop)", item->header, item->size);
+      log_event(item, PacketAction::DROP_DUP, ros::Time::now());
       continue;
     }
 
@@ -293,9 +280,9 @@ void ORProtocol::process_packets()
       const int rx_priority = relay_priority(node_id, item->header);
 
       if (rx_priority == item->header.relays.size()) {
-        print_msg_info("not relay (drop)", item->header, item->size);
+        continue;
       } else if (rx_priority > tx_priority) {
-        print_msg_info("low priority (drop)", item->header, item->size);
+        log_event(item, PacketAction::DROP_LOWPRI, ros::Time::now());
       } else {
 
         // update current transmitting node and packet hop count
@@ -307,16 +294,14 @@ void ORProtocol::process_packets()
         // relay immediately or with some delay
         if (rx_priority == 0) {
           send(item->buffer(), item->size);
-          ros::Time now = ros::Time::now();
-          print_msg_info("relay", item->header, item->size);
-          log_message(item->header, PacketAction::RELAY, item->size, now);
+          log_event(item, PacketAction::RELAY, ros::Time::now());
         } else {
           const ros::Duration delay(0, UNIT_DELAY * rx_priority);
           item->send_time = item->recv_time + delay;
           item->priority = rx_priority;
           item->processed = true;
           packet_queue.push(item);
-          print_msg_info("queue", item->header, item->size);
+          log_event(item, PacketAction::QUEUE, ros::Time::now());
         }
       }
       continue;
@@ -333,8 +318,7 @@ void ORProtocol::process_packets()
       item->header.relays = network_state.relays(item->header);
       update_msg_header(item->buffer(), item->header);
       send(item->buffer(), item->size);
-      print_msg_info("reply ping", item->header, item->size);
-      log_message(item->header, PacketAction::SEND, item->size, ros::Time::now());
+      log_event(item, PacketAction::SEND, ros::Time::now());
       continue;
     }
 
@@ -346,8 +330,8 @@ void ORProtocol::process_packets()
         if (retransmission_set.count(ack_seq) > 0)
           retransmission_set.erase(ack_seq);
       }
-      print_msg_info("got ACK", item->header, item->size);
-      continue;
+      string msg = fmt::format("ack_seq={}", ack_seq);
+      log_event(item, PacketAction::ACK, ros::Time::now(), msg);
     }
 
     // if reliable, send full acknowledgement (with routing), otherwise send a
@@ -372,7 +356,7 @@ void ORProtocol::process_packets()
       or_protocol_msgs::Packet msg;
       deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
       // TODO don't block receiving thread
-      print_msg_info("deliver", item->header, item->size);
+      log_event(item, PacketAction::DELIVER, ros::Time::now());
       recv_handle(item->recv_time, msg, node_id, item->size);
     }
   }
@@ -465,22 +449,23 @@ void ORProtocol::compute_routes()
 
 void ORProtocol::process_log_queue()
 {
-  const std::string topic = "/node" + std::to_string(node_id) + "/log";
+  const string topic = "/node" + std::to_string(node_id) + "/log";
 
   while (run) {
 
     LogQueueItem item;
     while (log_queue.pop(item)) {
-      const auto [hdr, action, size, time] = item;
-      const std::string rel_str = hdr.reliable ? ", REL" : "";
-      const std::string type_str = packet_type_string(hdr);
+      const auto [hdr, action, size, time, msg] = item;
+      const string rel_str = hdr.reliable ? "TRUE" : "FALSE";
+      const string type_str = packet_type_string(hdr);
 
       std::lock_guard<std::mutex> lock(log_mutex);
-      fprintf(log_file, "[%.9f] %d: %s %s: %d > %d via %d, bytes=%d, relays=[%d"
-              ", %d, %d, %d], seq=%d, att=%d%s\n", time.toSec(), node_id,
-              packet_action_string(action).c_str(), type_str.c_str(), hdr.src_id,
-              hdr.dest_id, hdr.curr_id, size, hdr.relays[0], hdr.relays[1],
-              hdr.relays[2], hdr.relays[3], hdr.seq, hdr.attempt, rel_str.c_str());
+      fmt::print(log_file, "[{:.9f}] {}: {} {}: {} > {} v {} bytes={} relays=[{}"
+                 ", {}, {}, {}] seq={} att={} rel={} {}\n", time.toSec(), node_id,
+                 packet_action_string(action).c_str(), type_str.c_str(), hdr.src_id,
+                 hdr.dest_id, hdr.curr_id, size, hdr.relays[0], hdr.relays[1],
+                 hdr.relays[2], hdr.relays[3], hdr.seq, hdr.attempt, rel_str.c_str(),
+                 msg.c_str());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
