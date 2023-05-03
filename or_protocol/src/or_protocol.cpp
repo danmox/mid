@@ -332,6 +332,12 @@ void ORProtocol::process_packets()
       }
       string msg = fmt::format("ack_seq={}", ack_seq);
       log_event(item, PacketAction::ACK, ros::Time::now(), msg);
+
+      // don't ACK messages sent without routing (i.e. has a relay array with
+      // all zeros; this signifies the message is meant as a one-time broadcast)
+      // TODO kind of brittle? introduce a MINI_ACK for this purpose?
+      if (item->header.relays[0] == 0)
+        continue;
     }
 
     // if reliable, send full acknowledgement (with routing), otherwise send a
