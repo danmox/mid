@@ -62,9 +62,6 @@ void msg_cb(ros::Time recv_time, or_protocol_msgs::Packet& pkt, int node_id, int
     ROS_DEBUG("writing received seq number to bag");
     std::lock_guard<std::mutex> lock(bag_mutex);
     bag.write(topic_prefix + "recv_seq_numbers", recv_time, seq);
-  } else {
-    std::string type = or_protocol::packet_type_string(pkt.header);
-    ROS_DEBUG("unknown message type: %s", type.c_str());
   }
 }
 
@@ -120,9 +117,12 @@ int main(int argc, char** argv)
   if (flows.size() > 0 && sample["total_msgs"])
     total_msgs = sample["total_msgs"].as<int>();
   double rate = 10;
-  if (sample["rate"])
-    rate = sample["rate"].as<double>();
+  if (sample["send_rate"])
+    rate = sample["send_rate"].as<double>();
   int sleep_ms = 1.0 / rate * 1000;
+  int delay_seconds = 20;
+  if (sample["delay_seconds"])
+    delay_seconds = sample["delay_seconds"].as<int>();
 
   if (flows.size() > 0) {
     for (auto& src : flows) {
@@ -150,8 +150,8 @@ int main(int argc, char** argv)
     + std::to_string(or_node->get_node_id()) + std::string("/");
   or_node->register_recv_func(msg_cb);
 
-  ROS_INFO("[main] sleeping for 10 seconds");
-  std::this_thread::sleep_for(std::chrono::seconds(10));
+  ROS_INFO("[main] sleeping for %d seconds", delay_seconds);
+  std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
   ROS_INFO("[main] starting main loop");
 
   if (total_msgs != 0)

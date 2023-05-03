@@ -48,7 +48,7 @@ def print_main(args):
 
     log_filename = Path(args.log)
     if not log_filename.exists():
-        print(f'bagfile {log_filename} does not exist')
+        print(f'logfile {log_filename} does not exist')
         return
 
     if args.action is not None and args.action not in action_set:
@@ -101,7 +101,7 @@ def print_main(args):
             return
         end_time = args.end + log_start
 
-    time_str_len = len(f'{log_end - log_start:.0f}') + 9
+    time_str_len = len(f'{log_end - log_start:.0f}') + 7
     print_count = 0
     f = open(log_filename, 'r')
     for line in f:
@@ -134,13 +134,13 @@ def print_main(args):
         if args.quiet:
             continue
 
-        time_str = f'{t - log_start:.6f} s'
+        time_str = f'{t - log_start:.6f}'
         time_str = (time_str_len - len(time_str))*' ' + time_str
 
         rel = 'TRUE' if rel_matcher.match(d['extra']) is not None else 'FALSE'
-        print(f"[{time_str}] {d['action']}[{d['node_id']}]: {d['msg_type']}:"
-              f" {d['src_id']} > {d['dest_id']} via {d['curr_id']}, {d['bytes']}"
-              f" bytes, seq={d['seq']}, try={d['attempt']}, rel={rel}")
+        print(f"[{time_str}] {d['node_id']}: {d['action']} {d['msg_type']}:"
+              f" {d['src_id']} > {d['dest_id']} v {d['curr_id']} bytes={d['bytes']}"
+              f" seq={d['seq']} try={d['attempt']} rel={rel} relays={d['relays']}")
 
     print(f'{print_count} messages')
 
