@@ -48,6 +48,23 @@ struct PacketQueueItem
 typedef std::shared_ptr<PacketQueueItem> PacketQueueItemPtr;
 
 
+enum class PacketAction
+{
+  RECEIVE,
+  SEND,
+  RELAY,
+  RETRY,
+  CANCEL_RETRY,
+  DROP_SUP,
+  DROP_DUP,
+  DROP_ECHO,
+  DROP_LOWPRI,
+  QUEUE,
+  ACK,
+  DELIVER
+};
+
+
 }  // namespace or_protocol
 
 

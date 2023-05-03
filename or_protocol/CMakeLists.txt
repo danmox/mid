@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 find_package(Threads REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(fmt REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -20,7 +21,10 @@ catkin_package(
     or_protocol_msgs
     rosbag
     roscpp
-  DEPENDS Threads
+  DEPENDS
+    Threads
+    yaml-cpp
+    fmt
 )
 
 include_directories(
@@ -36,7 +40,7 @@ set(LIBRARY_FILES
 )
 
 add_library(${PROJECT_NAME} ${LIBRARY_FILES})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} Threads::Threads)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} Threads::Threads fmt::fmt)
 
 add_executable(or_node src/or_node.cpp)
 target_link_libraries(or_node ${catkin_LIBRARIES} ${PROJECT_NAME})

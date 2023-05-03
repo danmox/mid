@@ -19,6 +19,9 @@
 namespace or_protocol {
 
 
+using or_protocol_msgs::Header;
+
+
 class ORProtocol
 {
   public:
@@ -91,7 +94,7 @@ class ORProtocol
     std::thread routing_thread;
 
     // safe queue for log information to be processed by logging thread
-    typedef std::tuple<or_protocol_msgs::Header, PacketAction, int, ros::Time> LogQueueItem;
+    typedef std::tuple<Header, PacketAction, int, ros::Time, std::string> LogQueueItem;
     SafeFIFOQueue<LogQueueItem> log_queue;
 
     // thread for logging protocol decisions in plain text
@@ -123,17 +126,16 @@ class ORProtocol
     // thread for processing the log_queue
     void process_log_queue();
 
-    // a helper function for logging information about a message
-    void print_msg_info(const std::string& msg,
-                        const or_protocol_msgs::Header& header,
-                        int size,
-                        bool total = true);
-
-    // helper function for logging messages
-    void log_message(const or_protocol_msgs::Header& header,
-                     const PacketAction action,
-                     const int size,
-                     const ros::Time& time);
+    // helper functions for logging
+    void log_event(const Header& header,
+                   const PacketAction action,
+                   const int size,
+                   const ros::Time& time,
+                   const std::string& msg = "");
+    void log_event(const PacketQueueItemPtr& item,
+                   const PacketAction action,
+                   const ros::Time& time,
+                   const std::string& msg = "");
 
     // helper function returning the unique message sequence number to be
     // embedded in outgoing message headers
@@ -141,7 +143,7 @@ class ORProtocol
 
     // helper function returning the priority of the most recent received
     // message associated with header
-    inline int msg_priority(const or_protocol_msgs::Header& header)
+    inline int msg_priority(const Header& header)
     {
       return network_state.priority(header.src_id, header.seq);
     };

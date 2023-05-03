@@ -19,15 +19,6 @@ namespace or_protocol {
 #define OR_FATAL(fmt, ...) ROS_FATAL("[ORNode] " fmt, ##__VA_ARGS__)
 
 
-enum class PacketAction
-{
-  RECEIVE,
-  SEND,
-  RELAY,
-  RETRY
-};
-
-
 // searches through header.relays for id and returns its priority (i.e. position
 // in the array); if an occurence of id is not found then the size of the array
 // is returned, corresponding to the lowest priority
