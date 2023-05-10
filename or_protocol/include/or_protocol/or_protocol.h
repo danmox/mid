@@ -74,7 +74,7 @@ class ORProtocol
 
     // the main packet queue processed by this node; incoming messages are
     // pushed onto this queue for processing by the process thread
-    SafeFIFOQueue<std::shared_ptr<PacketQueueItem>> packet_queue;
+    SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
 
     // sequence numbers of unACKed reliable messages
     std::unordered_set<uint32_t> retransmission_set;
@@ -132,6 +132,7 @@ class ORProtocol
                    const int size,
                    const ros::Time& time,
                    const std::string& msg = "");
+
     void log_event(const PacketQueueItemPtr& item,
                    const PacketAction action,
                    const ros::Time& time,
