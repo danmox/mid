@@ -16,11 +16,12 @@ MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header)
 {
   if (msg_hist_map.size() > MSG_BUFFER_CAPACITY) {
     SeqAttemptPair& oldest = msg_hist_deque.back();
-    msg_hist_deque.pop_back();
 
     // remove the message from the map if no new attempts have been received
     if (oldest.attempt == msg_hist_map[oldest.seq].attempt)
       msg_hist_map.erase(oldest.seq);
+
+    msg_hist_deque.pop_back();
   }
 
   unsigned int priority = relay_priority(header.curr_id, header);
@@ -101,7 +102,7 @@ or_protocol_msgs::ETXEntry NodeState::get_etx_entry(const int dest) const
 
 
 MsgStatus NetworkState::update_queue(const int node_id,
-                                     const or_protocol_msgs::Header &header)
+                                     const or_protocol_msgs::Header& header)
 {
   return node_states[node_id].update_queue(header);
 }
