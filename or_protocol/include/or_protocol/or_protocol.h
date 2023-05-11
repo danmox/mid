@@ -40,10 +40,11 @@ class ORProtocol
     // TODO implement: shut down the node
     void shutdown();
 
-    // the receive interface between ORNode and higher level application nodes
-    void register_recv_func(msg_recv_func fcn);
-
     int get_node_id() const { return node_id; }
+
+    // pop message off of the receive queue, returns true if a message is
+    // available (and written to item) and false otherwise
+    bool recv_msg(AppQueueItemPtr& item) { return app_queue.pop(item); }
 
     friend class ORProtocolTest;
 
@@ -74,7 +75,13 @@ class ORProtocol
 
     // the main packet queue processed by this node; incoming messages are
     // pushed onto this queue for processing by the process thread
+    // TODO check for overflow
     SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
+
+    // packets addressed to this node are pushed onto this queue to be processed
+    // by the application
+    // TODO check for overflow
+    SafeFIFOQueue<AppQueueItemPtr> app_queue;
 
     // sequence numbers of unACKed reliable messages
     std::unordered_set<uint32_t> retransmission_set;

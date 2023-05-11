@@ -78,12 +78,6 @@ ORProtocol::~ORProtocol()
 }
 
 
-void ORProtocol::register_recv_func(msg_recv_func fcn)
-{
-  recv_handle = fcn;
-}
-
-
 // assuming node specific message header information has not been completed
 bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
@@ -357,13 +351,10 @@ void ORProtocol::process_packets()
       send(ack, false);  // send one-time ACK broadcast
     }
 
-    if (recv_handle && ms.is_new_seq) {
-      // deserialize entire message
-      or_protocol_msgs::Packet msg;
-      deserialize(msg, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
-      // TODO don't block receiving thread
+    if (ms.is_new_seq) {
       log_event(item, PacketAction::DELIVER, ros::Time::now());
-      recv_handle(item->recv_time, msg, node_id, item->size);
+      AppQueueItemPtr app_item(new AppQueueItem(item));
+      app_queue.push(app_item);
     }
   }
 }
@@ -380,11 +371,11 @@ void ORProtocol::process_beacons()
 
 void ORProtocol::transmit_beacons()
 {
-  or_protocol_msgs::Packet beacon;
-  beacon.header.msg_type = or_protocol_msgs::Header::STATUS;
-  beacon.header.hops = 0;
-  beacon.header.attempt = 0;
-  beacon.header.reliable = false;
+  or_protocol_msgs::PacketPtr beacon(new or_protocol_msgs::Packet());
+  beacon->header.msg_type = or_protocol_msgs::Header::STATUS;
+  beacon->header.hops = 0;
+  beacon->header.attempt = 0;
+  beacon->header.reliable = false;
 
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -393,18 +384,18 @@ void ORProtocol::transmit_beacons()
   unsigned int it = 1;
   ros::Time t0 = ros::Time::now();
   while (run) {
-    beacon.header.hops = 0;
-    beacon.data.clear();
+    beacon->header.hops = 0;
+    beacon->data.clear();
 
     or_protocol_msgs::NetworkStatusPtr ptr = network_state.generate_beacon();
-    pack_msg(beacon, *ptr);
+    pack_msg(*beacon, *ptr);
 
     const bool set_routes = false;
-    send(beacon, set_routes);
+    send(*beacon, set_routes);
 
-    if (recv_handle)
-      recv_handle(ros::Time::now(), beacon, node_id,
-                  ros::serialization::serializationLength(beacon));
+    // pass network status to application for logging purposes
+    AppQueueItemPtr app_item(new AppQueueItem(beacon));
+    app_queue.push(app_item);
 
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
@@ -425,20 +416,21 @@ void ORProtocol::transmit_beacons()
 
 void ORProtocol::compute_routes()
 {
+  or_protocol_msgs::PacketPtr pkt(new or_protocol_msgs::Packet());
+  pkt->header.msg_type = or_protocol_msgs::Header::ROUTING_TABLE;
+  pkt->header.curr_id = node_id;
+  pkt->header.src_id = node_id;
+
   ros::Time target_time = ros::Time::now();
   while (run) {
     network_state.update_routes(node_id);
 
-    if (recv_handle) {
-      or_protocol_msgs::Packet pkt;
-      pkt.header.msg_type = or_protocol_msgs::Header::ROUTING_TABLE;
-      pkt.header.curr_id = node_id;
-      pkt.header.src_id = node_id;
-      or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg(node_id);
-      pack_msg(pkt, *s);
-      recv_handle(ros::Time::now(), pkt, node_id,
-                  ros::serialization::serializationLength(pkt));
-    }
+    // pass routing table to application for logging purposes
+    pkt->data.clear();
+    or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg(node_id);
+    pack_msg(*pkt, *s);
+    AppQueueItemPtr app_item(new AppQueueItem(pkt));
+    app_queue.push(app_item);
 
     target_time += ros::Duration(ROUTING_UPDATE_INTERVAL * 1e-3);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;
