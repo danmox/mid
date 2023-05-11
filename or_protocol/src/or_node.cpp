@@ -33,9 +33,5 @@ int main(int argc, char** argv)
   while (run && or_node.is_running())
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-  ROS_INFO("[main] sleeping for 4 seconds to allow all messages to transmit");
-  std::this_thread::sleep_for(std::chrono::milliseconds(4000));
-  ROS_INFO("[main] exiting");
-
   return 0;
 }
