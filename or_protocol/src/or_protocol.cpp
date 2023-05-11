@@ -195,10 +195,12 @@ void ORProtocol::process_packets()
       if (item->send_time > ros::Time::now()) {
         packet_queue.push(item);
       } else if (item->retransmission) {
-        retrans_mutex.lock();
-        if (retransmission_set.count(item->header.seq) > 0) {
-          retrans_mutex.unlock();
-
+        int seq_count;
+        {
+          std::lock_guard<std::mutex> lock(retrans_mutex);
+          seq_count = retransmission_set.count(item->header.seq);
+        }
+        if (seq_count > 0) {
           item->header.attempt++;
           item->header.relays = network_state.relays(item->header);
           update_msg_header(item->buffer(), item->header);
@@ -217,7 +219,6 @@ void ORProtocol::process_packets()
             packet_queue.push(item);
           }
         } else {
-          retrans_mutex.unlock();
           log_event(item->header, PacketAction::CANCEL_RETRY, item->size,
                     ros::Time::now());
         }
