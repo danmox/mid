@@ -508,7 +508,7 @@ or_protocol_msgs::RoutingTable::Ptr NetworkState::get_routing_table_msg(int root
 {
   FixedRoutingMap routing_map_copy;
   {
-    std::lock_guard<std::mutex> lock(status_mutex);
+    std::lock_guard<std::mutex> lock(routing_map_mutex);
     routing_map_copy = routing_map;
   }
 
