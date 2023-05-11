@@ -1,7 +1,9 @@
+#include <atomic>
 #include <chrono>
 #include <csignal>
 #include <iostream>
 #include <memory>
+#include <thread>
 
 #include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
@@ -11,29 +13,50 @@
 #include <std_msgs/Time.h>
 
 
-volatile bool run = true;
+volatile std::atomic<bool> run = true;
+std::shared_ptr<or_protocol::ORProtocol> or_node;
+std::thread recv_thread;
 int recv_msgs = 0;
 std::vector<double> rtts_ms;
 
-void ping_recv(ros::Time recv_time, or_protocol_msgs::Packet& msg, int node_id, int bytes)
+
+void ping_recv()
 {
-  if (msg.header.dest_id != node_id ||
-      msg.header.msg_type != or_protocol_msgs::Header::PING_RES)
-    return;
+  while (run) {
 
-  std_msgs::Time send_stamp_msg;
-  or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
+    or_protocol::AppQueueItemPtr item;
+    while (or_node->recv_msg(item)) {
+      if (!item->queue_ptr)
+        continue;
 
-  std_msgs::Int32 msg_seq;
-  uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
-  or_protocol::deserialize(msg_seq, msg.data.data() + offset, msg.data.size() - offset);
+      // unpack packet queue item
+      or_protocol_msgs::Packet msg;
+      or_protocol::deserialize(msg,
+                               reinterpret_cast<uint8_t*>(item->queue_ptr->buffer()),
+                               item->queue_ptr->size);
+      ros::Time recv_time = item->queue_ptr->recv_time;
+      int bytes = item->queue_ptr->size;
 
-  double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
-  printf("%d bytes from 192.168.0.%d: seq=%d, hops=%d, time=%.2f ms\n",
-         bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
+      if (msg.header.msg_type != or_protocol_msgs::Header::PING_RES)
+        continue;
 
-  rtts_ms.push_back(ms);
-  recv_msgs++;
+      std_msgs::Time send_stamp_msg;
+      or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
+
+      std_msgs::Int32 msg_seq;
+      uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
+      or_protocol::deserialize(msg_seq, msg.data.data() + offset, msg.data.size() - offset);
+
+      double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
+      printf("%d bytes from 192.168.0.%d: seq=%d hops=%d time=%.2f ms\n",
+             bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
+
+      rtts_ms.push_back(ms);
+      recv_msgs++;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
 }
 
 
@@ -59,20 +82,20 @@ int main(int argc, char** argv)
 
   ros::Time::init();
 
-  or_protocol::ORProtocol or_node(argv[1]);
-  or_node.register_recv_func(ping_recv);
+  or_node.reset(new or_protocol::ORProtocol(argv[1]));
+
+  // start receiver thread
+  recv_thread = std::thread(ping_recv);
 
   // build message
   or_protocol_msgs::Packet msg;
   msg.header.msg_type = or_protocol_msgs::Header::PING_REQ;
   msg.header.dest_id = std::stoi(argv[2]);
-  msg.header.relays[0] = 2;
-  msg.header.relays[1] = 3;
-  msg.header.relays[2] = 4;
+  msg.header.relays[0] = msg.header.dest_id;
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
-  while (run && or_node.is_running()) {
+  while (run && or_node->is_running()) {
     msg.data.clear();
     msg.header.hops = 0;
 
@@ -89,10 +112,17 @@ int main(int argc, char** argv)
     // pad the message so that it's the same size as a normal ping (64 bytes)
     msg.data.insert(msg.data.end(), 22, 1);
 
-    or_node.send(msg);
+    bool set_relays = false;
+    or_node->send(msg, set_relays);
     sent_msgs++;
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
+
+  // join recv thread
+  recv_thread.join();
+
+  if (sent_msgs == 0)
+    return 0;
 
   printf("\n--- 192.168.0.%d ping statistics ---\n", msg.header.dest_id);
   int total_time = (ros::Time::now() - start).toSec() * 1000;
