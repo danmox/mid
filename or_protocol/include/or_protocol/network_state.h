@@ -124,7 +124,7 @@ class NetworkState
     // generate beacon (NetworkStatus) message to be sent to other nodes
     or_protocol_msgs::NetworkStatus::Ptr generate_beacon();
 
-    // NOTE not thread safe but is meant only for testing
+    // NOTE ONLY FOR TESTING NOT THREAD SAFE
     void set_etx_map(const ETXMap& map);
     FixedRoutingMap get_routing_map() { return routing_map; }
 
