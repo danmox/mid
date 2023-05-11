@@ -48,6 +48,19 @@ struct PacketQueueItem
 typedef std::shared_ptr<PacketQueueItem> PacketQueueItemPtr;
 
 
+struct AppQueueItem
+{
+    PacketQueueItemPtr queue_ptr;
+    or_protocol_msgs::PacketPtr packet_ptr;
+
+    AppQueueItem(const PacketQueueItemPtr& pqip) : queue_ptr(pqip) {}
+    AppQueueItem(const or_protocol_msgs::PacketPtr& pp) : packet_ptr(pp) {}
+};
+
+
+typedef std::shared_ptr<AppQueueItem> AppQueueItemPtr;
+
+
 enum class PacketAction
 {
   RECEIVE,
