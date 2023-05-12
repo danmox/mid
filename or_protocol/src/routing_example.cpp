@@ -40,31 +40,31 @@ int routing_example()
       sample_link_etx.emplace(tx_node, inner_map);
     }
 
-    or_protocol::IntVectorMap route_relays;
+    or_protocol::IntVectorMap sample_relay_map;
     for (const auto& node : sample["relay_map"]) {
       const int& relay = node.first.as<int>();
       const std::vector<int>& relays = node.second.as<std::vector<int>>();
-      route_relays.emplace(relay, relays);
+      sample_relay_map.emplace(relay, relays);
     }
 
     std::cout << file << std::endl;
 
-    uint8_t src = sample["src"].as<uint8_t>();
-    uint8_t dest = sample["dest"].as<uint8_t>();
-    for (const auto& item : route_relays) {
+    int src = sample["src"].as<int>();
+    int dest = sample["dest"].as<int>();
+    for (const auto& item : sample_relay_map) {
       or_protocol::NetworkState ns;
       ns.set_etx_map(sample_link_etx);
       ns.update_routes(item.first);
-      or_protocol::FixedRoutingMap routing_map = ns.get_routing_map();
+      or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
 
       std::cout << "  NetworkState: " << std::endl << "    ";
-      const or_protocol::RelayArray& ns_relays = routing_map[src][dest];
+      const or_protocol::RelayArray& ns_relays = computed_routing_map[src][dest];
       for (size_t i = 0; i < ns_relays.size() - 1; i++)
         std::cout << int(ns_relays[i]) << ", ";
       std::cout << int(ns_relays.back()) << std::endl;
 
       std::cout << "  Sample: " << std::endl << "    ";
-      const std::vector<int>& s_relays = route_relays[item.first];
+      const std::vector<int>& s_relays = sample_relay_map[item.first];
       for (size_t i = 0; i < s_relays.size() - 1; i++)
         std::cout << s_relays[i] << ", ";
       std::cout << s_relays.back() << std::endl;
