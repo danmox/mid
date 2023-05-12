@@ -130,13 +130,16 @@ TEST(TestSuite, route_selection)
   std::string package_path = ros::package::getPath("or_protocol");
   fs::path sample_dir = fs::path(package_path) / "test" / "samples";
 
-  if (!fs::exists(sample_dir) || !fs::is_directory(sample_dir))
+  if (!fs::exists(sample_dir) || !fs::is_directory(sample_dir)) {
     ASSERT_TRUE(false) << "directory: " << sample_dir << " does not exist";
+  }
 
   std::vector<fs::path> sample_files;
-  for (const auto& file : fs::directory_iterator(sample_dir))
-    if (fs::is_regular_file(file) && file.path().extension() == ".yaml")
+  for (const auto& file : fs::directory_iterator(sample_dir)) {
+    if (fs::is_regular_file(file) && file.path().extension() == ".yaml") {
       sample_files.push_back(file.path());
+    }
+  }
 
   for (const fs::path& file : sample_files) {
     YAML::Node sample = YAML::LoadFile(file.string());
@@ -156,24 +159,24 @@ TEST(TestSuite, route_selection)
       sample_link_etx.emplace(tx_node, inner_map);
     }
 
-    or_protocol::IntArrayMap route_relays;
+    or_protocol::IntArrayMap sample_routing_map;
     for (const auto& node : sample["relay_map"]) {
       const int& relay = node.first.as<int>();
       const std::vector<int>& relays_vec = node.second.as<std::vector<int>>();
       or_protocol::RelayArray relays = {0, 0, 0, 0};
       for (size_t i = 0; i < relays_vec.size(); ++i)
         relays[i] = relays_vec[i];
-      route_relays.emplace(relay, relays);
+      sample_routing_map.emplace(relay, relays);
     }
 
-    uint8_t src = sample["src"].as<uint8_t>();
-    uint8_t dest = sample["dest"].as<uint8_t>();
-    for (const auto& item : route_relays) {
+    int src = sample["src"].as<int>();
+    int dest = sample["dest"].as<int>();
+    for (const auto& item : sample_routing_map) {
       or_protocol::NetworkState ns;
       ns.set_etx_map(sample_link_etx);
       ns.update_routes(item.first);
-      or_protocol::FixedRoutingMap routing_map = ns.get_routing_map();
-      EXPECT_EQ(routing_map[src][dest], route_relays[item.first]);
+      or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
+      EXPECT_EQ(computed_routing_map[src][dest], sample_routing_map[item.first]);
     }
   }
 }
