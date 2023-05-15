@@ -103,7 +103,10 @@ int main(int argc, char** argv)
   std::string ip_str(argv[1]);
   int node_id = std::stoi(ip_str.substr(ip_str.find_last_of('.') + 1));
 
+  //
   // load flows and etx table from yaml
+  //
+
   fs::path sample_path(argv[2]);
   if (!fs::is_regular_file(sample_path)) {
     std::cout << "[main] " << sample_path << " is not a file" << std::endl;
@@ -163,6 +166,10 @@ int main(int argc, char** argv)
   } else {
     ROS_INFO("no flows originating at this node");
   }
+
+  //
+  // run test
+  //
 
   struct sigaction siginthandler;
   siginthandler.sa_handler = signal_handler;

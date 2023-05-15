@@ -181,8 +181,6 @@ bool BCastSocket::init_send_socket()
 
 bool BCastSocket::send(const char* buff, int buff_size)
 {
-  // TODO chunking?
-
   int numbytes;
   if ((numbytes = sendto(send_sockfd, buff, buff_size, 0,
                          (struct sockaddr*)&bcast_addr, sizeof bcast_addr)) == -1) {

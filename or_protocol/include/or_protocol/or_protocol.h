@@ -65,10 +65,6 @@ class ORProtocol
     // internal state used to gracefully signal a shutdown to running threads
     volatile std::atomic<bool> run;
 
-    // a function called by the process thread for messages for which the
-    // current node is the intended destination
-    msg_recv_func recv_handle = nullptr;
-
     // a class keeping track of the current state of the network, including
     // received messages and estimated ETX values for each node
     NetworkState network_state;

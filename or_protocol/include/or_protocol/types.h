@@ -10,7 +10,6 @@ namespace or_protocol {
 
 
 typedef std::function<void(std::shared_ptr<char[]>&, int)> buff_recv_func;
-typedef std::function<void(ros::Time, or_protocol_msgs::Packet&, int, int)> msg_recv_func;
 
 
 // TODO switch to std::unique_ptr for better performance?
