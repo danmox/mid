@@ -131,7 +131,6 @@ void BCastSocket::recv_loop()
       fprintf(stderr, "[BCastSocket] Insufficient buffer size. Dropping message.");
       continue;
     }
-    buff_ptr[num_bytes] = '\0';
 
     if (num_bytes > 0)
       recv_handle(buff_ptr, num_bytes);

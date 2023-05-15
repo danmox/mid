@@ -9,11 +9,11 @@
 namespace or_protocol {
 
 
-typedef std::function<void(std::shared_ptr<char[]>&, int)> buff_recv_func;
-
-
 // TODO switch to std::unique_ptr for better performance?
-typedef std::shared_ptr<char[]> buffer_ptr;
+typedef std::unique_ptr<char[]> buffer_ptr;
+
+
+typedef std::function<void(buffer_ptr&, int)> buff_recv_func;
 
 
 struct PacketQueueItem
@@ -29,7 +29,7 @@ struct PacketQueueItem
                     size_t _size,
                     or_protocol_msgs::Header& _header,
                     ros::Time& now) :
-      buff_ptr(_buff_ptr),
+      buff_ptr(std::move(_buff_ptr)),
       size(_size),
       header(_header),
       recv_time(now),
