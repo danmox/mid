@@ -20,10 +20,10 @@ const int RETRY_DELAY = 20 * UNIT_DELAY;
 // giving up
 const int MAX_RETRY_COUNT = 2;
 
-// maximum number of messages to keep in a NodeState queue - at some point
+// maximum duration to hold onto messages in a NodeState queue - at some point
 // messages reach their intended destinations and aren't being relayed any
 // longer and no longer need to be tracked
-const int MSG_BUFFER_CAPACITY = 100;
+const int MSG_BUFFER_DURATION = MAX_RETRY_COUNT * RETRY_DELAY * 1.5;
 
 // thresholds for determining if a candidate relay node is "close" to the
 // current node in terms of ETX
