@@ -12,19 +12,23 @@
 namespace or_protocol {
 
 
-MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header)
+MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header,
+                                  const double stamp)
 {
-  if (msg_hist_map.size() > MSG_BUFFER_CAPACITY) {
-    SeqAttemptPair& oldest = msg_hist_deque.back();
-
-    // remove the message from the map if no new attempts have been received
-    if (oldest.attempt == msg_hist_map[oldest.seq].attempt)
-      msg_hist_map.erase(oldest.seq);
-
-    msg_hist_deque.pop_back();
+  // NOTE implicit assumption that SeqAttemptStamped.stamp monotonically
+  // increases in msg_hist_queue
+  while (!msg_hist_deque.empty()) {
+    const SeqAttemptStamped& oldest = msg_hist_deque.back();
+    if (ros::Time::now().toSec() - oldest.stamp > MSG_BUFFER_DURATION) {
+      if (oldest.attempt == msg_hist_map[oldest.seq].attempt)
+        msg_hist_map.erase(oldest.seq);
+      msg_hist_deque.pop_back();
+    } else {
+      break;
+    }
   }
 
-  unsigned int priority = relay_priority(header.curr_id, header);
+  const unsigned int priority = relay_priority(header.curr_id, header);
 
   // NOTE ACK transmissions may fail, resulting in the source node transmitting
   // another attempt when the original message and information was actually
@@ -35,11 +39,11 @@ MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header)
   if (msg_hist_map.count(header.seq) == 0) {
     status.is_new_msg = true;
     status.is_new_seq = true;
-    msg_hist_deque.push_front(SeqAttemptPair{header.seq, header.attempt});
+    msg_hist_deque.push_front(SeqAttemptStamped{header.seq, header.attempt, stamp});
     msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
   } else if (msg_hist_map[header.seq].attempt < header.attempt) {
     status.is_new_msg = true;
-    msg_hist_deque.push_front(SeqAttemptPair{header.seq, header.attempt});
+    msg_hist_deque.push_front(SeqAttemptStamped{header.seq, header.attempt, stamp});
     msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
   } else if (msg_hist_map[header.seq].priority > priority) {
     msg_hist_map[header.seq] = AttemptPriorityPair{header.attempt, priority};
@@ -49,7 +53,7 @@ MsgStatus NodeState::update_queue(const or_protocol_msgs::Header& header)
 }
 
 
-void NodeState::ack_msg(const uint32_t seq)
+void NodeState::ack_msg(const uint32_t seq, const double stamp)
 {
   // future traffic can be dissabled for a message associated with seq by:
   // 1) setting the sequence number to zero so that a higher priority relay will
@@ -57,7 +61,7 @@ void NodeState::ack_msg(const uint32_t seq)
   // 2) setting the attempts to the MAX_RETRY_COUNT so that a message with a
   //    higher number of attempts will not be received
   if (msg_hist_map.count(seq) == 0)
-    msg_hist_deque.push_front(SeqAttemptPair{seq, MAX_RETRY_COUNT});
+    msg_hist_deque.push_front(SeqAttemptStamped{seq, MAX_RETRY_COUNT, stamp});
   msg_hist_map[seq] = AttemptPriorityPair{MAX_RETRY_COUNT, 0};
 }
 
@@ -101,16 +105,16 @@ or_protocol_msgs::ETXEntry NodeState::get_etx_entry(const int dest) const
 }
 
 
-MsgStatus NetworkState::update_queue(const int node_id,
-                                     const or_protocol_msgs::Header& header)
+MsgStatus NetworkState::update_queue(const PacketQueueItemPtr& item)
 {
-  return node_states[node_id].update_queue(header);
+  return node_states[item->header.src_id].update_queue(item->header,
+                                                       item->recv_time.toSec());
 }
 
 
-void NetworkState::ack_msg(const int node_id, const uint32_t seq)
+void NetworkState::ack_msg(const int node_id, const uint32_t seq, const double stamp)
 {
-  node_states[node_id].ack_msg(seq);
+  node_states[node_id].ack_msg(seq, stamp);
 }
 
 

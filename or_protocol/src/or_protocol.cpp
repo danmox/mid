@@ -255,7 +255,7 @@ void ORProtocol::process_packets()
 
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
-    MsgStatus ms = network_state.update_queue(item->header.src_id, item->header);
+    MsgStatus ms = network_state.update_queue(item);
     if (!ms.is_new_msg) {
       log_event(item, PacketAction::DROP_DUP, ros::Time::now());
       continue;
@@ -268,7 +268,7 @@ void ORProtocol::process_packets()
       if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
         uint32_t ack_seq = extract_ack(item);
         // the source of the original message is the destination of the ACK
-        network_state.ack_msg(item->header.dest_id, ack_seq);
+        network_state.ack_msg(item->header.dest_id, ack_seq, item->recv_time.toSec());
       }
 
       const int tx_priority = relay_priority(item->header.curr_id, item->header);
