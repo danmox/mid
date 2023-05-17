@@ -46,6 +46,7 @@ class Message:
     size: int
     relays: list
     seq: int
+    hops: int
     attempt: int
     reliable: str
     extra: str
@@ -54,7 +55,7 @@ class Message:
 class LogParser:
     matcher = re.compile('^\[([0-9.]+)\] ([0-9]+): ([A-Z_]+) ([A-Z_]+): ([0-9]+) > ' + \
                          '([0-9]+) v ([0-9]+) bytes=([0-9]+) relays=\[([0-9, ]+)\] ' + \
-                         'seq=([0-9]+) att=([0-9]+) rel=([A-Z]+)(.*)$')
+                         'seq=([0-9]+) hops=([0-9]+) att=([0-9]+) rel=([A-Z]+)(.*)$')
 
     @staticmethod
     def parse(line) -> Message:
@@ -71,9 +72,10 @@ class LogParser:
                        size=      int(m.group(8)),
                        relays=    [int(x) for x in m.group(9).split(',')],
                        seq=       int(m.group(10)),
-                       attempt=   int(m.group(11)),
-                       reliable=  m.group(12),
-                       extra=     m.group(13))
+                       hops=      int(m.group(11)),
+                       attempt=   int(m.group(12)),
+                       reliable=  m.group(13),
+                       extra=     m.group(14))
 
 
 def merge_main(args):
@@ -189,7 +191,7 @@ def print_main(args):
               f' seq={m.seq} try={m.attempt} rel={m.reliable} '
               f'relays={m.relays}{m.extra}')
 
-    print(f'{print_count} messages')
+    print(f'{print_count} entries')
 
 
 def stats_main(args):
