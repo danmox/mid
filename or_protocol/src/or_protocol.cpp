@@ -464,11 +464,11 @@ void ORProtocol::process_log_queue()
 
       std::lock_guard<std::mutex> lock(log_mutex);
       fmt::print(log_file, "[{:.9f}] {}: {} {}: {} > {} v {} bytes={} relays=[{}"
-                 ", {}, {}, {}] seq={} att={} rel={} {}\n", time.toSec(), node_id,
-                 packet_action_string(action).c_str(), type_str.c_str(), hdr.src_id,
-                 hdr.dest_id, hdr.curr_id, size, hdr.relays[0], hdr.relays[1],
-                 hdr.relays[2], hdr.relays[3], hdr.seq, hdr.attempt, rel_str.c_str(),
-                 msg.c_str());
+                 ", {}, {}, {}] seq={} hops={} att={} rel={} {}\n", time.toSec(),
+                 node_id, packet_action_string(action).c_str(), type_str.c_str(),
+                 hdr.src_id, hdr.dest_id, hdr.curr_id, size, hdr.relays[0],
+                 hdr.relays[1], hdr.relays[2], hdr.relays[3], hdr.seq, hdr.hops,
+                 hdr.attempt, rel_str.c_str(), msg.c_str());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
