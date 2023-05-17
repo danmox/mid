@@ -21,10 +21,6 @@ catkin_package(
     or_protocol_msgs
     rosbag
     roscpp
-  DEPENDS
-    Threads
-    yaml-cpp
-    fmt
 )
 
 include_directories(

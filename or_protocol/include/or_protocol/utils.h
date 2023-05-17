@@ -30,7 +30,7 @@ uint32_t extract_ack(const PacketQueueItemPtr& ptr);
 
 
 // update header in serialized message buffer
-void update_msg_header(char*, const or_protocol_msgs::Header&);
+void update_msg_header(char* buff, const or_protocol_msgs::Header& header);
 
 
 // returns the message type as a string
@@ -83,6 +83,12 @@ class SafeFIFOQueue
     {
       std::lock_guard<std::mutex> lock(queue_mutex);
       queue.push_back(item);
+    }
+
+    size_t size()
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex);
+      return queue.size();
     }
 
   private:

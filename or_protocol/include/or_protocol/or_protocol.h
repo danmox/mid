@@ -143,11 +143,11 @@ class ORProtocol
 
     // helper function returning the unique message sequence number to be
     // embedded in outgoing message headers
-    inline uint32_t getSeqNum() { return seq++; }
+    uint32_t getSeqNum() { return seq++; }
 
     // helper function returning the priority of the most recent received
     // message associated with header
-    inline int msg_priority(const Header& header)
+    int msg_priority(const Header& header)
     {
       return network_state.priority(header.src_id, header.seq);
     };

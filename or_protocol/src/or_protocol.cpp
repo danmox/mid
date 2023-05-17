@@ -174,6 +174,10 @@ void ORProtocol::process_packets()
   // TODO reduce time spent busy waiting?
   while (run) {
 
+    int queue_size = packet_queue.size();
+    if (queue_size > 1000)
+      ROS_WARN_THROTTLE(0.1, "[ORNode] packet_queue.size() == %d!", queue_size);
+
     std::shared_ptr<PacketQueueItem> item;
     if (!packet_queue.pop(item))
       continue;
@@ -271,8 +275,8 @@ void ORProtocol::process_packets()
         network_state.ack_msg(item->header.dest_id, ack_seq, item->recv_time.toSec());
       }
 
-      const int tx_priority = relay_priority(item->header.curr_id, item->header);
-      const int rx_priority = relay_priority(node_id, item->header);
+      const unsigned int tx_priority = relay_priority(item->header.curr_id, item->header);
+      const unsigned int rx_priority = relay_priority(node_id, item->header);
 
       if (rx_priority == item->header.relays.size()) {
         continue;
