@@ -1,8 +1,79 @@
 #!/usr/bin/env python3
 
 import argparse
+from dataclasses import dataclass
+from enum import Enum
+import numpy as np
 import re
 from pathlib import Path
+
+
+class Actions(Enum):
+    RECEIVE = 1
+    SEND = 2
+    RELAY = 3
+    RETRY = 4
+    CANCEL_RETRY = 5
+    DROP_SUP = 6
+    DROP_DUP = 7
+    DROP_ECHO = 8
+    DROP_LOWPRI = 9
+    QUEUE = 10
+    ACK = 11
+    DELIVER = 12
+
+class MsgTypes(Enum):
+    STATUS = 1
+    PAYLOAD = 2
+    PING_REQ = 3
+    PING_RES = 4
+    ACK = 5
+    ROUTING_TABLE = 6
+
+action_set = set([item for item in dir(Actions) if item[:2] != '__'])
+msg_type_set = set([item for item in dir(MsgTypes) if item[:2] != '__'])
+
+
+@dataclass
+class Message:
+    timestamp: float
+    node_id: int
+    action: Actions
+    msg_type: MsgTypes
+    src_id: int
+    dest_id: int
+    curr_id: int
+    size: int
+    relays: list
+    seq: int
+    attempt: int
+    reliable: str
+    extra: str
+
+
+class LogParser:
+    matcher = re.compile('^\[([0-9.]+)\] ([0-9]+): ([A-Z_]+) ([A-Z_]+): ([0-9]+) > ' + \
+                         '([0-9]+) v ([0-9]+) bytes=([0-9]+) relays=\[([0-9, ]+)\] ' + \
+                         'seq=([0-9]+) att=([0-9]+) rel=([A-Z]+)(.*)$')
+
+    @staticmethod
+    def parse(line) -> Message:
+        m = LogParser.matcher.match(line)
+        if m is None:
+            return None
+        return Message(timestamp= float(m.group(1)),
+                       node_id=   int(m.group(2)),
+                       action=    Actions[m.group(3)],
+                       msg_type=  MsgTypes[m.group(4)],
+                       src_id=    int(m.group(5)),
+                       dest_id=   int(m.group(6)),
+                       curr_id=   int(m.group(7)),
+                       size=      int(m.group(8)),
+                       relays=    [int(x) for x in m.group(9).split(',')],
+                       seq=       int(m.group(10)),
+                       attempt=   int(m.group(11)),
+                       reliable=  m.group(12),
+                       extra=     m.group(13))
 
 
 def merge_main(args):
@@ -39,12 +110,6 @@ def merge_main(args):
     print(f'wrote contents to: {outlogfilename}')
 
 
-
-action_set = set(['RECEIVE', 'SEND', 'RELAY', 'RETRY', 'CANCEL_RETRY', 'DROP_SUP',
-                  'DROP_DUP', 'DROP_ECHO', 'DROP_LOWPRI', 'QUEUE', 'ACK', 'DELIVER'])
-msg_type_set = set(['STATUS', 'PAYLOAD', 'PING_REQ', 'PING_RES', 'ACK', 'ROUTING_TABLE'])
-
-
 def print_main(args):
 
     log_filename = Path(args.log)
@@ -55,30 +120,11 @@ def print_main(args):
     if args.action is not None and args.action not in action_set:
         print(f'invalid action {args.action}')
         return
-    action = args.action
+    action = Actions[args.action] if args.action is not None else None
     if args.type is not None and args.type not in msg_type_set:
         print(f'invalid msg_type {args.type}')
         return
-    msg_type = args.type
-
-    line_matcher = re.compile('^\[([0-9.]+)\] ([0-9]+): ([A-Z_]+) ([A-Z_]+): ([0-9]+) > ([0-9]+) v ([0-9]+) bytes=([0-9]+) relays=\[([0-9, ]+)\] seq=([0-9]+) att=([0-9]+) rel=([A-Z]+)(.*)$')
-    def parse_line(line, regex=line_matcher):
-        m = regex.match(line)
-        if m is None:
-            return None
-        return {'timestamp': float(m.group(1)),
-                'node_id': int(m.group(2)),
-                'action': m.group(3),
-                'msg_type': m.group(4),
-                'src_id': int(m.group(5)),
-                'dest_id': int(m.group(6)),
-                'curr_id': int(m.group(7)),
-                'bytes': int(m.group(8)),
-                'relays': [int(x) for x in m.group(9).split(',')],
-                'seq': int(m.group(10)),
-                'attempt': int(m.group(11)),
-                'reliable': m.group(12),
-                'extra': m.group(13)}
+    msg_type = MsgTypes[args.type] if args.type is not None else None
 
     with open(log_filename, 'r') as f:
         first_line = f.readline()
@@ -107,27 +153,27 @@ def print_main(args):
     f = open(log_filename, 'r')
     for line in f:
 
-        d = parse_line(line)
-        t = d['timestamp']
+        m = LogParser.parse(line)
+        t = m.timestamp
 
         if t < start_time:
             continue
         if t > end_time:
             break
 
-        if args.node is not None and d['node_id'] != args.node:
+        if args.node is not None and m.node_id != args.node:
             continue
-        if args.seq is not None and d['seq'] != args.seq:
+        if args.seq is not None and m.seq != args.seq:
             continue
-        if action is not None and d['action'] != action:
+        if action is not None and m.action != action:
             continue
-        if msg_type is not None and d['msg_type'] != msg_type:
+        if msg_type is not None and m.msg_type != msg_type:
             continue
         if args.count is not None and print_count + 1 > args.count:
             break
-        if args.src is not None and d['src_id'] != args.src:
+        if args.src is not None and m.src_id != args.src:
             continue
-        if args.dest is not None and d['dest_id'] != args.dest:
+        if args.dest is not None and m.dest_id != args.dest:
             continue
 
 
@@ -138,12 +184,157 @@ def print_main(args):
         time_str = f'{t - log_start:.6f}'
         time_str = (time_str_len - len(time_str))*' ' + time_str
 
-        print(f"[{time_str}] {d['node_id']}: {d['action']} {d['msg_type']}:"
-              f" {d['src_id']} > {d['dest_id']} v {d['curr_id']} bytes={d['bytes']}"
-              f" seq={d['seq']} try={d['attempt']} rel={d['reliable']} "
-              f"relays={d['relays']}{d['extra']}")
+        print(f'[{time_str}] {m.node_id}: {m.action.name} {m.msg_type.name}:'
+              f' {m.src_id} > {m.dest_id} v {m.curr_id} bytes={m.size}'
+              f' seq={m.seq} try={m.attempt} rel={m.reliable} '
+              f'relays={m.relays}{m.extra}')
 
     print(f'{print_count} messages')
+
+
+def stats_main(args):
+
+    log_filename = Path(args.log)
+    if not log_filename.exists():
+        print(f'logfile {log_filename} does not exist')
+        return
+
+    msg_type = MsgTypes[args.type] if args.type is not None else None
+
+    messages = []
+    node_ids = set()
+    with open(log_filename, 'r') as f:
+        for line in f:
+            d = LogParser.parse(line)
+            node_ids.add(d.node_id)
+            if args.node is not None and d.node_id != args.node:
+                continue
+            if msg_type is not None and d.msg_type != msg_type:
+                continue
+            messages.append(d)
+    N = len(node_ids)
+    ids = sorted(list(node_ids))
+
+    nodes = [f'node{k}' for k in ids]
+    id_to_index = {id: idx for idx, id in enumerate(ids)}
+    N = len(nodes)
+
+    pairwise_recv_msgs = np.zeros((N, N))
+    pairwise_recv_bytes = np.zeros((N, N))
+    total_sent_msgs = np.zeros((N,))
+    total_sent_bytes = np.zeros((N,))
+    total_recv_msgs = np.zeros((N,))
+    total_recv_bytes = np.zeros((N,))
+    total_retry_msgs = np.zeros((N,))
+    total_retry_bytes = np.zeros((N,))
+    total_relay_msgs = np.zeros((N,))
+    total_relay_bytes = np.zeros((N,))
+
+    for msg in messages:
+        if msg.action == Actions.RECEIVE:
+            sender = id_to_index[msg.curr_id]
+            receiver = id_to_index[msg.node_id]
+            pairwise_recv_msgs[sender, receiver] += 1
+            pairwise_recv_bytes[sender, receiver] += msg.size
+            total_recv_msgs[receiver] += 1
+            total_recv_bytes[receiver] += msg.size
+        elif msg.action == Actions.SEND:
+            sender = id_to_index[msg.curr_id]
+            total_sent_msgs[sender] += 1
+            total_sent_bytes[sender] += msg.size
+        elif msg.action == Actions.RETRY:
+            sender = id_to_index[msg.curr_id]
+            total_retry_msgs[sender] += 1
+            total_retry_bytes[sender] += msg.size
+        elif msg.action == Actions.RELAY:
+            sender = id_to_index[msg.curr_id]
+            total_relay_msgs[sender] += 1
+            total_relay_bytes[sender] += msg.size
+
+    def print_table(tab):
+        spaces = 2
+        col_size = [max(len(tab[i][j]) for i in range(len(tab))) for j in range(len(tab[0]))]
+        for row in tab:
+            padded_row = [(col_size[i] + spaces - len(row[i]))*' ' + row[i] for i in range(len(row))]
+            print(''.join(padded_row))
+        print('')
+
+    type_msg = 'ALL messages' if args.type is None else f'{args.type} only'
+
+    # transmission statistics
+
+    cells = [[''] + nodes]
+    cells.append(['sent']  + [f'{int(n)}' if int(n) > 0 else '-' for n in total_sent_msgs])
+    cells.append(['retry'] + [f'{int(n)}' if int(n) > 0 else '-' for n in total_retry_msgs])
+    cells.append(['relay'] + [f'{int(n)}' if int(n) > 0 else '-' for n in total_relay_msgs])
+    cells.append(['recv']  + [f'{int(n)}' if int(n) > 0 else '-' for n in total_recv_msgs])
+
+    print(f'totals ({type_msg}):')
+    print_table(cells)
+
+    total_trans_msgs = total_sent_msgs + total_relay_msgs + total_retry_msgs
+
+    # delivery percentage
+
+    delivery_prob = np.zeros((N, N))
+    for i in range(N):
+        if total_sent_msgs[i] > 0:
+            delivery_prob[i] = pairwise_recv_msgs[i] / total_trans_msgs[i]
+
+    cells = [[''] + nodes + ['sent']]
+    for i in range(N):
+        row = delivery_prob[i]
+        nums = [f'{row[j]*100:.1f}' if row[j] > 1e-3 else '-' for j in range(N)]
+        cells.append([nodes[i]] + nums + [f'{int(total_trans_msgs[i])}'])
+    cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
+
+    print(f'delivery percentage ({type_msg}):')
+    print_table(cells)
+
+    # received messages
+
+    cells = [[''] + nodes + ['sent']]
+    for i in range(N):
+        row = pairwise_recv_msgs[i]
+        nums = [f'{int(row[j])}' if row[j] > 0 else '-' for j in range(N)]
+        cells.append([nodes[i]] + nums + [f'{int(total_trans_msgs[i])}'])
+    cells.append(['recv'] + [f'{int(n)}' if n > 0 else '0' for n in total_recv_msgs] + [''])
+
+    print(f'received messages ({type_msg}):')
+    print_table(cells)
+
+    # flow statistics
+
+    flows = {}
+    for msg in messages:
+        if (msg.action in set([Actions.SEND, Actions.RETRY]) and msg.src_id == msg.curr_id) \
+           or (msg.action == Actions.RECEIVE and msg.dest_id == msg.node_id):
+
+            src = msg.src_id
+            dest = msg.dest_id
+            msg_type = msg.msg_type
+
+            if src not in flows:
+                flows[src] = {dest: {msg_type: {Actions.SEND: [], Actions.RECEIVE: [], Actions.RETRY: []}}}
+            elif dest not in flows[src]:
+                flows[src][dest] = {msg_type: {Actions.SEND: [], Actions.RECEIVE: [], Actions.RETRY: []}}
+            elif msg_type not in flows[src][dest]:
+                flows[src][dest][msg_type] = {Actions.SEND: [], Actions.RECEIVE: [], Actions.RETRY: []}
+
+            flows[src][dest][msg_type][msg.action].append((msg.seq, msg.timestamp, msg.attempt))
+
+    for src in flows:
+        for dest in flows[src]:
+            for msg_type in flows[src][dest]:
+
+                sent_count  = len(flows[src][dest][msg_type][Actions.SEND])
+                retry_count = len(flows[src][dest][msg_type][Actions.RETRY])
+                recv_count  = len(set([item[0] for item in flows[src][dest][msg_type][Actions.RECEIVE]]))
+                delivery_prob = recv_count / sent_count * 100
+
+                print(f'flow: {src} > {dest} [{msg_type.name}]: '
+                      f'{sent_count} sent, {recv_count} received, {retry_count} retried, '
+                      f'{delivery_prob:.1f}% delivery rate')
 
 
 if __name__ == '__main__':
@@ -171,9 +362,18 @@ if __name__ == '__main__':
     print_parser.add_argument('--start', type=float, help='print messages after given start time (s)')
     print_parser.add_argument('--end', type=float, help='print messages until given end time (s)')
 
+    # parsing
+    stats_parser = subparsers.add_parser('stats', help='compute protocol statistics from logs')
+    stats_parser.add_argument('log', type=str, help='logfile to parse')
+    stats_parser.add_argument('-n', '--node', type=int, help='print statistics for messages originating at the given node')
+    stats_parser.add_argument('-t', '--type', type=str, help='compute stats for the given message type only',
+                              choices=['PAYLOAD', 'STATUS', 'ACK'])
+
     args = parser.parse_args()
 
     if args.command == 'merge':
         merge_main(args)
     elif args.command == 'print':
         print_main(args)
+    elif args.command == 'stats':
+        stats_main(args)
