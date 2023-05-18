@@ -26,7 +26,7 @@ class ORProtocol
 {
   public:
     // initializes ORNode with a unique IPv4 address
-    ORProtocol(std::string _IP);
+    ORProtocol(std::string _IP, msg_recv_func msg_cb = nullptr);
 
     // destructor required for thread cleanup logic
     ~ORProtocol();
@@ -41,10 +41,6 @@ class ORProtocol
     void shutdown();
 
     int get_node_id() const { return node_id; }
-
-    // pop message off of the receive queue, returns true if a message is
-    // available (and written to item) and false otherwise
-    bool recv_msg(AppQueueItemPtr& item) { return app_queue.pop(item); }
 
     friend class ORProtocolTest;
 
@@ -65,6 +61,10 @@ class ORProtocol
     // internal state used to gracefully signal a shutdown to running threads
     volatile std::atomic<bool> run;
 
+    // a function called by the process thread for messages for which the
+    // current node is the intended destination
+    msg_recv_func recv_handle;
+
     // a class keeping track of the current state of the network, including
     // received messages and estimated ETX values for each node
     NetworkState network_state;
@@ -74,17 +74,12 @@ class ORProtocol
     // TODO check for overflow
     SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
 
-    // packets addressed to this node are pushed onto this queue to be processed
-    // by the application
-    // TODO check for overflow
-    SafeFIFOQueue<AppQueueItemPtr> app_queue;
-
     // sequence numbers of unACKed reliable messages
     std::unordered_set<uint32_t> retransmission_set;
 
-    // processing the packet queue, logging, and updating the retransmission set
-    // occur across threads and must be protected
-    std::mutex log_mutex, retrans_mutex;
+    // logging, updating the retransmission set, and passing messages to the
+    // application occur across threads and must be protected
+    std::mutex log_mutex, retrans_mutex, app_mutex;
 
     // packet processing thread
     std::thread process_thread;

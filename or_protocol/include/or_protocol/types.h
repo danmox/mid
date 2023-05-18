@@ -14,6 +14,7 @@ typedef std::unique_ptr<char[]> buffer_ptr;
 
 
 typedef std::function<void(buffer_ptr&, int)> buff_recv_func;
+typedef std::function<void(ros::Time&, or_protocol_msgs::Packet&, int)> msg_recv_func;
 
 
 struct PacketQueueItem
