@@ -8,7 +8,7 @@
 #include <thread>
 #include <yaml-cpp/yaml.h>
 
-//#include <rosbag/bag.h>
+#include <rosbag/bag.h>
 #include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
 
@@ -20,10 +20,10 @@ namespace fs = std::filesystem;
 using ros::serialization::serializationLength;
 
 
-std::atomic<bool> run = true;
+std::atomic<bool> run = true, reply = false;
 std::shared_ptr<or_protocol::ORProtocol> or_node;
 std::thread recv_thread;
-//rosbag::Bag bag;
+rosbag::Bag bag;
 std::mutex bag_mutex;
 std::string topic_prefix;
 
@@ -52,14 +52,17 @@ void msg_cb()
 
       or_protocol_msgs::Packet pkt;
       int size;
+      ros::Time recv_time;
       if (item->queue_ptr) {
         or_protocol::deserialize(pkt,
                                  reinterpret_cast<uint8_t*>(item->queue_ptr->buffer()),
                                  item->queue_ptr->size);
         size = item->queue_ptr->size;
+        recv_time = item->queue_ptr->recv_time;
       } else if (item->packet_ptr) {
         pkt = *item->packet_ptr;
         size = serializationLength(pkt);
+        recv_time = ros::Time::now();
       } else {
         ROS_ERROR("invalid queue_ptr and packet_ptr");
         continue;
@@ -71,24 +74,29 @@ void msg_cb()
         or_protocol_msgs::RoutingTable table;
         or_protocol::deserialize(table, pkt.data.data(), pkt.data.size());
         ROS_DEBUG("writing routing table to bag");
-        //std::lock_guard<std::mutex> lock(bag_mutex);
-        //bag.write(topic_prefix + "routes", recv_time, table);
+        std::lock_guard<std::mutex> lock(bag_mutex);
+        bag.write(topic_prefix + "routes", recv_time, table);
       } else if (pkt.header.msg_type == or_protocol_msgs::Header::STATUS) {
         or_protocol_msgs::NetworkStatus status;
         or_protocol::deserialize(status, pkt.data.data(), pkt.data.size());
         ROS_DEBUG("writing status message to bag");
-        //std::lock_guard<std::mutex> lock(bag_mutex);
-        //bag.write(topic_prefix + "status", recv_time, status);
+        std::lock_guard<std::mutex> lock(bag_mutex);
+        bag.write(topic_prefix + "status", recv_time, status);
       } else if (pkt.header.msg_type == or_protocol_msgs::Header::PAYLOAD) {
-        std_msgs::UInt32 seq;
-        or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
-        ROS_DEBUG("writing received seq number to bag");
-        //std::lock_guard<std::mutex> lock(bag_mutex);
-        //bag.write(topic_prefix + "recv_seq_numbers", recv_time, seq);
+        if (reply) {
+          pkt.header.dest_id = pkt.header.src_id;
+          or_node->send(pkt);
+        } else {
+          std_msgs::UInt32 seq;
+          or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
+          ROS_DEBUG("writing received seq number to bag");
+          std::lock_guard<std::mutex> lock(bag_mutex);
+          bag.write(topic_prefix + "recv_seq_numbers", recv_time, seq);
+        }
       }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 
@@ -117,7 +125,7 @@ int main(int argc, char** argv)
     std::cout << "[main] 'flows' must be specified" << std::endl;
     return 0;
   }
-  std::unordered_map<int, std::unordered_map<int, FlowSpec>> flows;
+  std::unordered_map<int, FlowSpec> flows;
   for (const auto& node : sample["flows"]) {
     if (!node["src"] || !node["dest"] || !node["reliable"] || !node["size"]) {
       std::cout << "[main] each flow must contain 'src', 'dest', 'reliable', and";
@@ -141,7 +149,7 @@ int main(int argc, char** argv)
     std_msgs::UInt32 seq;
     seq.data = 0;
 
-    flows[src][dest] = {pkt, seq, size};
+    flows[dest] = {pkt, seq, size};
   }
   int total_msgs = 0;
   if (flows.size() > 0 && sample["total_msgs"])
@@ -155,16 +163,15 @@ int main(int argc, char** argv)
     delay_seconds = sample["delay_seconds"].as<int>();
 
   if (flows.size() > 0) {
-    for (auto& src : flows) {
-      for (auto& dest : src.second) {
+    for (auto& dest : flows) {
         const FlowSpec& flow = dest.second;
         ROS_INFO("flow: %d > %d, size=%d, reliable=%s",
                  flow.packet.header.src_id, flow.packet.header.dest_id,
                  flow.total_size, flow.packet.header.reliable ? "true" : "false");
-      }
     }
   } else {
     ROS_INFO("no flows originating at this node");
+    reply = true; // reflect traffic back to sender for accurate delay stats
   }
 
   //
@@ -177,11 +184,10 @@ int main(int argc, char** argv)
   siginthandler.sa_flags = 0;
   sigaction(SIGINT, &siginthandler, NULL);
 
-  //bag.open("test_node.bag", rosbag::bagmode::Write);
+  bag.open("test_node.bag", rosbag::bagmode::Write);
 
   or_node.reset(new or_protocol::ORProtocol(argv[1]));
-  topic_prefix = std::string("/node")
-    + std::to_string(or_node->get_node_id()) + std::string("/");
+  topic_prefix = std::string("/node") + std::to_string(node_id) + std::string("/");
   recv_thread = std::thread(msg_cb);
 
   ROS_INFO("[main] sleeping for %d seconds", delay_seconds);
@@ -192,36 +198,36 @@ int main(int argc, char** argv)
     ROS_INFO("[main] sending %d messages", total_msgs);
   int sent_msgs = 0;
   while (run && or_node->is_running()) {
-    for (auto& src : flows) {
-      for (auto& dest : src.second) {
-        FlowSpec& flow = dest.second;
+    for (auto& dest : flows) {
+      FlowSpec& flow = dest.second;
 
-        flow.packet.header.hops = 0;
-        flow.packet.data.clear();
+      flow.packet.header.hops = 0;
+      flow.packet.data.clear();
 
-        or_protocol::pack_msg(flow.packet, flow.seq);
-        const int pad_bytes = flow.total_size - serializationLength(flow.packet);
-        flow.packet.data.insert(flow.packet.data.end(), pad_bytes, 1);
+      or_protocol::pack_msg(flow.packet, flow.seq);
+      const int pad_bytes = flow.total_size - serializationLength(flow.packet);
+      flow.packet.data.insert(flow.packet.data.end(), pad_bytes, 1);
 
-        or_node->send(flow.packet);
-        {
-          //std::lock_guard<std::mutex> lock(bag_mutex);
-          //bag.write(topic_prefix + "send_seq_numbers", ros::Time::now(), flow.seq);
-        }
-        flow.seq.data++;
+      or_node->send(flow.packet);
+      ros::Time send_time = ros::Time::now();
+      {
+        std::lock_guard<std::mutex> lock(bag_mutex);
+        bag.write(topic_prefix + "send_seq_numbers", send_time, flow.seq);
       }
+      flow.seq.data++;
     }
+
+    ++sent_msgs;
 
     if (total_msgs != 0 && !(sent_msgs < total_msgs))
       break;
-
-    ++sent_msgs;
 
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
   }
   ROS_INFO("[main] done sending messages, awaiting shutdown signal");
 
   recv_thread.join();
+  bag.close();
 
   return 0;
 }
