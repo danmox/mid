@@ -152,6 +152,8 @@ def print_main(args):
 
     time_str_len = len(f'{log_end - log_start:.0f}') + 7
     print_count = 0
+    bytes_count = 0
+    trans_count = 0
     f = open(log_filename, 'r')
     for line in f:
 
@@ -178,8 +180,10 @@ def print_main(args):
         if args.dest is not None and m.dest_id != args.dest:
             continue
 
-
         print_count += 1
+        if m.action in set((Actions.RELAY, Actions.RETRY, Actions.SEND)):
+            bytes_count += m.size
+            trans_count += 1
         if args.quiet:
             continue
 
@@ -191,7 +195,8 @@ def print_main(args):
               f' seq={m.seq} try={m.attempt} rel={m.reliable} '
               f'relays={m.relays}{m.extra}')
 
-    print(f'{print_count} entries')
+    print(f'{print_count} entries, {trans_count} transmissions, {bytes_count}' +\
+          f' bytes, {end_time - start_time} seconds')
 
 
 def stats_main(args):
@@ -208,6 +213,8 @@ def stats_main(args):
     with open(log_filename, 'r') as f:
         for line in f:
             d = LogParser.parse(line)
+            if d is None:
+                continue
             node_ids.add(d.node_id)
             if args.node is not None and d.node_id != args.node:
                 continue
