@@ -18,7 +18,8 @@ namespace or_protocol {
 using std::string;
 
 
-ORProtocol::ORProtocol(string _IP)
+ORProtocol::ORProtocol(string _IP, msg_recv_func msg_cb) :
+  recv_handle(msg_cb)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
@@ -356,10 +357,12 @@ void ORProtocol::process_packets()
       send(ack, false);  // send one-time ACK broadcast
     }
 
-    if (ms.is_new_seq) {
+    if (recv_handle && ms.is_new_seq) {
+      or_protocol_msgs::Packet pkt;
+      deserialize(pkt, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
       log_event(item, PacketAction::DELIVER, ros::Time::now());
-      AppQueueItemPtr app_item(new AppQueueItem(item));
-      app_queue.push(app_item);
+      std::lock_guard<std::mutex> lock(app_mutex);
+      recv_handle(item->recv_time, pkt, item->size);
     }
   }
 }
@@ -399,8 +402,12 @@ void ORProtocol::transmit_beacons()
     send(*beacon, set_routes);
 
     // pass network status to application for logging purposes
-    AppQueueItemPtr app_item(new AppQueueItem(beacon));
-    app_queue.push(app_item);
+    if (recv_handle) {
+      int size = ros::serialization::serializationLength(*beacon);
+      ros::Time now = ros::Time::now();
+      std::lock_guard<std::mutex> lock(app_mutex);
+      recv_handle(now, *beacon, size);
+    }
 
     int offset_ms = it * BEACON_INTERVAL + jitter_dist(gen);
     ros::Duration offset = ros::Duration(offset_ms / 1000, (offset_ms % 1000) * 1e6);
@@ -421,21 +428,25 @@ void ORProtocol::transmit_beacons()
 
 void ORProtocol::compute_routes()
 {
-  or_protocol_msgs::PacketPtr pkt(new or_protocol_msgs::Packet());
-  pkt->header.msg_type = or_protocol_msgs::Header::ROUTING_TABLE;
-  pkt->header.curr_id = node_id;
-  pkt->header.src_id = node_id;
+  or_protocol_msgs::Packet pkt;
+  pkt.header.msg_type = or_protocol_msgs::Header::ROUTING_TABLE;
+  pkt.header.curr_id = node_id;
+  pkt.header.src_id = node_id;
 
   ros::Time target_time = ros::Time::now();
   while (run) {
     network_state.update_routes(node_id);
 
     // pass routing table to application for logging purposes
-    pkt->data.clear();
+    pkt.data.clear();
     or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg(node_id);
-    pack_msg(*pkt, *s);
-    AppQueueItemPtr app_item(new AppQueueItem(pkt));
-    app_queue.push(app_item);
+    pack_msg(pkt, *s);
+    if (recv_handle) {
+      int size = ros::serialization::serializationLength(pkt);
+      ros::Time now = ros::Time::now();
+      std::lock_guard<std::mutex> lock(app_mutex);
+      recv_handle(now, pkt, size);
+    }
 
     target_time += ros::Duration(ROUTING_UPDATE_INTERVAL * 1e-3);
     int sleep_ms = (target_time - ros::Time::now()).toSec() * 1e3;

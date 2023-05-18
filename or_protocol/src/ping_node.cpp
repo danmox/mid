@@ -15,48 +15,28 @@
 
 volatile std::atomic<bool> run = true;
 std::shared_ptr<or_protocol::ORProtocol> or_node;
-std::thread recv_thread;
 int recv_msgs = 0;
 std::vector<double> rtts_ms;
 
 
-void ping_recv()
+void ping_recv(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, int size)
 {
-  while (run) {
+  if (pkt.header.msg_type != or_protocol_msgs::Header::PING_RES)
+    return;
 
-    or_protocol::AppQueueItemPtr item;
-    while (or_node->recv_msg(item)) {
-      if (!item->queue_ptr)
-        continue;
+  std_msgs::Time send_stamp_msg;
+  or_protocol::deserialize(send_stamp_msg, pkt.data.data(), pkt.data.size());
 
-      // unpack packet queue item
-      or_protocol_msgs::Packet msg;
-      or_protocol::deserialize(msg,
-                               reinterpret_cast<uint8_t*>(item->queue_ptr->buffer()),
-                               item->queue_ptr->size);
-      ros::Time recv_time = item->queue_ptr->recv_time;
-      int bytes = item->queue_ptr->size;
+  std_msgs::Int32 msg_seq;
+  uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
+  or_protocol::deserialize(msg_seq, pkt.data.data() + offset, pkt.data.size() - offset);
 
-      if (msg.header.msg_type != or_protocol_msgs::Header::PING_RES)
-        continue;
+  double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
+  printf("%d bytes from 192.168.0.%d: seq=%d hops=%d time=%.2f ms\n",
+         size, pkt.header.src_id, msg_seq.data, pkt.header.hops, ms);
 
-      std_msgs::Time send_stamp_msg;
-      or_protocol::deserialize(send_stamp_msg, msg.data.data(), msg.data.size());
-
-      std_msgs::Int32 msg_seq;
-      uint32_t offset = ros::serialization::serializationLength(send_stamp_msg) + 4;
-      or_protocol::deserialize(msg_seq, msg.data.data() + offset, msg.data.size() - offset);
-
-      double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
-      printf("%d bytes from 192.168.0.%d: seq=%d hops=%d time=%.2f ms\n",
-             bytes, msg.header.src_id, msg_seq.data, msg.header.hops, ms);
-
-      rtts_ms.push_back(ms);
-      recv_msgs++;
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
+  rtts_ms.push_back(ms);
+  recv_msgs++;
 }
 
 
@@ -82,10 +62,7 @@ int main(int argc, char** argv)
 
   ros::Time::init();
 
-  or_node.reset(new or_protocol::ORProtocol(argv[1]));
-
-  // start receiver thread
-  recv_thread = std::thread(ping_recv);
+  or_node.reset(new or_protocol::ORProtocol(argv[1], ping_recv));
 
   // build message
   or_protocol_msgs::Packet msg;
@@ -117,9 +94,6 @@ int main(int argc, char** argv)
     sent_msgs++;
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
-
-  // join recv thread
-  recv_thread.join();
 
   if (sent_msgs == 0)
     return 0;

@@ -43,60 +43,33 @@ void signal_handler(int s)
 }
 
 
-void msg_cb()
+void pkt_cb(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, int size)
 {
-  while (run) {
+  ROS_DEBUG("received message with size %d", size);
 
-    or_protocol::AppQueueItemPtr item;
-    while (or_node->recv_msg(item)) {
-
-      or_protocol_msgs::Packet pkt;
-      int size;
-      ros::Time recv_time;
-      if (item->queue_ptr) {
-        or_protocol::deserialize(pkt,
-                                 reinterpret_cast<uint8_t*>(item->queue_ptr->buffer()),
-                                 item->queue_ptr->size);
-        size = item->queue_ptr->size;
-        recv_time = item->queue_ptr->recv_time;
-      } else if (item->packet_ptr) {
-        pkt = *item->packet_ptr;
-        size = serializationLength(pkt);
-        recv_time = ros::Time::now();
-      } else {
-        ROS_ERROR("invalid queue_ptr and packet_ptr");
-        continue;
-      }
-
-      ROS_DEBUG("received message with size %d", size);
-
-      if (pkt.header.msg_type == or_protocol_msgs::Header::ROUTING_TABLE) {
-        or_protocol_msgs::RoutingTable table;
-        or_protocol::deserialize(table, pkt.data.data(), pkt.data.size());
-        ROS_DEBUG("writing routing table to bag");
-        std::lock_guard<std::mutex> lock(bag_mutex);
-        bag.write(topic_prefix + "routes", recv_time, table);
-      } else if (pkt.header.msg_type == or_protocol_msgs::Header::STATUS) {
-        or_protocol_msgs::NetworkStatus status;
-        or_protocol::deserialize(status, pkt.data.data(), pkt.data.size());
-        ROS_DEBUG("writing status message to bag");
-        std::lock_guard<std::mutex> lock(bag_mutex);
-        bag.write(topic_prefix + "status", recv_time, status);
-      } else if (pkt.header.msg_type == or_protocol_msgs::Header::PAYLOAD) {
-        if (reply) {
-          pkt.header.dest_id = pkt.header.src_id;
-          or_node->send(pkt);
-        } else {
-          std_msgs::UInt32 seq;
-          or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
-          ROS_DEBUG("writing received seq number to bag");
-          std::lock_guard<std::mutex> lock(bag_mutex);
-          bag.write(topic_prefix + "recv_seq_numbers", recv_time, seq);
-        }
-      }
+  if (pkt.header.msg_type == or_protocol_msgs::Header::ROUTING_TABLE) {
+    or_protocol_msgs::RoutingTable table;
+    or_protocol::deserialize(table, pkt.data.data(), pkt.data.size());
+    ROS_DEBUG("writing routing table to bag");
+    std::lock_guard<std::mutex> lock(bag_mutex);
+    bag.write(topic_prefix + "routes", recv_time, table);
+  } else if (pkt.header.msg_type == or_protocol_msgs::Header::STATUS) {
+    or_protocol_msgs::NetworkStatus status;
+    or_protocol::deserialize(status, pkt.data.data(), pkt.data.size());
+    ROS_DEBUG("writing status message to bag");
+    std::lock_guard<std::mutex> lock(bag_mutex);
+    bag.write(topic_prefix + "status", recv_time, status);
+  } else if (pkt.header.msg_type == or_protocol_msgs::Header::PAYLOAD) {
+    if (reply) {
+      pkt.header.dest_id = pkt.header.src_id;
+      or_node->send(pkt);
+    } else {
+      std_msgs::UInt32 seq;
+      or_protocol::deserialize(seq, pkt.data.data(), pkt.data.size());
+      ROS_DEBUG("writing received seq number to bag");
+      std::lock_guard<std::mutex> lock(bag_mutex);
+      bag.write(topic_prefix + "recv_seq_numbers", recv_time, seq);
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 
@@ -186,9 +159,9 @@ int main(int argc, char** argv)
 
   bag.open("test_node.bag", rosbag::bagmode::Write);
 
-  or_node.reset(new or_protocol::ORProtocol(argv[1]));
   topic_prefix = std::string("/node") + std::to_string(node_id) + std::string("/");
-  recv_thread = std::thread(msg_cb);
+
+  or_node.reset(new or_protocol::ORProtocol(argv[1], pkt_cb));
 
   ROS_INFO("[main] sleeping for %d seconds", delay_seconds);
   std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
@@ -226,7 +199,9 @@ int main(int argc, char** argv)
   }
   ROS_INFO("[main] done sending messages, awaiting shutdown signal");
 
-  recv_thread.join();
+  while (run)
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
   bag.close();
 
   return 0;
