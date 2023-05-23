@@ -9,10 +9,10 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <depend>fmt</depend>
   <depend>or_protocol_msgs</depend>
   <depend>roscpp</depend>
   <depend>rosbag</depend>
   <depend>yaml-cpp</depend>
-  <depend>fmt</depend>
 
 </package>
