@@ -53,6 +53,9 @@ target_link_libraries(serialization_example ${catkin_LIBRARIES} ${PROJECT_NAME})
 add_executable(routing_example src/routing_example.cpp)
 target_link_libraries(routing_example ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
 
+add_executable(fragment_test src/fragment_test.cpp)
+target_link_libraries(fragment_test ${catkin_LIBRARIES} ${PROJECT_NAME})
+
 catkin_add_gtest(${PROJECT_NAME}-test test/test.cpp)
 if (TARGET ${PROJECT_NAME}-test)
   target_link_libraries(${PROJECT_NAME}-test ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
