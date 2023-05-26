@@ -1,0 +1,39 @@
+#!/usr/bin/env fish
+
+# update
+#
+# a script used to update the or_protocol running on one of the nodes in the
+# mesh network testbed remotely
+
+argparse 'd/debug' 't/test' -- $argv
+
+if test -z "$OR_PROTOCOL_DIR"
+    echo "OR_PROTOCOL_DIR not set, exiting."
+    exit
+end
+
+cd $OR_PROTOCOL_DIR
+
+if not test -d .catkin_tools
+    if test -d /opt/ros/melodic
+        catkin config --init --extend /opt/ros/melodic
+    else if test -d /opt/ros/noetic
+        catkin config --init --extend /opt/ros/noetic
+    else
+        echo "no ROS installation found under /opt/ros"
+        exit
+    end
+end
+
+if not set -q _flag_debug
+    catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release
+else
+    catkin config --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+end
+
+catkin clean -y
+catkin build or_protocol
+
+if set -q _flag_test
+   catkin run_tests
+end

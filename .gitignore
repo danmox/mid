@@ -1,7 +1,8 @@
 __pycache__
 compile_commands.json
-CATKIN_IGNORE
-
 *.cache
 *.bag
 *.clangd
+*.cache
+*.bag
+CATKIN_IGNORE
