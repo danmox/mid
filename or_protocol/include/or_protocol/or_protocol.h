@@ -1,5 +1,5 @@
-#ifndef OR_PROTOCOL_OR_NODE_H_
-#define OR_PROTOCOL_OR_NODE_H_
+#ifndef OR_PROTOCOL_OR_PROTOCOL_H_
+#define OR_PROTOCOL_OR_PROTOCOL_H_
 
 #include <atomic>
 #include <memory>

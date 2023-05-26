@@ -34,6 +34,7 @@ add_message_files(
     RoutingSrcEntry.msg
     RoutingDestEntry.msg
     RoutingRule.msg
+    TopicInfo.msg
 )
 
 generate_messages()

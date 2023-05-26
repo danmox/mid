@@ -12,11 +12,11 @@
 namespace or_protocol {
 
 
-#define OR_DEBUG(fmt, ...) ROS_DEBUG("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_INFO(fmt, ...) ROS_INFO("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_WARN(fmt, ...) ROS_WARN("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_ERROR(fmt, ...) ROS_ERROR("[ORNode] " fmt, ##__VA_ARGS__)
-#define OR_FATAL(fmt, ...) ROS_FATAL("[ORNode] " fmt, ##__VA_ARGS__)
+#define OR_DEBUG(fmt, ...) ROS_DEBUG("[ORProtocol] " fmt, ##__VA_ARGS__)
+#define OR_INFO(fmt, ...) ROS_INFO("[ORProtocol] " fmt, ##__VA_ARGS__)
+#define OR_WARN(fmt, ...) ROS_WARN("[ORProtocol] " fmt, ##__VA_ARGS__)
+#define OR_ERROR(fmt, ...) ROS_ERROR("[ORProtocol] " fmt, ##__VA_ARGS__)
+#define OR_FATAL(fmt, ...) ROS_FATAL("[ORProtocol] " fmt, ##__VA_ARGS__)
 
 
 // searches through header.relays for id and returns its priority (i.e. position

@@ -53,6 +53,8 @@ std::string packet_type_string(const or_protocol_msgs::Header& header)
       return std::string("ACK");
     case or_protocol_msgs::Header::ROUTING_TABLE:
       return std::string("ROUTING_TABLE");
+    case or_protocol_msgs::Header::TOPIC_INFO:
+      return std::string("TOPIC_INFO");
     default:
       return std::string("UNKNOWN");
   }

@@ -4,6 +4,7 @@ uint8 PING_REQ=3
 uint8 PING_RES=4
 uint8 ACK=5
 uint8 ROUTING_TABLE=6
+uint8 TOPIC_INFO=7
 
 # the type of data encapsulated in the packet
 uint8 msg_type
