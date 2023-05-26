@@ -5,10 +5,15 @@
 #include <or_protocol/types.h>
 #include <or_protocol/utils.h>
 #include <or_protocol/network_state.h>
+#include <topic_tools/shape_shifter.h>
 
 #include <ros/package.h>
+#include <ros/message_traits.h>
 #include <std_msgs/Time.h>
 #include <std_msgs/UInt32.h>
+#include <std_msgs/UInt16.h>
+#include <or_protocol_msgs/Packet.h>
+#include <or_protocol_msgs/TopicInfo.h>
 
 
 using or_protocol::PacketQueueItem;
@@ -179,6 +184,38 @@ TEST(TestSuite, route_selection)
       EXPECT_EQ(computed_routing_map[src][dest], sample_routing_map[item.first]);
     }
   }
+}
+
+
+/* test automatic message encapsulation */
+TEST(TestSuite, message_encapsulation)
+{
+  namespace mt = ros::message_traits;
+
+  or_protocol_msgs::TopicInfo in_topic_info_msg;
+  in_topic_info_msg.id = 2;
+  in_topic_info_msg.name = std::string("/some/topic");
+  in_topic_info_msg.md5sum = mt::MD5Sum<or_protocol_msgs::TopicInfo>::value();
+  in_topic_info_msg.type = mt::DataType<or_protocol_msgs::TopicInfo>::value();
+  in_topic_info_msg.definition = mt::Definition<or_protocol_msgs::TopicInfo>::value();
+  in_topic_info_msg.latching = "false";
+
+  std_msgs::UInt16 in_id;
+  in_id.data = 3;
+
+  or_protocol_msgs::Packet in_pkt;
+  or_protocol::pack_msg(in_pkt, in_id);
+  or_protocol::pack_msg(in_pkt, in_topic_info_msg);
+
+  topic_tools::ShapeShifter ss;
+  ss.morph(in_topic_info_msg.md5sum, in_topic_info_msg.type,
+           in_topic_info_msg.definition, in_topic_info_msg.latching);
+  ros::serialization::IStream is(reinterpret_cast<uint8_t*>(in_pkt.data.data() + 10), in_pkt.data.size() - 10);
+  ros::serialization::Serializer<topic_tools::ShapeShifter>::read(is, ss);
+
+  or_protocol_msgs::TopicInfo out_topic_info_msg = *ss.instantiate<or_protocol_msgs::TopicInfo>();
+
+  EXPECT_EQ(in_topic_info_msg, out_topic_info_msg);
 }
 
 
