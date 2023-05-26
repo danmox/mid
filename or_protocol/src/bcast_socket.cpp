@@ -62,7 +62,7 @@ void BCastSocket::recv_loop()
 {
   struct addrinfo hints, *res, *p;
   struct sockaddr_storage addr;
-  const int bufflen = 1500;
+  const int bufflen = 1473; // IP+UDP MTU
   int status, num_bytes;
 
   memset(&hints, 0, sizeof hints);
@@ -188,7 +188,7 @@ bool BCastSocket::send(const char* buff, int buff_size)
   }
 
   if (numbytes != buff_size) {
-    fprintf(stderr, "[BCastSocket] buff contains %d bytes but only %d sent", buff_size, numbytes);
+    fprintf(stderr, "[BCastSocket] buff contains %d bytes but only %d sent\n", buff_size, numbytes);
     return false;
   }
 

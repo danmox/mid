@@ -82,6 +82,11 @@ ORProtocol::~ORProtocol()
 // assuming node specific message header information has not been completed
 bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
+  if (msg.header.msg_type == 0) {
+    OR_ERROR("cannot transmit packet without valid msg_type");
+    return false;
+  }
+
   msg.header.src_id = node_id;
   msg.header.curr_id = node_id;
   msg.header.seq = getSeqNum();
@@ -99,6 +104,11 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
   ros::serialization::OStream s(reinterpret_cast<uint8_t*>(buff_ptr.get()), len);
   ros::serialization::serialize(s, len - 4);
   ros::serialization::serialize(s, msg);
+
+  if (len > 1472) {
+    OR_ERROR("packet size (%d) greater than MTU (1472)", len);
+    return false;
+  }
 
   if (send(buff_ptr.get(), len)) {
     ros::Time now = ros::Time::now();
