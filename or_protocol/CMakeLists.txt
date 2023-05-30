@@ -56,6 +56,9 @@ target_link_libraries(routing_example ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-c
 add_executable(fragment_test src/fragment_test.cpp)
 target_link_libraries(fragment_test ${catkin_LIBRARIES} ${PROJECT_NAME})
 
+add_executable(sim_routing_node src/sim_routing_node.cpp)
+target_link_libraries(sim_routing_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
 catkin_add_gtest(${PROJECT_NAME}-test test/test.cpp)
 if (TARGET ${PROJECT_NAME}-test)
   target_link_libraries(${PROJECT_NAME}-test ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
