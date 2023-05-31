@@ -127,11 +127,12 @@ int NetworkState::priority(const int node_id, const int seq)
 }
 
 
-RelayArray NetworkState::relays(const or_protocol_msgs::Header& header)
+RelayArray NetworkState::relays(const or_protocol_msgs::Header& header,
+                                const int node_id)
 {
   // NOTE if no entry exists in the routing table, direct routing is used
   std::lock_guard<std::mutex> lock(routing_map_mutex);
-  RelayArray relays = routing_map[header.src_id][header.dest_id];
+  RelayArray relays = routing_map[header.src_id][header.dest_id][node_id];
   if (relays[0] == 0)
     relays[0] = header.dest_id;
   return relays;
@@ -182,7 +183,7 @@ void NetworkState::update_routes(const int root)
 
   // find the shortest path between each pair of nodes in the network
   ETXMap path_etx;
-  VariableRoutingMap default_paths;
+  std::unordered_map<int, IntVectorMap> default_paths;
   for (const int node : ids) {
 
     PriorityQueue frontier;
@@ -272,13 +273,12 @@ void NetworkState::update_routes(const int root)
   VariableRoutingMap new_routing_map;
   for (const int src : ids) {
     for (const int dest : ids) {
-      bool found_root_relays = false;
       const std::vector<int>& path = default_paths[src][dest];
       auto& default_path_i_etx = default_path_etx[src][dest];
 
       // compute relays for nodes on the default path
       std::unordered_set<int> relay_set(path.begin(), path.end());
-      for (size_t i = 0; i < path.size() - 1 && !found_root_relays; i++) {
+      for (size_t i = 0; i < path.size() - 1; i++) {
         const int c = path[i];
         const int n = path[i+1];
 
@@ -307,74 +307,77 @@ void NetworkState::update_routes(const int root)
             relays.push_back({r, default_path_i_etx[r]});
         }
 
-        if (c == root) {
-          std::sort(relays.begin(), relays.end(), pair_less);
-          std::vector<int> final_relays;
-          for (const auto& item : relays) {
-            final_relays.push_back(item.first);
-          }
-          found_root_relays = true;
-          new_routing_map[src][dest] = final_relays;
-          break;
-        } else {
-          for (const auto& item : relays)
-            relay_set.insert(item.first);
-        }
+        for (const auto& item : relays)
+          relay_set.insert(item.first);
+
+        std::sort(relays.begin(), relays.end(), pair_less);
+        std::vector<int> final_relays;
+        for (const auto &item : relays)
+          final_relays.push_back(item.first);
+        new_routing_map[src][dest][c] = final_relays;
       }
 
       // only record routing information for flows involving root
-      if (relay_set.count(root) == 0 || found_root_relays)
+      if (relay_set.count(root) == 0)
         continue;
 
-      // root must be an auxiliary relay, compute it's relays
-      const int c = root;
-      std::vector<NodeCostPair> candidates;
-      for (const int r : relay_set) {
+      // compute relays for auxilary relays (those not on the default path)
+      // NOTE we do a little extra work here to compute the relays for all
+      // relays involved in this flow (not just the root node) as this
+      // information is required by the planner later on
 
-        // candidate relays must satisfy:
-        // 1) r moves the packet closer to dest
-        // 2) r is within a threshold ETX of p_curr
-        // 3) r is within a threshold ETX of a node in path (already satisfied)
-        if (r != c && default_path_i_etx[r] < default_path_i_etx[c] &&  // 1
-            link_etx[c][r] < compute_closeness_factor(c,r))             // 2
-          candidates.push_back({r, link_etx[c][r] + default_path_i_etx[r]});
+      std::unordered_set<int> path_set(path.begin(), path.end());
+      std::unordered_set<int> aux_relay_set;
+      for (const int r : relay_set)
+        if (path_set.count(r) == 0)
+          aux_relay_set.insert(r);
+
+      for (const int c : aux_relay_set) {
+
+        std::vector<NodeCostPair> candidates;
+        for (const int r : relay_set) {
+
+          // candidate relays must satisfy:
+          // 1) r moves the packet closer to dest
+          // 2) r is within a threshold ETX of p_curr
+          // 3) r is within a threshold ETX of a node in path (already satisfied)
+          if (r != c && default_path_i_etx[r] < default_path_i_etx[c] &&  // 1
+              link_etx[c][r] < compute_closeness_factor(c,r))             // 2
+            candidates.push_back({r, link_etx[c][r] + default_path_i_etx[r]});
+        }
+        std::sort(candidates.begin(), candidates.end(), pair_less);
+
+        // choose at most MAX_RELAY_COUNT relays from the candidates that are all
+        // within RELAY_ETX_THRESHOLD of one another
+        std::vector<NodeCostPair> relays;
+        for (size_t j = 0; j < candidates.size() && relays.size() < MAX_RELAY_COUNT; j++) {
+          const int r = candidates[j].first;
+          if (near_all(relays, r))
+            relays.push_back({r, default_path_i_etx[r]});
+        }
+
+        std::sort(relays.begin(), relays.end(), pair_less);
+        std::vector<int> final_relays;
+        for (const auto& item : relays)
+          final_relays.push_back(item.first);
+        new_routing_map[src][dest][c] = final_relays;
       }
-      std::sort(candidates.begin(), candidates.end(), pair_less);
-
-      // choose at most MAX_RELAY_COUNT relays from the candidates that are all
-      // within RELAY_ETX_THRESHOLD of one another
-      std::vector<NodeCostPair> relays;
-      for (size_t j = 0; j < candidates.size() && relays.size() < MAX_RELAY_COUNT; j++) {
-        const int r = candidates[j].first;
-        if (near_all(relays, r))
-          relays.push_back({r, default_path_i_etx[r]});
-      }
-
-      std::sort(relays.begin(), relays.end(), pair_less);
-      std::vector<int> final_relays;
-      for (const auto& item : relays)
-        final_relays.push_back(item.first);
-      new_routing_map[src][dest] = final_relays;
     }
   }
 
-  // convert to fixed relay arrays used in or_protocol_msgs::Header and add
-  // direct routing for any src, dest pairs for which root does not participate
+  // convert to fixed relay arrays used in or_protocol_msgs::Header
   // NOTE this may occur when network state information on each node is out of
   // sync (i.e. node Y thinks node X should participate but node X does not)
   FixedRoutingMap new_fixed_routing_map;
-  for (const int src : ids) {
-    for (const int dest: ids) {
-      if (src == dest)
-        continue;
-      if (new_routing_map[src][dest].size() == 0) {
-        new_fixed_routing_map[src][dest] = {static_cast<uint8_t>(dest), 0, 0, 0};
-      } else {
-        const std::vector<int>& relays = new_routing_map[src][dest];
+  for (const auto& src_item : new_routing_map) {
+    const int src_id = src_item.first;
+    for (const auto& dst_item : src_item.second) {
+      const int dst_id = dst_item.first;
+      for (const auto& relay_item : dst_item.second) {
+        const int relay_id = relay_item.first;
+        const std::vector<int>& relays = relay_item.second;
         for (size_t i = 0; i < relays.size(); i++)
-          new_fixed_routing_map[src][dest][i] = relays[i];
-        for (size_t i = relays.size(); i < MAX_RELAY_COUNT; i++)
-          new_fixed_routing_map[src][dest][i] = 0;
+          new_fixed_routing_map[src_id][dst_id][relay_id][i] = relays[i];
       }
     }
   }
@@ -508,7 +511,7 @@ or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
 }
 
 
-or_protocol_msgs::RoutingTable::Ptr NetworkState::get_routing_table_msg(int root)
+or_protocol_msgs::RoutingTable::Ptr NetworkState::get_routing_table_msg()
 {
   FixedRoutingMap routing_map_copy;
   {
@@ -524,12 +527,12 @@ or_protocol_msgs::RoutingTable::Ptr NetworkState::get_routing_table_msg(int root
     for (const auto& dest_entry : src_entry.second) {
       or_protocol_msgs::RoutingDestEntry dest_entry_msg;
       dest_entry_msg.dest_id = dest_entry.first;
-
-      or_protocol_msgs::RoutingRule rule;
-      rule.relay_id = root;
-      rule.relays = dest_entry.second;
-
-      dest_entry_msg.rules.push_back(rule);
+      for (const auto& rule_entry : dest_entry.second) {
+        or_protocol_msgs::RoutingRule rule;
+        rule.relay_id = rule_entry.first;
+        rule.relays = rule_entry.second;
+        dest_entry_msg.rules.push_back(rule);
+      }
       src_entry_msg.entries.push_back(dest_entry_msg);
     }
     msg->entries.push_back(src_entry_msg);

@@ -92,7 +92,7 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
   msg.header.seq = getSeqNum();
   msg.header.hops++;
   if (set_relays)
-    msg.header.relays = network_state.relays(msg.header);
+    msg.header.relays = network_state.relays(msg.header, node_id);
 
   // manually serialize message so that we can keep a copy of buffer_ptr around
   // for later retransmission of reliable messages (i.e. reimplement
@@ -217,7 +217,7 @@ void ORProtocol::process_packets()
         }
         if (seq_count > 0) {
           item->header.attempt++;
-          item->header.relays = network_state.relays(item->header);
+          item->header.relays = network_state.relays(item->header, node_id);
           update_msg_header(item->buffer(), item->header);
           send(item->buffer(), item->size);
 
@@ -298,7 +298,7 @@ void ORProtocol::process_packets()
         // update current transmitting node and packet hop count
         item->header.curr_id = node_id;
         item->header.hops++;
-        item->header.relays = network_state.relays(item->header);
+        item->header.relays = network_state.relays(item->header, node_id);
         update_msg_header(item->buffer(), item->header);
 
         // relay immediately or with some delay
@@ -325,7 +325,7 @@ void ORProtocol::process_packets()
       item->header.src_id = node_id;
       item->header.seq = getSeqNum();
       item->header.hops++;
-      item->header.relays = network_state.relays(item->header);
+      item->header.relays = network_state.relays(item->header, node_id);
       update_msg_header(item->buffer(), item->header);
       send(item->buffer(), item->size);
       log_event(item, PacketAction::SEND, ros::Time::now());
@@ -449,7 +449,7 @@ void ORProtocol::compute_routes()
 
     // pass routing table to application for logging purposes
     pkt.data.clear();
-    or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg(node_id);
+    or_protocol_msgs::RoutingTablePtr s = network_state.get_routing_table_msg();
     pack_msg(pkt, *s);
     if (recv_handle) {
       int size = ros::serialization::serializationLength(pkt);

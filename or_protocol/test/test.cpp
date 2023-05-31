@@ -174,15 +174,20 @@ TEST(TestSuite, route_selection)
       sample_routing_map.emplace(relay, relays);
     }
 
+    // need to seed update_routes with a node we know is involved in routing
+    int root_id;
+    for (const auto& item : sample_routing_map) {
+      root_id = item.first;
+      break;
+    }
+
     int src = sample["src"].as<int>();
     int dest = sample["dest"].as<int>();
-    for (const auto& item : sample_routing_map) {
-      or_protocol::NetworkState ns;
-      ns.set_etx_map(sample_link_etx);
-      ns.update_routes(item.first);
-      or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
-      EXPECT_EQ(computed_routing_map[src][dest], sample_routing_map[item.first]);
-    }
+    or_protocol::NetworkState ns;
+    ns.set_etx_map(sample_link_etx);
+    ns.update_routes(root_id);
+    or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
+    EXPECT_EQ(computed_routing_map[src][dest], sample_routing_map);
   }
 }
 

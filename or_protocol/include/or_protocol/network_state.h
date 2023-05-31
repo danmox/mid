@@ -91,14 +91,14 @@ class NodeState
 };
 
 
+// TODO clean up these definitions / move to a pair/tuple key
 typedef std::unordered_map<int, std::unordered_map<int, double>> ETXMap;
 typedef std::unordered_map<int, std::unordered_map<int, ETXEntryStamped>> ETXEntryMap;
 typedef std::unordered_map<int, std::vector<int>> IntVectorMap;
 typedef or_protocol_msgs::Header::_relays_type RelayArray;
 typedef std::unordered_map<int, RelayArray> IntArrayMap;
-typedef std::unordered_map<int, IntVectorMap> VariableRoutingMap;
-typedef std::unordered_map<int, IntArrayMap> FixedRoutingMap;
-
+typedef std::unordered_map<int, std::unordered_map<int, IntVectorMap>> VariableRoutingMap;
+typedef std::unordered_map<int, std::unordered_map<int, IntArrayMap>> FixedRoutingMap;
 
 const int MAX_RELAY_COUNT = RelayArray::max_size();
 
@@ -130,13 +130,13 @@ class NetworkState
     FixedRoutingMap get_routing_map() { return routing_map; }
 
     // returns the routing map in the form of a ROS message
-    or_protocol_msgs::RoutingTable::Ptr get_routing_table_msg(int root);
+    or_protocol_msgs::RoutingTable::Ptr get_routing_table_msg();
 
-    // compute relays root should use for every possible flow in the network
+    // compute relays every possible flow in the network involving root_id
     void update_routes(const int root);
 
     // query the routing table for the relays to use for the given src, dest
-    RelayArray relays(const or_protocol_msgs::Header& header);
+    RelayArray relays(const or_protocol_msgs::Header& header, const int node_id);
 
   private:
     // the message history of each node in the network used for determining

@@ -51,7 +51,7 @@ add_executable(serialization_example src/serialization_example.cpp)
 target_link_libraries(serialization_example ${catkin_LIBRARIES} ${PROJECT_NAME})
 
 add_executable(routing_example src/routing_example.cpp)
-target_link_libraries(routing_example ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
+target_link_libraries(routing_example ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp fmt::fmt)
 
 add_executable(fragment_test src/fragment_test.cpp)
 target_link_libraries(fragment_test ${catkin_LIBRARIES} ${PROJECT_NAME})

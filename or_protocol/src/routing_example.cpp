@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <fmt/printf.h>
 #include <yaml-cpp/yaml.h>
 #include <ros/package.h>
 #include <or_protocol/network_state.h>
@@ -13,8 +14,8 @@ int routing_example()
   fs::path sample_dir = fs::path(package_path) / "test" / "samples";
 
   if (!fs::exists(sample_dir) || !fs::is_directory(sample_dir)) {
-    std::cout << "directory: " << sample_dir << " does not exist";
-    return 1;
+    fmt::print("directory: {} does not exist\n", sample_dir.c_str());
+    return EXIT_FAILURE;
   }
 
   std::vector<fs::path> sample_files;
@@ -47,28 +48,34 @@ int routing_example()
       sample_relay_map.emplace(relay, relays);
     }
 
-    std::cout << file << std::endl;
+    fmt::print("File: {}\n", file.c_str());
+
+    int root_id;
+    for (const auto& item : sample_relay_map) {
+      root_id = item.first;
+      break;
+    }
+
+    or_protocol::NetworkState ns;
+    ns.set_etx_map(sample_link_etx);
+    ns.update_routes(root_id);
+    or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
 
     int src = sample["src"].as<int>();
     int dest = sample["dest"].as<int>();
     for (const auto& item : sample_relay_map) {
-      or_protocol::NetworkState ns;
-      ns.set_etx_map(sample_link_etx);
-      ns.update_routes(item.first);
-      or_protocol::FixedRoutingMap computed_routing_map = ns.get_routing_map();
 
-      std::cout << "  NetworkState: " << std::endl << "    ";
-      const or_protocol::RelayArray& ns_relays = computed_routing_map[src][dest];
+      const or_protocol::RelayArray& ns_relays = computed_routing_map[src][dest][item.first];
+      fmt::print("  NetworkState:\n    ");
       for (size_t i = 0; i < ns_relays.size() - 1; i++)
-        std::cout << int(ns_relays[i]) << ", ";
-      std::cout << int(ns_relays.back()) << std::endl;
+        fmt::print("{}, ", ns_relays[i]);
+      fmt::print("{}\n", ns_relays.back());
 
-      std::cout << "  Sample: " << std::endl << "    ";
+      fmt::print("  Sample:\n    ");
       const std::vector<int>& s_relays = sample_relay_map[item.first];
       for (size_t i = 0; i < s_relays.size() - 1; i++)
-        std::cout << s_relays[i] << ", ";
-      std::cout << s_relays.back() << std::endl;
-      std::cout << std::endl;
+        fmt::print("{}, ", s_relays[i]);
+      fmt::print("{}\n\n", s_relays.back());
     }
   }
 
@@ -77,12 +84,12 @@ int routing_example()
   header.src_id = 1;
   header.dest_id = 2;
   or_protocol::NetworkState ns;
-  or_protocol::RelayArray default_route = ns.relays(header);
+  or_protocol::RelayArray default_route = ns.relays(header, header.src_id);
   // print default route
-  std::cout << std::endl << "Default route: " << std::endl;
+  fmt::print("Default rout for flow {} > {}:\n", header.src_id, header.dest_id);
   for (size_t i = 0; i < default_route.size() - 1; i++)
-    std::cout << int(default_route[i]) << ", ";
-  std::cout << int(default_route.back()) << std::endl;
+    fmt::print("{}, ", default_route[i]);
+  fmt::print("{}\n", default_route.back());
 
   return 0;
 }

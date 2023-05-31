@@ -130,7 +130,7 @@ int main(int argc, char** argv)
       // compute routes for each node
       for (const int id : node_ids) {
         ns.update_routes(id);
-        or_protocol_msgs::RoutingTablePtr rt_ptr = ns.get_routing_table_msg(id);
+        or_protocol_msgs::RoutingTablePtr rt_ptr = ns.get_routing_table_msg();
         pub_map[id].publish(rt_ptr);
       }
 
