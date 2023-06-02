@@ -318,8 +318,10 @@ void NetworkState::update_routes(const int root)
       }
 
       // only record routing information for flows involving root
-      if (relay_set.count(root) == 0)
+      if (relay_set.count(root) == 0) {
+        new_routing_map[src][dest].clear();
         continue;
+      }
 
       // compute relays for auxilary relays (those not on the default path)
       // NOTE we do a little extra work here to compute the relays for all
