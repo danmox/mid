@@ -35,13 +35,13 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "sim_routing_node");
 
-  ros::NodeHandle nh, pnh("~");
+  ros::NodeHandle nh;
 
   ros::Publisher status_pub = nh.advertise<or_protocol_msgs::NetworkStatus>("network_state", 1);
 
   double max_range;
-  if (!pnh.getParam("max_range", max_range)) {
-    ROS_FATAL("[sim_routing] unable to fetch param 'max_range'");
+  if (!nh.getParam("/max_range", max_range)) {
+    ROS_FATAL("[sim_routing] unable to fetch param '/max_range'");
     return EXIT_FAILURE;
   }
 
