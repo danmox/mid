@@ -175,6 +175,7 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
 
         paths[idx].push_back(relays[0]);
         path_probs[idx] *= link_probs(last_node, relays[0]);
+        incomplete.push(idx);
 
         for (size_t i = 1; i < relays.size(); i++) {
           paths.push_back(path_so_far);
@@ -293,7 +294,7 @@ void ORPlanner::run()
         const std::vector<int> &path = paths[i];
 
         size_t j = 1; // MID agents are never sources
-        while (path[j] != root_idx && j < path.size() - 1)
+        while (path[j] != root_idx && j < path.size() - 2)
           j++;
 
         // some paths in the flow don't involve root_idx
@@ -332,21 +333,22 @@ void ORPlanner::run()
         step_size *= 0.5;
       }
     }
-    double pos_error = (next_config.col(root_idx) - poses.col(root_idx)).norm();
+    double dist_error = (next_config.col(root_idx) - poses.col(root_idx)).norm();
 
     double yaw_error = atan2(gradient(1), gradient(0)) - pose_ptr->theta;
-    double yaw_sign = yaw_error > 0 ? 1.0 : -1.0;
-    if (yaw_error > 2.0 * M_PI) // TODO should be >=?
+    if (yaw_error > M_PI)
       yaw_error -= 2.0 * M_PI;
-    if (yaw_error < -2.0 * M_PI)
+    if (yaw_error < -M_PI)
       yaw_error += 2.0 * M_PI;
+    double yaw_sign = yaw_error > 0 ? 1.0 : -1.0;
 
     geometry_msgs::Twist vel_cmd;
-    if (abs(yaw_error) > heading_tol && pos_error > position_tol) {
+    if (abs(yaw_error) > heading_tol && dist_error > position_tol) {
       vel_cmd.angular.z = yaw_sign * w_max;
-    } else if (pos_error > position_tol) {
-      vel_cmd.angular.z = std::min(yaw_sign * w_max, 0.2 * yaw_error);
-      vel_cmd.linear.x = std::min(v_max, 0.5 * pos_error);
+    } else if (dist_error > position_tol) {
+      double yaw_cmd = 0.5 * yaw_error;
+      vel_cmd.angular.z = abs(yaw_cmd) > w_max ? yaw_sign * w_max : yaw_cmd;
+      vel_cmd.linear.x = std::min(v_max, 0.5 * dist_error);
     }
     vel_pub.publish(vel_cmd);
 
