@@ -46,7 +46,7 @@ Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false)
 {
-  table_sub = nh.subscribe("table", 1, &ORPlanner::table_cb, this);
+  table_sub = nh.subscribe("routing_table", 1, &ORPlanner::table_cb, this);
   status_sub = nh.subscribe("status", 1, &ORPlanner::status_cb, this);
   pose_sub = nh.subscribe("pose", 1, &ORPlanner::pose_cb, this);
 
@@ -54,6 +54,12 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   viz_pub = nh.advertise<visualization_msgs::Marker>("planner", 1);
 
   if (!pnh.getParam("node_id", node_id)) {
+    OP_FATAL("failed to fetch required param 'node_id'");
+    return;
+  }
+
+  std::string robot_type;
+  if (!pnh.getParam("robot_type", robot_type)) {
     OP_FATAL("failed to fetch required param 'node_id'");
     return;
   }
@@ -84,6 +90,17 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
       mid_ids.insert(mid_agent_ids_param[i]);
   }
 
+  // if the robot type is not set correctly by the user bad things happen
+  if (robot_type == "mid") {
+    if (mid_ids.count(node_id) == 0) {
+      OP_FATAL("robot_type is 'mid' but 'node_id' (%d) is not in mid_ids: {%s}; are /mid_agent_ids and /task_agent_ids set correctly?", node_id, set_to_str(mid_ids).c_str());
+      return;
+    }
+  } else if (robot_type != "none" && robot_type != "task") {
+    OP_FATAL("robot_type '%s' not set correctly for agent %d", robot_type.c_str(), node_id);
+    return;
+  }
+
   if (!pnh.getParam("v_max", v_max)) {
     v_max = 0.5;
     OP_WARN("failed to fetch param 'v_max': using default value of %.2f m/s", v_max);
@@ -91,8 +108,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
 
   if (!pnh.getParam("w_max", w_max)) {
     w_max = 1.5;
-    OP_WARN("failed to fetch param 'w_max': using default value of %.2f rad/s",
-            w_max);
+    OP_WARN("failed to fetch param 'w_max': using default value of %.2f rad/s", w_max);
   }
 
   if (!pnh.getParam("heading_tol", heading_tol)) {
@@ -352,16 +368,16 @@ void ORPlanner::run()
     }
     vel_pub.publish(vel_cmd);
 
-    // gradient visualization
+    // planner visualizations
 
-    geometry_msgs::Point a0;
-    a0.x = poses(0, root_idx);
-    a0.y = poses(1, root_idx);
-    a0.z = 0.2;
+    geometry_msgs::Point p0;
+    p0.x = poses(0, root_idx);
+    p0.y = poses(1, root_idx);
+    p0.z = 0.2;
 
-    geometry_msgs::Point a1 = a0;
-    a1.x += gradient(0);
-    a1.y += gradient(1);
+    geometry_msgs::Point p1 = p0;
+    p1.x += gradient(0);
+    p1.y += gradient(1);
 
     visualization_msgs::Marker grad_msg;
     grad_msg.header.frame_id = "world";
@@ -372,13 +388,36 @@ void ORPlanner::run()
     grad_msg.lifetime = ros::Duration(1.0);
     grad_msg.color.r = 1;
     grad_msg.color.a = 1;
-    grad_msg.points.push_back(a0);
-    grad_msg.points.push_back(a1);
+    grad_msg.points.push_back(p0);
+    grad_msg.points.push_back(p1);
     grad_msg.scale.x = 0.1;
     grad_msg.scale.y = 0.2;
     grad_msg.scale.z = 0.25;
+    grad_msg.pose.orientation.w = 1.0; // avoid rviz warning
+
+    p0.z = 0.1;
+
+    geometry_msgs::Point p2;
+    p2.x = next_config(0, root_idx);
+    p2.y = next_config(1, root_idx);
+    p2.z = 0.1;
+
+    visualization_msgs::Marker plan_msg;
+    plan_msg.header.frame_id = "world";
+    plan_msg.ns = "plan";
+    plan_msg.id = 0;
+    plan_msg.type = visualization_msgs::Marker::LINE_STRIP;
+    plan_msg.action = visualization_msgs::Marker::ADD;
+    plan_msg.lifetime = ros::Duration(1.0);
+    plan_msg.color.b = 1;
+    plan_msg.color.a = 1;
+    plan_msg.points.push_back(p0);
+    plan_msg.points.push_back(p2);
+    plan_msg.scale.x = 0.05;
+    plan_msg.pose.orientation.w = 1.0;  // avoid rviz warning
 
     viz_pub.publish(grad_msg);
+    viz_pub.publish(plan_msg);
   }
 }
 
