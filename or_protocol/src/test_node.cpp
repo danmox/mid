@@ -164,7 +164,9 @@ int main(int argc, char** argv)
   or_node.reset(new or_protocol::ORProtocol(argv[1], pkt_cb));
 
   ROS_INFO("[main] sleeping for %d seconds", delay_seconds);
-  std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
+  int steps = delay_seconds * 10;
+  for (int i = 0; i < steps && run; ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   ROS_INFO("[main] starting main loop");
 
   if (total_msgs != 0)
@@ -197,6 +199,7 @@ int main(int argc, char** argv)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
   }
+  ROS_INFO("[main] sent %d messages", sent_msgs);
   ROS_INFO("[main] done sending messages, awaiting shutdown signal");
 
   while (run)
