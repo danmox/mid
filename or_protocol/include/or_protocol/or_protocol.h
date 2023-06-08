@@ -22,6 +22,9 @@ namespace or_protocol {
 using or_protocol_msgs::Header;
 
 
+typedef std::tuple<Header, PacketAction, int, ros::Time, std::string> LogQueueItem;
+
+
 class ORProtocol
 {
   public:
@@ -89,7 +92,6 @@ class ORProtocol
     std::thread routing_thread;
 
     // safe queue for log information to be processed by logging thread
-    typedef std::tuple<Header, PacketAction, int, ros::Time, std::string> LogQueueItem;
     SafeFIFOQueue<LogQueueItem> log_queue;
 
     // thread for logging protocol decisions in plain text

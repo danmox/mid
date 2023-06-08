@@ -167,13 +167,28 @@ void ORProtocol::recv(buffer_ptr& buff_ptr, size_t size)
 }
 
 
+std::string log_msg(const LogQueueItem& item, const int node_id)
+{
+  const auto& [hdr, action, size, time, msg] = item;
+  const string rel_str = hdr.reliable ? "TRUE" : "FALSE";
+  const string type_str = packet_type_string(hdr);
+  return fmt::format("{}: {} {}: {} > {} v {} bytes={} relays=[{}, {}, {}, {}] seq={} hops={} att={} rel={} {}", node_id, packet_action_string(action).c_str(), type_str.c_str(), hdr.src_id, hdr.dest_id, hdr.curr_id, size, hdr.relays[0], hdr.relays[1], hdr.relays[2], hdr.relays[3], hdr.seq, hdr.hops, hdr.attempt, rel_str.c_str(), msg.c_str());
+}
+
+
 void ORProtocol::log_event(const or_protocol_msgs::Header& header,
                            const PacketAction action,
                            const int size,
                            const ros::Time& time,
                            const string& msg)
 {
+#ifdef OR_DEBUG_LOG
+  LogQueueItem item = std::make_tuple(header, action, size, time, msg);
+  OR_INFO("%s", log_msg(item, node_id).c_str());
+  log_queue.push(item);
+#else
   log_queue.push(std::make_tuple(header, action, size, time, msg));
+#endif
 }
 
 
@@ -182,7 +197,13 @@ void ORProtocol::log_event(const PacketQueueItemPtr& item,
                            const ros::Time& time,
                            const std::string& msg)
 {
+#ifdef OR_DEBUG_LOG
+  LogQueueItem log_item = std::make_tuple(item->header, action, item->size, time, msg);
+  OR_INFO("%s", log_msg(log_item, node_id).c_str());
+  log_queue.push(log_item);
+#else
   log_queue.push(std::make_tuple(item->header, action, item->size, time, msg));
+#endif
 }
 
 

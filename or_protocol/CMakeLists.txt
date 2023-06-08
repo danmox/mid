@@ -5,6 +5,11 @@ add_compile_options(-std=c++17)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
+set(OR_DEBUG_LOG OFF CACHE BOOL "Verbose mode for debugging ORProtocol")
+if(OR_DEBUG_LOG)
+  add_compile_definitions(OR_DEBUG_LOG)
+endif()
+
 find_package(catkin REQUIRED COMPONENTS
   or_protocol_msgs
   rosbag
