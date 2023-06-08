@@ -446,7 +446,7 @@ def status_main(args):
         time_str = f'{(t.to_sec() - bag_start):.2f}s'
 
         print(f'\n[{time_str}] node {node}, num={print_count+1}:')
-        if msg_type == 'beacons':
+        if msg_type == 'status':
             for etx_list in msg.etx_table:
                 print(f'  {etx_list.node}:')
                 for etx_entry in etx_list.etx_list:
@@ -458,7 +458,7 @@ def status_main(args):
                     for rule in dest_entry.rules:
                         print(f"    {rule.relay_id}: [{', '.join(map(str,rule.relays))}]")
         else:
-            print('unknown message type for topic: {topic}')
+            print(f'unknown message type "{msg_type}" for topic "{topic}"')
 
         print_count += 1
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     print_parser = subparsers.add_parser('status', help='print contents of bag in a human readable fashion')
     print_parser.add_argument('bag', type=str, help='bagfile to print')
     print_parser.add_argument('-t', '--type', type=str, help='only print messages of a particular type',
-                              choices=['beacons', 'routes'])
+                              choices=['status', 'routes'])
 
     # compute stats for test
     print_parser = subparsers.add_parser('test', help='compute stats for a test_node bag')
