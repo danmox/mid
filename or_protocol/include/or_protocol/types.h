@@ -1,6 +1,7 @@
 #ifndef OR_PROTOCOL_TYPES_H_
 #define OR_PROTOCOL_TYPES_H_
 
+#include <or_protocol/constants.h>
 
 #include <or_protocol_msgs/Header.h>
 #include <or_protocol_msgs/Packet.h>
@@ -24,7 +25,7 @@ struct PacketQueueItem
     or_protocol_msgs::Header header;
     ros::Time recv_time, send_time;
     bool processed, retransmission;
-    int priority, retries;
+    int priority;
 
     PacketQueueItem(buffer_ptr& _buff_ptr,
                     size_t _size,
@@ -37,8 +38,7 @@ struct PacketQueueItem
       send_time(0),
       processed(false),
       retransmission(false),
-      priority(0),
-      retries(0)
+      priority(0)
     {}
 
     char* buffer() { return buff_ptr.get(); }

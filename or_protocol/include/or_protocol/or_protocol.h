@@ -74,9 +74,6 @@ class ORProtocol
     // TODO check for overflow
     SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
 
-    // sequence numbers of unACKed reliable messages
-    std::unordered_set<uint32_t> retransmission_set;
-
     // logging, updating the retransmission set, and passing messages to the
     // application occur across threads and must be protected
     std::mutex log_mutex, retrans_mutex, app_mutex;

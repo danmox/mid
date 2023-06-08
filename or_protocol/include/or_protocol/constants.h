@@ -11,19 +11,18 @@ const int OR_PROTOCOL_PORT = 4568;
 // minimum unit of delay for enforcing relay priority in nanoseconds
 const int UNIT_DELAY = 10000000;
 
-// duration of time in nanoseconds to wait for an ACK before re-transmitting
-// a reliable packet, taking into account the worst case forwarding path for
-// the packet and ACK
-const int RETRY_DELAY = 20 * UNIT_DELAY;
-
 // maximum number of times a reliable packet should be re-transmitted before
 // giving up
 const int MAX_RETRY_COUNT = 2;
 
+// each retransmission is delayed RETRY_DELAY_FACTOR ^ (attempt - 1)
+const double RETRY_DELAY_FACTOR = 1.5;
+
 // maximum duration to hold onto messages in a NodeState queue - at some point
 // messages reach their intended destinations and aren't being relayed any
 // longer and no longer need to be tracked
-const int MSG_BUFFER_DURATION = MAX_RETRY_COUNT * RETRY_DELAY * 1.5;
+// NOTE 4 hop route * 4 candidate relays / hop * 2 factor of safety
+const int MSG_BUFFER_DURATION = MAX_RETRY_COUNT * UNIT_DELAY * 16 * 2;
 
 // thresholds for determining if a candidate relay node is "close" to the
 // current node in terms of ETX

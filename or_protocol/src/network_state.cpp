@@ -458,6 +458,8 @@ void NetworkState::process_beacon_queue(const int root)
   // NOTE the ETX values held in node_states are guaranteed to be the most
   // recent and thus we don't need to check for increasing sequence numbers here
   for (const auto& item : node_states) {
+    if (item.first == root)
+      continue;
     new_link_etx_table[item.first][root].entry = item.second.get_etx_entry(root);
     new_link_etx_table[item.first][root].stamp = item.second.get_etx_stamp();
   }

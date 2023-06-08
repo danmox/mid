@@ -79,6 +79,18 @@ ORProtocol::~ORProtocol()
 }
 
 
+ros::Duration compute_retry_delay(const PacketQueueItemPtr &item) {
+  // NOTE by convention, 0 is not a valid relay; the first occurence of 0 in the
+  // fixed relay array signifies the number of relays for that packet
+  int num_relays = relay_priority(0, item->header);
+
+  // use an exponential delay to avoid overloading the channel with retries
+  double exp_factor = pow(RETRY_DELAY_FACTOR, std::max(item->header.attempt - 1, 0));
+
+  return ros::Duration(0, num_relays * UNIT_DELAY * exp_factor);
+}
+
+
 // assuming node specific message header information has not been completed
 bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
@@ -105,6 +117,8 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
   ros::serialization::serialize(s, len - 4);
   ros::serialization::serialize(s, msg);
 
+  // NOTE on the systems tested, this is the largest payload that fits into one
+  // UDP packet (i.e. won't get fragmented at a lower network layer)
   if (len > 1472) {
     OR_ERROR("packet size (%d) greater than MTU (1472)", len);
     return false;
@@ -114,20 +128,12 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
     ros::Time now = ros::Time::now();
     log_event(msg.header, PacketAction::SEND, len, now);
 
-    // queue message for re-transmission (will get cancelled if an ACK is
-    // received within RETRY_DELAY)
+    // queue message for possible re-transmission
     if (msg.header.reliable) {
-      {
-        std::lock_guard<std::mutex> lock(retrans_mutex);
-        retransmission_set.emplace(msg.header.seq);
-      }
-
       PacketQueueItemPtr item(new PacketQueueItem(buff_ptr, len, msg.header, now));
-      item->send_time = now + ros::Duration(0, RETRY_DELAY);
-      item->processed = true;
+      item->send_time = now + compute_retry_delay(item);
       item->retransmission = true;
-      item->retries = MAX_RETRY_COUNT;
-
+      item->priority = MAX_RELAY_COUNT;  // lowest possible priority
       packet_queue.push(item);
     }
     return true;
@@ -203,47 +209,37 @@ void ORProtocol::process_packets()
     // packets may be processed but held for a short period of time before
     // being re-transmitted
     if (item->processed) {
-      // determine if processed message should be dropped, delayed, or sent
-      // TODO determine a smarter way of requeuing so that the packet is not
+      // TODO determine a smarter way of re-queuing so that the packet is not
       // delayed unnecessarily (step through queue and insert packet before
       // others with more recent send_time?)
       if (item->send_time > ros::Time::now()) {
         packet_queue.push(item);
-      } else if (item->retransmission) {
-        int seq_count;
-        {
-          std::lock_guard<std::mutex> lock(retrans_mutex);
-          seq_count = retransmission_set.count(item->header.seq);
-        }
-        if (seq_count > 0) {
+
+      } else if (item->priority <= msg_priority(item->header)) {
+
+        PacketAction action;
+        if (item->retransmission) {
           item->header.attempt++;
           item->header.relays = network_state.relays(item->header, node_id);
           update_msg_header(item->buffer(), item->header);
           send(item->buffer(), item->size);
-
-          ros::Time now = ros::Time::now();
-          double actual_dt = (now - item->recv_time).toSec() * 1000;
-          double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
-          string msg = fmt::format("t={:.2f}ms a={:.2f}ms", target_dt, actual_dt);
-          log_event(item, PacketAction::RETRY, now, msg);
-
-          // add message back to queue if retries remain
-          item->retries--;
-          if (item->retries > 0) {
-            item->send_time += ros::Duration(0, RETRY_DELAY);
-            packet_queue.push(item);
-          }
+          action = PacketAction::RETRY;
         } else {
-          log_event(item->header, PacketAction::CANCEL_RETRY, item->size,
-                    ros::Time::now());
+          send(item->buffer(), item->size); // TODO update relays here too?
+          action = PacketAction::RELAY;
+          item->retransmission = true;
         }
-      } else if (item->priority < msg_priority(item->header)) {
-        send(item->buffer(), item->size);  // TODO update relays here too?
+
         ros::Time now = ros::Time::now();
         double actual_dt = (now - item->recv_time).toSec() * 1000;
         double target_dt = (item->send_time - item->recv_time).toSec() * 1000;
         string msg = fmt::format("t={:.2f}ms a={:.2f}ms", target_dt, actual_dt);
-        log_event(item->header, PacketAction::RELAY, item->size, now, msg);
+        log_event(item->header, action, item->size, now, msg);
+
+        if (item->header.reliable && item->header.attempt < MAX_RETRY_COUNT) {
+          item->send_time += compute_retry_delay(item);
+          packet_queue.push(item);
+        }
       } else {
         log_event(item, PacketAction::DROP_SUP, ros::Time::now());
       }
@@ -261,13 +257,6 @@ void ORProtocol::process_packets()
       continue;
     }
 
-    // filter out messages that originated from the current node (i.e. echoed
-    // back from an intermediate relay)
-    if (item->header.src_id == node_id) {
-      log_event(item, PacketAction::DROP_ECHO, ros::Time::now());
-      continue;
-    }
-
     // update received messages queue (and highest priority msg received so far)
     // and filter out any that have already been received/processed
     MsgStatus ms = network_state.update_queue(item);
@@ -276,15 +265,28 @@ void ORProtocol::process_packets()
       continue;
     }
 
+    // the message history queue should be updated for packets originating at
+    // this node (i.e. in the send thread); however, to avoid thread safety
+    // overhead in NodeState we allow the packet to be processed here as if
+    // received over the air
+    if (item->header.curr_id == node_id) {
+      item->processed = true;
+      packet_queue.push(item);
+      continue;
+    }
+
+    // process ACKs
+    // TODO all ACKs are 1-hop ACKs now? remove attempt number tracking?
+    if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
+      uint32_t ack_seq = extract_ack(item);
+      string msg = fmt::format("ack_seq={}", ack_seq);
+      network_state.ack_msg(item->header.dest_id, ack_seq, item->recv_time.toSec());
+      log_event(item, PacketAction::ACK, ros::Time::now(), msg);
+      continue;
+    }
+
     // relay message
     if (item->header.dest_id != node_id) {
-
-      // update ACKed message in network_state so that no more relays are sent
-      if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
-        uint32_t ack_seq = extract_ack(item);
-        // the source of the original message is the destination of the ACK
-        network_state.ack_msg(item->header.dest_id, ack_seq, item->recv_time.toSec());
-      }
 
       const unsigned int tx_priority = relay_priority(item->header.curr_id, item->header);
       const unsigned int rx_priority = relay_priority(node_id, item->header);
@@ -305,14 +307,19 @@ void ORProtocol::process_packets()
         if (rx_priority == 0) {
           send(item->buffer(), item->size);
           log_event(item, PacketAction::RELAY, ros::Time::now());
+
+          item->send_time = item->recv_time + compute_retry_delay(item);
+          item->retransmission = true;
         } else {
           const ros::Duration delay(0, UNIT_DELAY * rx_priority);
           item->send_time = item->recv_time + delay;
-          item->priority = rx_priority;
-          item->processed = true;
-          packet_queue.push(item);
-          log_event(item, PacketAction::QUEUE, ros::Time::now());
         }
+
+        // requeue delayed relay or future retransmission
+        item->priority = rx_priority;
+        item->processed = true;
+        packet_queue.push(item);
+        log_event(item, PacketAction::QUEUE, ros::Time::now());
       }
       continue;
     }
@@ -332,28 +339,9 @@ void ORProtocol::process_packets()
       continue;
     }
 
-    // process received acknowledgements
-    if (item->header.msg_type == or_protocol_msgs::Header::ACK) {
-      uint32_t ack_seq = extract_ack(item);
-      {
-        std::lock_guard<std::mutex> lock(retrans_mutex);
-        if (retransmission_set.count(ack_seq) > 0)
-          retransmission_set.erase(ack_seq);
-      }
-      string msg = fmt::format("ack_seq={}", ack_seq);
-      log_event(item, PacketAction::ACK, ros::Time::now(), msg);
-
-      // don't ACK messages sent without routing (i.e. has a relay array with
-      // all zeros; this signifies the message is meant as a one-time broadcast)
-      // TODO kind of brittle? introduce a MINI_ACK for this purpose?
-      if (item->header.relays[0] == 0)
-        continue;
-    }
-
-    // if reliable, send full acknowledgement (with routing), otherwise send a
-    // one-time ACK (will not get relayed) to terminate cooperative relaying
-    // (this will prevent the highest priority relay from always transmitting
-    // even if the destination receives the packet)
+    // send a one-time ACK (will not get relayed) to terminate cooperative
+    // relaying (this will prevent the highest priority relay from always
+    // transmitting even if the destination receives the packet)
     or_protocol_msgs::Packet ack;
     std_msgs::UInt32 ack_seq;
     ack_seq.data = item->header.seq;
@@ -361,11 +349,7 @@ void ORProtocol::process_packets()
     ack.header.msg_type = or_protocol_msgs::Header::ACK;
     ack.header.dest_id = item->header.src_id;
     ack.header.reliable = false;
-    if (item->header.reliable) {
-      send(ack);  // send ACK with routing
-    } else {
-      send(ack, false);  // send one-time ACK broadcast
-    }
+    send(ack, false);
 
     if (recv_handle && ms.is_new_seq) {
       or_protocol_msgs::Packet pkt;
@@ -479,7 +463,7 @@ void ORProtocol::process_log_queue()
 
     LogQueueItem item;
     while (log_queue.pop(item)) {
-      const auto [hdr, action, size, time, msg] = item;
+      const auto& [hdr, action, size, time, msg] = item;
       const string rel_str = hdr.reliable ? "TRUE" : "FALSE";
       const string type_str = packet_type_string(hdr);
 
