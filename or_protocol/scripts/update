@@ -15,7 +15,9 @@ end
 cd $OR_PROTOCOL_DIR
 
 if not test -d .catkin_tools
-    if test -d /opt/ros/melodic
+    if test -d /opt/ros/scarab
+        catkin config --init --extend /opt/ros/scarab
+    else if test -d /opt/ros/melodic
         catkin config --init --extend /opt/ros/melodic
     else if test -d /opt/ros/noetic
         catkin config --init --extend /opt/ros/noetic
@@ -32,7 +34,7 @@ else
 end
 
 catkin clean -y
-catkin build or_protocol
+catkin build
 
 if set -q _flag_test
    catkin run_tests
