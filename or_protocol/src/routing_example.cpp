@@ -50,7 +50,7 @@ int routing_example()
 
     fmt::print("File: {}\n", file.c_str());
 
-    int root_id;
+    int root_id{};
     for (const auto& item : sample_relay_map) {
       root_id = item.first;
       break;

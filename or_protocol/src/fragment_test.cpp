@@ -19,7 +19,7 @@ void signal_handler(int s)
 }
 
 
-void buff_cb(or_protocol::buffer_ptr& buff, int size)
+void buff_cb([[maybe_unused]]or_protocol::buffer_ptr& buff, int size)
 {
   fmt::print("[main] received buffer with {} bytes\n", size);
 }
