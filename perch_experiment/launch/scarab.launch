@@ -1,0 +1,84 @@
+<launch>
+
+  <arg name="id"/>
+  <arg name="agent" default="$(env AGENT)"/>
+  <arg name="type"  default="none"/>
+  <arg name="gdb"   default="false"/>
+
+  <arg name="map_frame"   default="$(arg agent)/map"/>
+  <arg name="base_frame"  default="$(arg agent)/base_link"/>
+  <arg name="odom_frame"  default="$(arg agent)/odom"/>
+  <arg name="world_frame" default="world"/>
+
+  <!-- constructed args -->
+
+  <arg name="task" value="true" if="$(eval arg('type') == 'task')"/>
+  <arg name="task" value="false" unless="$(eval arg('type') == 'task')"/>
+  <arg name="mid"  value="true" if="$(eval arg('type') == 'mid')"/>
+  <arg name="mid"  value="false" unless="$(eval arg('type') == 'mid')"/>
+
+  <arg name="launch_prefix" value="alacritty -e gdb --args" if="$(arg gdb)"/>
+  <arg name="launch_prefix" value="" unless="$(arg gdb)"/>
+
+  <!-- nodes -->
+
+  <include file="$(find scarab)/launch/navigation.launch">
+    <arg name="agent"      value="$(arg agent)"/>
+    <arg name="map_frame"  value="$(arg map_frame)"/>
+    <arg name="base_frame" value="$(arg base_frame)"/>
+    <arg name="odom_frame" value="$(arg odom_frame)"/>
+    <arg name="xmin"       value="-20.0"/>
+    <arg name="xmax"       value="20.0"/>
+    <arg name="ymin"       value="-20.0"/>
+    <arg name="ymax"       value="50.0"/>
+  </include>
+
+  <group ns="$(arg agent)">
+
+    <!-- relative localization via vicon -->
+    <node name="relative_localization" pkg="relative_localization" type="rel_loc"
+          output="screen">
+      <param name="agent_name"  value="$(arg agent)"/>
+      <param name="base_frame"  value="$(arg base_frame)"/>
+      <param name="odom_frame"  value="$(arg odom_frame)"/>
+      <param name="map_frame"   value="$(arg map_frame)"/>
+      <param name="world_frame" value="$(arg world_frame)"/>
+    </node>
+
+    <arg name="model_list" value="['$(arg agent)']"/>
+    <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen">
+      <param name="server_address" value="mocap.perch"/>
+      <param name="frame_rate"     value="100"/>
+      <param name="max_accel"      value="10.0"/>
+      <param name="publish_tf"     value="true"/>
+      <param name="fixed_frame_id" value="$(arg world_frame)"/>
+      <rosparam param="model_list" subst_value="True">$(arg model_list)</rosparam>
+    </node>
+
+    <node name="frontier_exploration_node"
+          pkg="frontier_exploration"
+          type="frontier_exploration"
+          output="screen"
+          launch-prefix="$(arg launch_prefix)"
+          if="$(arg task)">
+      <param name="map_frame_id" value="$(arg agent)/map" />
+    </node>
+
+    <node name="mid_planner"
+          pkg="or_planner"
+          type="or_planner_node"
+          output="screen"
+          launch-prefix="$(arg launch_prefix)"
+          if="$(arg mid)">
+      <param name="robot_type"   value="$(arg type)"/>
+      <param name="node_id"      value="$(arg id)"/>
+      <param name="v_max"        value="0.5"/>   <!-- m/s -->
+      <param name="w_max"        value="1.0"/>   <!-- rad/s -->
+      <param name="heading_tol"  value="0.25"/>  <!-- ~15 deg -->
+      <param name="position_tol" value="0.25"/>  <!-- m -->
+      <remap from="status" to="/network_state"/>
+    </node>
+
+  </group>
+
+</launch>
