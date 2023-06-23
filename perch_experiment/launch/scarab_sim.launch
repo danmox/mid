@@ -39,7 +39,8 @@
           output="screen"
           launch-prefix="$(arg launch_prefix)"
           if="$(arg task)">
-      <param name="map_frame_id" value="$(arg agent)/map" />
+      <param name="map_frame_id"       value="$(arg agent)/map" />
+      <param name="frontier_threshold" value="75"/>
     </node>
 
     <node name="mid_planner"
