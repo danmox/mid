@@ -7,11 +7,10 @@
   <arg name="gazebo_gui"  default="false"/>
 
   <arg name="rviz"         default="true"/>
-
   <arg name="max_range"    default="30.0"/>
 
   <rosparam param="/task_agent_ids">[41, 42]</rosparam>
-  <rosparam param="/mid_agent_ids">[40]</rosparam>
+  <rosparam param="/mid_agent_ids">[40, 43]</rosparam>
   <param name="/max_range" value="$(arg max_range)"/>
 
   <!-- SIMULATION -->
@@ -34,22 +33,23 @@
   <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
         args="-sdf -model perch -file $(find scarab_gazebo)/models/perch/model.sdf"/>
 
-  <!-- SWRI console
-  <node pkg="swri_console" name="swri_console" type="swri_console"/> -->
+  <!-- SWRI console -->
+  <node pkg="swri_console" name="swri_console" type="swri_console"/>
 
-  <!-- fake comms -->
+  <!-- fake comms
   <node pkg="or_protocol" name="sim_routing" type="sim_routing_node" output="screen"/>
-
+ -->
   <!-- ROBOTS -->
 
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="40"/>
-    <arg name="spawn_x" value="4.0"/>
-    <arg name="spawn_y" value="3.0"/>
-    <arg name="type"    value="mid"/>
+    <arg name="spawn_x" value="0.0"/>
+    <arg name="spawn_y" value="0.0"/>
+    <arg name="type"    value="task"/>
     <arg name="gdb"     value="false"/>
   </include>
 
+  <!--
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="41"/>
     <arg name="spawn_x" value="10.0"/>
@@ -64,12 +64,11 @@
     <arg name="gdb"     value="false"/>
   </include>
 
-  <!--
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="43"/>
-    <arg name="spawn_x" value="-15.0"/>
-    <arg name="spawn_y" value="2.0"/>
-    <arg name="type"    value="none"/>
+    <arg name="spawn_x" value="-4.0"/>
+    <arg name="spawn_y" value="-3.0"/>
+    <arg name="type"    value="mid"/>
   </include>
 
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
