@@ -5,6 +5,7 @@
 #include <memory>
 #include <thread>
 
+#include <fmt/format.h>
 #include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
 #include <or_protocol_msgs/Packet.h>
@@ -32,25 +33,32 @@ void ping_recv(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, int size)
   or_protocol::deserialize(msg_seq, pkt.data.data() + offset, pkt.data.size() - offset);
 
   double ms = (recv_time - send_stamp_msg.data).toSec() * 1000;
-  printf("%d bytes from 192.168.0.%d: seq=%d hops=%d time=%.2f ms\n",
-         size, pkt.header.src_id, msg_seq.data, pkt.header.hops, ms);
+  fmt::print("{} bytes from 192.168.0.{}: seq={} hops={} time={:.2f} ms\n",
+             size, pkt.header.src_id, msg_seq.data, pkt.header.hops, ms);
 
   rtts_ms.push_back(ms);
   recv_msgs++;
 }
 
 
-void handler(int s)
+void handler([[maybe_unused]]int s)
 {
-  ROS_DEBUG("[main] received shutdown signal %d", s);
   run = false;
 }
 
 
 int main(int argc, char** argv)
 {
-  if (argc != 3) {
-    std::cout << "[main] usage: ping <ip address> <node id>" << std::endl;
+  bool send_packets = true;
+  int pkt_size = 64;
+  if (argc == 2) {
+    send_packets = false;
+    fmt::print("[main] running in passive mode\n");
+  } else if (argc == 3) {
+  } else if (argc == 4) {
+    pkt_size = std::stoi(argv[3]);
+  } else {
+    fmt::print("[main] usage: ping <ip address> [<node id> [<size>]]\n");
     return 0;
   }
 
@@ -64,11 +72,18 @@ int main(int argc, char** argv)
 
   or_node.reset(new or_protocol::ORProtocol(argv[1], ping_recv));
 
+  if (!send_packets) {
+    while (run)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    return 0;
+  }
   // build message
   or_protocol_msgs::Packet msg;
   msg.header.msg_type = or_protocol_msgs::Header::PING_REQ;
   msg.header.dest_id = std::stoi(argv[2]);
   msg.header.relays[0] = msg.header.dest_id;
+
+  fmt::print("[main] sending {} byte pings to node {}\n", pkt_size, msg.header.dest_id);
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
@@ -86,8 +101,9 @@ int main(int argc, char** argv)
     ping_seq.data = sent_msgs;
     or_protocol::pack_msg(msg, ping_seq);
 
-    // pad the message so that it's the same size as a normal ping (64 bytes)
-    msg.data.insert(msg.data.end(), 22, 1);
+    // pad the message to the desired size
+    const int pad = pkt_size - ros::serialization::serializationLength(msg) - 4;
+    msg.data.insert(msg.data.end(), pad, 1);
 
     bool set_relays = false;
     or_node->send(msg, set_relays);
@@ -98,11 +114,10 @@ int main(int argc, char** argv)
   if (sent_msgs == 0)
     return 0;
 
-  printf("\n--- 192.168.0.%d ping statistics ---\n", msg.header.dest_id);
+  fmt::print("\n--- 192.168.0.{} ping statistics ---\n", msg.header.dest_id);
   int total_time = (ros::Time::now() - start).toSec() * 1000;
-  printf("%d packets transmitted, %d packets received, %d%% packet loss, %d ms\n",
-         sent_msgs, recv_msgs, (sent_msgs - recv_msgs) * 100 / sent_msgs,
-         total_time);
+  fmt::print("{} packets transmitted, {} packets received, {}% packet loss, {} ms\n",
+             sent_msgs, recv_msgs, (sent_msgs - recv_msgs) * 100 / sent_msgs, total_time);
 
   if (rtts_ms.size() == 0)
     return 0;
@@ -120,7 +135,7 @@ int main(int argc, char** argv)
     sq_sum += (num - mean) * (num - mean);
   double std = sqrt(sq_sum / rtts_ms.size());
 
-  printf("rtt min/avg/max/std = %.3f/%.3f/%.3f/%.3f ms\n", min, mean, max, std);
+  fmt::print("rtt min/avg/max/std = {:.3f}/{:.3f}/{:.3f}/{:.3f} ms\n", min, mean, max, std);
 
   return 0;
 }
