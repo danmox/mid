@@ -8,9 +8,9 @@
 #include <thread>
 #include <yaml-cpp/yaml.h>
 
-#include <rosbag/bag.h>
 #include <or_protocol/or_protocol.h>
 #include <or_protocol/utils.h>
+#include <rosbag/bag.h>
 
 #include <or_protocol_msgs/Packet.h>
 #include <std_msgs/UInt32.h>
@@ -30,9 +30,9 @@ std::string topic_prefix;
 
 struct FlowSpec
 {
-    or_protocol_msgs::Packet packet;
-    std_msgs::UInt32 seq;
-    int total_size;
+  or_protocol_msgs::Packet packet;
+  std_msgs::UInt32 seq;
+  int total_size;
 };
 
 
@@ -137,14 +137,14 @@ int main(int argc, char** argv)
 
   if (flows.size() > 0) {
     for (auto& dest : flows) {
-        const FlowSpec& flow = dest.second;
-        ROS_INFO("flow: %d > %d, size=%d, reliable=%s",
-                 flow.packet.header.src_id, flow.packet.header.dest_id,
-                 flow.total_size, flow.packet.header.reliable ? "true" : "false");
+      const FlowSpec& flow = dest.second;
+      ROS_INFO("flow: %d > %d, size=%d, reliable=%s",
+               flow.packet.header.src_id, flow.packet.header.dest_id,
+               flow.total_size, flow.packet.header.reliable ? "true" : "false");
     }
   } else {
     ROS_INFO("no flows originating at this node");
-    reply = true; // reflect traffic back to sender for accurate delay stats
+    reply = true;  // reflect traffic back to sender for accurate delay stats
   }
 
   //
