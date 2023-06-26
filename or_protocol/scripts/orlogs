@@ -201,7 +201,7 @@ def print_main(args):
               f'relays={m.relays}{m.extra}')
 
     print(f'{print_count} entries, tx_pkts={tx_count}, tx_bytes={tx_bytes_count}' +\
-          f', rx_pkts={rx_count}, rx_bytes={rx_bytes_count}, {end_time - start_time} seconds')
+          f', rx_pkts={rx_count}, rx_bytes={rx_bytes_count}, {end_time - start_time:.3f} seconds')
 
 
 def stats_main(args):
