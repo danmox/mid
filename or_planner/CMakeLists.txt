@@ -6,10 +6,12 @@ add_compile_options(-std=c++17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 set(BUILD_DEPS
+  actionlib
   geometry_msgs
   nav_msgs
   or_protocol_msgs
   roscpp
+  scarab_msgs
   sensor_msgs
   tf2
   visualization_msgs

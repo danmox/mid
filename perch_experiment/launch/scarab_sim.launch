@@ -49,12 +49,9 @@
           output="screen"
           launch-prefix="$(arg launch_prefix)"
           if="$(arg mid)">
-      <param name="robot_type"   value="$(arg type)"/>
-      <param name="node_id"      value="$(arg id)"/>
-      <param name="v_max"        value="0.5"/>   <!-- m/s -->
-      <param name="w_max"        value="1.0"/>   <!-- rad/s -->
-      <param name="heading_tol"  value="0.25"/>  <!-- ~15 deg -->
-      <param name="position_tol" value="0.25"/>  <!-- m -->
+      <param name="robot_type" value="$(arg type)"/>
+      <param name="node_id"    value="$(arg id)"/>
+      <param name="nav_frame"  value="$(arg agent)/map"/>
       <remap from="status" to="/network_state"/>
     </node>
 

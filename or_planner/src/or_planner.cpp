@@ -44,13 +44,13 @@ Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 
 
 ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
-  nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false)
+  nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false),
+  hfn("move", true)
 {
   table_sub = nh.subscribe("routing_table", 1, &ORPlanner::table_cb, this);
   status_sub = nh.subscribe("status", 1, &ORPlanner::status_cb, this);
   pose_sub = nh.subscribe("pose", 1, &ORPlanner::pose_cb, this);
 
-  vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
   viz_pub = nh.advertise<visualization_msgs::Marker>("planner", 1);
 
   if (!pnh.getParam("node_id", node_id)) {
@@ -101,25 +101,19 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
     return;
   }
 
-  if (!pnh.getParam("v_max", v_max)) {
-    v_max = 0.5;
-    OP_WARN("failed to fetch param 'v_max': using default value of %.2f m/s", v_max);
+  if (!pnh.getParam("goal_threshold", goal_threshold)) {
+    goal_threshold = 1.5;
+    OP_WARN("failed to fetch param 'goal_threshold': using default value of %.2f m", goal_threshold);
   }
 
-  if (!pnh.getParam("w_max", w_max)) {
-    w_max = 1.5;
-    OP_WARN("failed to fetch param 'w_max': using default value of %.2f rad/s", w_max);
+  if (!pnh.getParam("nav_frame", nav_frame)) {
+    OP_FATAL("failed to fetch required param 'nav_frame'");
+    return;
   }
 
-  if (!pnh.getParam("heading_tol", heading_tol)) {
-    heading_tol = 0.25;  // ~15 deg
-    OP_WARN("failed to fetch param 'heading_tol': using default value of %.2f rad", heading_tol);
-  }
-
-  if (!pnh.getParam("position_tol", position_tol)) {
-    position_tol = 0.25;
-    OP_WARN("failed to fetch param 'position_tol': using default value of %.2f m", position_tol);
-  }
+  OP_INFO("waiting for hfn action server to start");
+  hfn.waitForServer();
+  OP_INFO("hfn action server ready");
 
   run_node = true;
 }
@@ -329,7 +323,10 @@ void ORPlanner::run()
     // compute control actions
 
     if (gradient.norm() < 1e-3) {
-      vel_pub.publish(geometry_msgs::Twist());
+      if (hfn.getState() == actionlib::SimpleClientGoalState::ACTIVE) {
+        OP_INFO("stopping robot");
+        hfn.cancelGoal();
+      }
       continue;
     }
     gradient.normalize();
@@ -339,6 +336,7 @@ void ORPlanner::run()
       OP_WARN("low delivery probability %f", current_prob);
 
     // search for local optimum along gradient direction
+    // TODO check for obstacles?
     double step_size = 0.5;
     Eigen::MatrixXd next_config = poses;
     for (int steps = 0; steps < 10; steps++) {
@@ -349,24 +347,23 @@ void ORPlanner::run()
         step_size *= 0.5;
       }
     }
-    double dist_error = (next_config.col(root_idx) - poses.col(root_idx)).norm();
+    Eigen::MatrixXd goal_pos = next_config.col(root_idx);
 
-    double yaw_error = atan2(gradient(1), gradient(0)) - pose_ptr->theta;
-    if (yaw_error > M_PI)
-      yaw_error -= 2.0 * M_PI;
-    if (yaw_error < -M_PI)
-      yaw_error += 2.0 * M_PI;
-    double yaw_sign = yaw_error > 0 ? 1.0 : -1.0;
+    // send goal to HFN
 
-    geometry_msgs::Twist vel_cmd;
-    if (abs(yaw_error) > heading_tol && dist_error > position_tol) {
-      vel_cmd.angular.z = yaw_sign * w_max;
-    } else if (dist_error > position_tol) {
-      double yaw_cmd = 0.5 * yaw_error;
-      vel_cmd.angular.z = abs(yaw_cmd) > w_max ? yaw_sign * w_max : yaw_cmd;
-      vel_cmd.linear.x = std::min(v_max, 0.5 * dist_error);
-    }
-    vel_pub.publish(vel_cmd);
+    geometry_msgs::PoseStamped goal_pose;
+    goal_pose.header.frame_id = nav_frame;
+    goal_pose.header.stamp = ros::Time::now();
+    goal_pose.pose.position.x = goal_pos(0);
+    goal_pose.pose.position.y = goal_pos(1);
+    goal_pose.pose.orientation.w = 1.0;
+
+    scarab_msgs::MoveGoal goal;
+    goal.target_poses.push_back(goal_pose);
+
+    OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
+
+    hfn.sendGoal(goal);
 
     // planner visualizations
 
@@ -398,8 +395,8 @@ void ORPlanner::run()
     p0.z = 0.1;
 
     geometry_msgs::Point p2;
-    p2.x = next_config(0, root_idx);
-    p2.y = next_config(1, root_idx);
+    p2.x = goal_pos(0);
+    p2.y = goal_pos(1);
     p2.z = 0.1;
 
     visualization_msgs::Marker plan_msg;
