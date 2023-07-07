@@ -1,16 +1,19 @@
 <launch>
 
-  <arg name="id"/>
-  <arg name="agent" default="$(env AGENT)"/>
-  <arg name="type"  default="none"/>
-  <arg name="gdb"   default="false"/>
+  <arg name="agent"  default="$(env AGENT)"/>
+  <arg name="type"   default="none"/>
+  <arg name="gdb"    default="false"/>
+  <arg name="record" default="false"/>
 
-  <arg name="map_frame"   default="$(arg agent)/map"/>
-  <arg name="base_frame"  default="$(arg agent)/base_link"/>
-  <arg name="odom_frame"  default="$(arg agent)/odom"/>
-  <arg name="world_frame" default="world"/>
+  <arg name="map_frame"     default="$(arg agent)/map"/>
+  <arg name="base_frame"    default="$(arg agent)/base_link"/>
+  <arg name="odom_frame"    default="$(arg agent)/odom"/>
+  <arg name="world_frame"   default="world"/>
+  <arg name="heading_frame" default="$(arg agent)/heading_correction"/>
 
   <!-- constructed args -->
+
+  <arg name="id" value="$(eval arg('agent')[6:])"/>
 
   <arg name="task" value="true" if="$(eval arg('type') == 'task')"/>
   <arg name="task" value="false" unless="$(eval arg('type') == 'task')"/>
@@ -19,6 +22,11 @@
 
   <arg name="launch_prefix" value="alacritty -e gdb --args" if="$(arg gdb)"/>
   <arg name="launch_prefix" value="" unless="$(arg gdb)"/>
+
+  <!-- parameters -->
+
+  <rosparam command="load"
+            file="$(find perch_experiment)/config/heading_calibration.yaml"/>
 
   <!-- nodes -->
 
@@ -38,11 +46,19 @@
     <!-- relative localization via vicon -->
     <node name="relative_localization" pkg="relative_localization" type="rel_loc"
           output="screen">
-      <param name="agent_name"  value="$(arg agent)"/>
-      <param name="base_frame"  value="$(arg base_frame)"/>
-      <param name="odom_frame"  value="$(arg odom_frame)"/>
-      <param name="map_frame"   value="$(arg map_frame)"/>
-      <param name="world_frame" value="$(arg world_frame)"/>
+      <param name="vicon_base_frame"  value="$(arg heading_frame)"/>
+      <param name="base_frame"        value="$(arg base_frame)"/>
+      <param name="odom_frame"        value="$(arg odom_frame)"/>
+      <param name="map_frame"         value="$(arg map_frame)"/>
+      <param name="world_frame"       value="$(arg world_frame)"/>
+    </node>
+
+    <!-- static transform publisher to align vicon and gmapping headings -->
+    <node name="heading_correction" pkg="relative_localization"
+          type="heading_correction" output="screen">
+      <param name="parent_frame" value="$(arg agent)"/>
+      <param name="child_frame"  value="$(arg heading_frame)"/>
+      <param name="agent"        value="$(arg agent)"/>
     </node>
 
     <arg name="model_list" value="['$(arg agent)']"/>
@@ -61,7 +77,7 @@
           output="screen"
           launch-prefix="$(arg launch_prefix)"
           if="$(arg task)">
-      <param name="map_frame_id" value="$(arg agent)/map" />
+      <param name="map_frame_id" value="$(arg map_frame)" />
     </node>
 
     <node name="mid_planner"
@@ -80,5 +96,13 @@
     </node>
 
   </group>
+
+  <node name="recorder" pkg="rosbag" type="record" output="screen"
+        if="$(arg record)"
+        args="record -o heading_calibration_$(arg id)
+              /tf
+              /scarab$(arg id)/map
+              /scarab$(arg id)/pose
+              /scarab$(arg id)/vicon/scarab$(arg id)/pose"/>
 
 </launch>
