@@ -1,15 +1,16 @@
 <launch>
 
-  <arg name="agent"  default="$(env AGENT)"/>
-  <arg name="type"   default="none"/>
-  <arg name="gdb"    default="false"/>
-  <arg name="record" default="false"/>
+  <arg name="agent"                 default="$(env AGENT)"/>
+  <arg name="type"                  default="none"/>
+  <arg name="gdb"                   default="false"/>
+  <arg name="record"                default="false"/>
+  <arg name="relative_localization" default="true"/>
 
-  <arg name="map_frame"     default="$(arg agent)/map"/>
-  <arg name="base_frame"    default="$(arg agent)/base_link"/>
-  <arg name="odom_frame"    default="$(arg agent)/odom"/>
-  <arg name="world_frame"   default="world"/>
-  <arg name="heading_frame" default="$(arg agent)/heading_correction"/>
+  <arg name="map_frame"             default="$(arg agent)/map"/>
+  <arg name="base_frame"            default="$(arg agent)/base_link"/>
+  <arg name="odom_frame"            default="$(arg agent)/odom"/>
+  <arg name="world_frame"           default="world"/>
+  <arg name="heading_frame"         default="$(arg agent)/heading_correction"/>
 
   <!-- constructed args -->
 
@@ -30,22 +31,23 @@
 
   <!-- nodes -->
 
-  <include file="$(find scarab)/launch/navigation.launch">
+  <include file="$(find perch_experiment)/launch/navigation.launch">
     <arg name="agent"      value="$(arg agent)"/>
     <arg name="map_frame"  value="$(arg map_frame)"/>
     <arg name="base_frame" value="$(arg base_frame)"/>
     <arg name="odom_frame" value="$(arg odom_frame)"/>
-    <arg name="xmin"       value="-20.0"/>
-    <arg name="xmax"       value="20.0"/>
-    <arg name="ymin"       value="-20.0"/>
-    <arg name="ymax"       value="50.0"/>
+    <arg name="map_xmin"   value="-20.0"/>
+    <arg name="map_xmax"   value="20.0"/>
+    <arg name="map_ymin"   value="-20.0"/>
+    <arg name="map_ymax"   value="50.0"/>
+    <arg name="hfn_config" value="$(find perch_experiment)/config/hfn.yaml"/>
   </include>
 
   <group ns="$(arg agent)">
 
     <!-- relative localization via vicon -->
     <node name="relative_localization" pkg="relative_localization" type="rel_loc"
-          output="screen">
+          output="screen" if="$(arg relative_localization)">
       <param name="vicon_base_frame"  value="$(arg heading_frame)"/>
       <param name="base_frame"        value="$(arg base_frame)"/>
       <param name="odom_frame"        value="$(arg odom_frame)"/>
@@ -54,15 +56,16 @@
     </node>
 
     <!-- static transform publisher to align vicon and gmapping headings -->
-    <node name="heading_correction" pkg="relative_localization"
-          type="heading_correction" output="screen">
+    <node name="heading_correction" pkg="relative_localization" type="heading_correction"
+          output="screen" if="$(arg relative_localization)">
       <param name="parent_frame" value="$(arg agent)"/>
       <param name="child_frame"  value="$(arg heading_frame)"/>
       <param name="agent"        value="$(arg agent)"/>
     </node>
 
     <arg name="model_list" value="['$(arg agent)']"/>
-    <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen">
+    <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen"
+          if="$(arg relative_localization)">
       <param name="server_address" value="mocap.perch"/>
       <param name="frame_rate"     value="100"/>
       <param name="max_accel"      value="10.0"/>
