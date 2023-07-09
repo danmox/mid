@@ -1,16 +1,20 @@
 <launch>
 
   <arg name="agent"                 default="$(env AGENT)"/>
+
   <arg name="type"                  default="none"/>
   <arg name="gdb"                   default="false"/>
   <arg name="record"                default="false"/>
   <arg name="relative_localization" default="true"/>
+  <arg name="camera"                default="true"/>
 
   <arg name="map_frame"             default="$(arg agent)/map"/>
   <arg name="base_frame"            default="$(arg agent)/base_link"/>
   <arg name="odom_frame"            default="$(arg agent)/odom"/>
-  <arg name="world_frame"           default="world"/>
   <arg name="heading_frame"         default="$(arg agent)/heading_correction"/>
+  <arg name="laser_frame"           default="$(arg agent)/laser"/>
+  <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
+  <arg name="world_frame"           default="world"/>
 
   <!-- constructed args -->
 
@@ -31,11 +35,15 @@
 
   <!-- nodes -->
 
+  <arg name="nav_laser_topic" value="scan_merged" if="$(arg camera)"/>
+  <arg name="nav_laser_topic" value="scan" unless="$(arg camera)"/>
+
   <include file="$(find perch_experiment)/launch/navigation.launch">
     <arg name="agent"      value="$(arg agent)"/>
     <arg name="map_frame"  value="$(arg map_frame)"/>
     <arg name="base_frame" value="$(arg base_frame)"/>
     <arg name="odom_frame" value="$(arg odom_frame)"/>
+    <arg name="nav_scan_topic" value="scan_merged"/>
     <arg name="map_xmin"   value="-20.0"/>
     <arg name="map_xmax"   value="20.0"/>
     <arg name="map_ymin"   value="-20.0"/>
@@ -45,34 +53,88 @@
 
   <group ns="$(arg agent)">
 
-    <!-- relative localization via vicon -->
-    <node name="relative_localization" pkg="relative_localization" type="rel_loc"
-          output="screen" if="$(arg relative_localization)">
-      <param name="vicon_base_frame"  value="$(arg heading_frame)"/>
-      <param name="base_frame"        value="$(arg base_frame)"/>
-      <param name="odom_frame"        value="$(arg odom_frame)"/>
-      <param name="map_frame"         value="$(arg map_frame)"/>
-      <param name="world_frame"       value="$(arg world_frame)"/>
-    </node>
+    <!-- nodes for using the Asus Xtion depth camera to improve navigation
+         obstacle avoidance performance -->
+    <group if="$(arg camera)">
 
-    <!-- static transform publisher to align vicon and gmapping headings -->
-    <node name="heading_correction" pkg="relative_localization" type="heading_correction"
-          output="screen" if="$(arg relative_localization)">
-      <param name="parent_frame" value="$(arg agent)"/>
-      <param name="child_frame"  value="$(arg heading_frame)"/>
-      <param name="agent"        value="$(arg agent)"/>
-    </node>
+      <!-- asus xtion nodes -->
+      <include file="$(find scarab)/launch/openni2_tf_prefix.launch">
+        <arg name="camera"          value="camera"/>
+        <arg name="tf_prefix"       value="$(arg agent)"/>
+	      <arg name="id_manufacturer" value="1d27"/>
+      </include>
 
-    <arg name="model_list" value="['$(arg agent)']"/>
-    <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen"
-          if="$(arg relative_localization)">
-      <param name="server_address" value="mocap.perch"/>
-      <param name="frame_rate"     value="100"/>
-      <param name="max_accel"      value="10.0"/>
-      <param name="publish_tf"     value="true"/>
-      <param name="fixed_frame_id" value="$(arg world_frame)"/>
-      <rosparam param="model_list" subst_value="True">$(arg model_list)</rosparam>
-    </node>
+      <!-- convert xtion camera pointcloud to laserscan to avoid obstacles the
+           hokuyo misses -->
+      <arg name="nodelet_name"
+           value="pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet"/>
+      <node pkg="nodelet" type="nodelet" name="pointcloud_to_laserscan_nodelet"
+            args="load $(arg nodelet_name) /$(arg agent)/camera/camera_nodelet_manager"
+            output="screen">
+        <param name="target_frame"    value="$(arg laser_frame)"/>
+        <param name="min_height"      value="-0.20"/> <!-- base_link coincident laser, thus heights -->
+        <param name="max_height"      value="1.0"/>   <!-- depend on laser's position relative to ground -->
+        <param name="range_max"       value="4.0"/>   <!-- return Inf beyond this value -->
+        <param name="use_inf"         value="true"/>
+        <param name="angle_min"       value="-2.0987584590911865"/>  <!-- to match hokuyo: -120.25 deg -->
+        <param name="angle_max"       value="2.0987584590911865"/>   <!-- to match hokuyo:  120.25 deg -->
+        <param name="angle_increment" value="0.004363323096185923"/> <!-- to match hokuyo:    0.25 deg -->
+        <remap from="cloud_in" to="camera/depth/points"/>
+        <remap from="scan"     to="scan_xtion"/>
+      </node>
+
+      <!-- static transform between camera frame and laser frame -->
+      <node pkg="tf2_ros"
+            type="static_transform_publisher"
+            name="camera_laser_static_tf_broadcaster"
+            args="-0.1 0 0.11 0 0 0 $(arg laser_frame) $(arg camera_frame)"/>
+
+      <!-- merge the laserscan coming from the hokuyo and xtion -->
+      <node pkg="laserscan_merger" type="laserscan_merger" name="laserscan_merger"
+            output="screen">
+        <remap from="scan1" to="scan_xtion"/>
+        <remap from="scan2" to="scan"/>
+        <remap from="merged_scan" to="scan_merged"/>
+      </node>
+
+    </group>
+
+    <!-- nodes for using VICON relative localizations between robots -->
+    <group if="$(arg relative_localization)">
+
+      <!-- computes the static transformation between the robot's starting point
+           and the world frame provided by vicon -->
+      <node name="relative_localization" pkg="relative_localization" type="rel_loc"
+            output="screen" if="$(arg relative_localization)">
+        <param name="vicon_base_frame"  value="$(arg heading_frame)"/>
+        <param name="base_frame"        value="$(arg base_frame)"/>
+        <param name="odom_frame"        value="$(arg odom_frame)"/>
+        <param name="map_frame"         value="$(arg map_frame)"/>
+        <param name="world_frame"       value="$(arg world_frame)"/>
+      </node>
+
+      <!-- static transform publisher to align vicon and gmapping headings -->
+      <node name="heading_correction" pkg="relative_localization" type="heading_correction"
+            output="screen" if="$(arg relative_localization)">
+        <param name="parent_frame" value="$(arg agent)"/>
+        <param name="child_frame"  value="$(arg heading_frame)"/>
+        <param name="agent"        value="$(arg agent)"/>
+      </node>
+
+      <!-- vicon node to provide initial estimate of robot's position relative to
+           the vicon world frame -->
+      <arg name="model_list" value="['$(arg agent)']"/>
+      <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen"
+            if="$(arg relative_localization)">
+        <param name="server_address" value="mocap.perch"/>
+        <param name="frame_rate"     value="100"/>
+        <param name="max_accel"      value="10.0"/>
+        <param name="publish_tf"     value="true"/>
+        <param name="fixed_frame_id" value="$(arg world_frame)"/>
+        <rosparam param="model_list" subst_value="True">$(arg model_list)</rosparam>
+      </node>
+
+    </group>
 
     <node name="frontier_exploration_node"
           pkg="frontier_exploration"

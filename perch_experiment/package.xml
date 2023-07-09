@@ -13,6 +13,7 @@
   <run_depend>gmapping</run_depend>
   <run_depend>robot_state_publisher</run_depend>
   <run_depend>joint_state_publisher</run_depend>
+  <run_depend>pointcloud_to_laserscan</run_depend>
   <run_depend>scarab_description</run_depend>
   <run_depend>scarab_gazebo</run_depend>
   <run_depend>tf2_ros</run_depend>
