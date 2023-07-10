@@ -39,16 +39,17 @@
   <arg name="nav_laser_topic" value="scan" unless="$(arg camera)"/>
 
   <include file="$(find perch_experiment)/launch/navigation.launch">
-    <arg name="agent"      value="$(arg agent)"/>
-    <arg name="map_frame"  value="$(arg map_frame)"/>
-    <arg name="base_frame" value="$(arg base_frame)"/>
-    <arg name="odom_frame" value="$(arg odom_frame)"/>
+    <arg name="agent"          value="$(arg agent)"/>
+    <arg name="map_frame"      value="$(arg map_frame)"/>
+    <arg name="base_frame"     value="$(arg base_frame)"/>
+    <arg name="odom_frame"     value="$(arg odom_frame)"/>
     <arg name="nav_scan_topic" value="scan_merged"/>
-    <arg name="map_xmin"   value="-20.0"/>
-    <arg name="map_xmax"   value="20.0"/>
-    <arg name="map_ymin"   value="-20.0"/>
-    <arg name="map_ymax"   value="50.0"/>
-    <arg name="hfn_config" value="$(find perch_experiment)/config/hfn.yaml"/>
+    <arg name="map_xmin"       value="-20.0"/>
+    <arg name="map_xmax"       value="20.0"/>
+    <arg name="map_ymin"       value="-20.0"/>
+    <arg name="map_ymax"       value="50.0"/>
+    <arg name="hfn_config"     value="$(find perch_experiment)/config/hfn.yaml"/>
+    <arg name="map_res"        value="0.1"/>
   </include>
 
   <group ns="$(arg agent)">
@@ -92,8 +93,8 @@
       <!-- merge the laserscan coming from the hokuyo and xtion -->
       <node pkg="laserscan_merger" type="laserscan_merger" name="laserscan_merger"
             output="screen">
-        <remap from="scan1" to="scan_xtion"/>
-        <remap from="scan2" to="scan"/>
+        <remap from="scan1"       to="scan_xtion"/>
+        <remap from="scan2"       to="scan"/>
         <remap from="merged_scan" to="scan_merged"/>
       </node>
 
@@ -106,11 +107,11 @@
            and the world frame provided by vicon -->
       <node name="relative_localization" pkg="relative_localization" type="rel_loc"
             output="screen" if="$(arg relative_localization)">
-        <param name="vicon_base_frame"  value="$(arg heading_frame)"/>
-        <param name="base_frame"        value="$(arg base_frame)"/>
-        <param name="odom_frame"        value="$(arg odom_frame)"/>
-        <param name="map_frame"         value="$(arg map_frame)"/>
-        <param name="world_frame"       value="$(arg world_frame)"/>
+        <param name="vicon_base_frame" value="$(arg heading_frame)"/>
+        <param name="base_frame"       value="$(arg base_frame)"/>
+        <param name="odom_frame"       value="$(arg odom_frame)"/>
+        <param name="map_frame"        value="$(arg map_frame)"/>
+        <param name="world_frame"      value="$(arg world_frame)"/>
       </node>
 
       <!-- static transform publisher to align vicon and gmapping headings -->
@@ -142,7 +143,15 @@
           output="screen"
           launch-prefix="$(arg launch_prefix)"
           if="$(arg task)">
-      <param name="map_frame_id" value="$(arg map_frame)" />
+      <param name="node_id"             value="$(arg id)"/>
+      <param name="map_frame_id"        value="$(arg map_frame)"/>
+      <rosparam>
+        frontier_threshold:   15
+        free_dilation_steps:   2
+        occ_dilation_steps:    3
+        banned_threshold:    0.5
+        goal_threshold:      5.0
+      </rosparam>
     </node>
 
     <node name="mid_planner"
