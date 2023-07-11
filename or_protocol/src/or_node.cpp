@@ -61,6 +61,8 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
 
         subscribers.push_back(SubInfo{topic, queue_size, reliable, false, dest_id, std::move(ptr)});
         ORN_INFO("Adding local subscriber: %s: {queue_size: %d, reliable: %s, dest_id: %d}", topic.c_str(), queue_size, reliable ? "true" : "false", dest_id);
+
+        // TODO publishers
       }
     } catch (const XmlRpc::XmlRpcException& e) {
       ORN_FATAL("failure while parsing 'sync_topic' param: %s", e.getMessage().c_str());
@@ -81,27 +83,6 @@ void ORNode::ros_msg_cb(const topic_tools::ShapeShifter::ConstPtr& msg, int idx)
 {
   SubInfo& subscriber = subscribers[idx];
 
-  if (!subscriber.synced) {
-    ORN_INFO("sending TopicInfo for '%s' to dest_id '%d'", subscriber.topic.c_str(), subscriber.dest_id);
-    or_protocol_msgs::TopicInfo info_msg;
-    info_msg.id = idx;
-    info_msg.name = subscriber.topic;
-    info_msg.type = msg->getDataType();
-    info_msg.md5sum = msg->getMD5Sum();
-    info_msg.definition = msg->getMessageDefinition();
-    info_msg.latching = "false"; // TODO make this a parameter
-
-    or_protocol_msgs::Packet pkt;
-    pkt.header.msg_type = or_protocol_msgs::Header::TOPIC_INFO;
-    pkt.header.dest_id = subscriber.dest_id;
-    pkt.header.reliable = true;
-    pack_msg(pkt, info_msg);
-    protocol->send(pkt);
-
-    // TODO need to check if the message was actually delivered!!
-    subscriber.synced = true;
-  }
-
   or_protocol_msgs::Packet pkt;
   pkt.header.msg_type = or_protocol_msgs::Header::PAYLOAD;
   pkt.header.dest_id = subscriber.dest_id;  // TODO multicast?
@@ -111,8 +92,9 @@ void ORNode::ros_msg_cb(const topic_tools::ShapeShifter::ConstPtr& msg, int idx)
   id_msg.data = idx;
   pack_msg(pkt, id_msg);
 
-  ORN_INFO("sending packet to %d", pkt.header.dest_id);
   or_protocol::pack_msg(pkt, *msg);
+
+  ORN_INFO("sending packet to %d", pkt.header.dest_id);
   protocol->send(pkt);
 }
 
@@ -168,7 +150,6 @@ void ORNode::recv_packet(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, in
     PubKey key = std::make_pair(pkt.header.src_id, id.data);
     auto it = publishers.find(key);
     if (it == publishers.end()) {
-      // TODO queue messages until TopicInfo is received?
       ORN_WARN("no PubInfo found for key {node: %d, id: %d}, dropping!", pkt.header.src_id, id.data);
     } else {
       PubInfo& info = it->second;

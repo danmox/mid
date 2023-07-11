@@ -7,6 +7,7 @@
 
 #include <or_protocol/types.h>
 #include <ros/console.h>
+#include <topic_tools/shape_shifter.h>
 
 
 namespace or_protocol {
@@ -39,6 +40,11 @@ std::string packet_type_string(const or_protocol_msgs::Header& header);
 
 // returns the message type as a string
 std::string packet_action_string(const PacketAction action);
+
+
+// returns a ShapeShifter with message info filled in given a message type
+// NOTE this is used to avoid having to pass TopicInfo messages around
+topic_tools::ShapeShifter get_msg_info(const std::string& type);
 
 
 // serializes a ROS message and inserts it into the payload of an

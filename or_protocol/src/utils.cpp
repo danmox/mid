@@ -1,4 +1,8 @@
 #include <or_protocol/utils.h>
+
+#include <frontier_exploration/Goal.h>
+#include <frontier_exploration/FrontierGoals.h>
+#include <ros/message_traits.h>
 #include <std_msgs/UInt32.h>
 
 
@@ -91,6 +95,20 @@ std::string packet_action_string(const PacketAction action)
     default:
       return std::string("UNKNOWN");
   }
+}
+
+
+topic_tools::ShapeShifter get_msg_info(const std::string& type)
+{
+  topic_tools::ShapeShifter ss;
+
+  if (type == "frontier_exploration/FrontierGoals") {
+  } else if (type == "frontier_exploration/Goal") {
+  } else {
+    OR_ERROR("get_msg_info not implemented for type %s!", type.c_str());
+  }
+
+  return ss;
 }
 
 

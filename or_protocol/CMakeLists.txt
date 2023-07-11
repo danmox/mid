@@ -11,6 +11,7 @@ if(OR_DEBUG_LOG)
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  frontier_exploration
   or_protocol_msgs
   rosbag
   roscpp
@@ -23,6 +24,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES or_protocol
   CATKIN_DEPENDS
+    frontier_exploration
     or_protocol_msgs
     rosbag
     roscpp
