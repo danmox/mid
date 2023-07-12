@@ -40,8 +40,17 @@
           output="screen"
           launch-prefix="$(arg launch_prefix)"
           if="$(arg task)">
-      <param name="map_frame_id"       value="$(arg agent)/map" />
-      <param name="frontier_threshold" value="75"/>
+      <param name="node_id"        value="$(arg id)"/>
+      <param name="map_frame_id"   value="$(arg agent)/map"/>
+      <param name="frontier_topic" value="/scarab*/frontiers"/>
+      <param name="goal_topic"     value="/scarab*/goals"/>
+      <rosparam>
+        frontier_threshold:   15
+        free_dilation_steps:   2
+        occ_dilation_steps:    3
+        banned_threshold:    0.5
+        goal_threshold:      5.0
+      </rosparam>
     </node>
 
     <node name="mid_planner"
