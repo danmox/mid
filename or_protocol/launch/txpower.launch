@@ -1,0 +1,13 @@
+<launch>
+
+  <arg name="agent" default="$(env AGENT)"/>
+
+  <include file="$(find scarab)/launch/slam.launch"/>
+  <include file="$(find scarab_twist)/launch/joystick.launch"/>
+
+  <node name="recorder" pkg="rosbag" type="record" output="screen"
+        args="-o txpower_test
+              /$(arg agent)/map
+              /$(arg agent)/pose" />
+
+</launch>
