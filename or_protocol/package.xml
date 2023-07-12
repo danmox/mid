@@ -10,9 +10,11 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>fmt</depend>
+  <depend>frontier_exploration</depend>
   <depend>or_protocol_msgs</depend>
   <depend>roscpp</depend>
   <depend>rosbag</depend>
+  <depend>std_msgs</depend>
   <depend>yaml-cpp</depend>
 
 </package>

@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   or_protocol_msgs
   rosbag
   roscpp
+  std_msgs
 )
 find_package(Threads REQUIRED)
 find_package(yaml-cpp REQUIRED)
@@ -28,6 +29,7 @@ catkin_package(
     or_protocol_msgs
     rosbag
     roscpp
+    std_msgs
 )
 
 include_directories(

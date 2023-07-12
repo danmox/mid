@@ -22,34 +22,11 @@ namespace or_protocol {
 #define ORN_FATAL(fmt, ...) ROS_FATAL("[ORNode] " fmt, ##__VA_ARGS__)
 
 
-struct PairHash
-{
-  template <typename T1, typename T2>
-  std::size_t operator()(const std::pair<T1, T2>& p) const
-  {
-    auto h1 = std::hash<T1>{}(p.first);
-    auto h2 = std::hash<T2>{}(p.second);
-    return h1 ^ (h2 << 1);
-  }
-};
-
-struct PairEqual
-{
-  template <typename T1, typename T2>
-  bool operator()(const std::pair<T1, T2>& p1, const std::pair<T1, T2>& p2) const
-  {
-    return p1.first == p2.first && p1.second == p2.second;
-  }
-};
-
-
 struct SubInfo
 {
   std::string topic;
   int queue_size;
   bool reliable;
-  bool synced;
-  unsigned int dest_id;
   std::unique_ptr<ros::Subscriber> sub;
 };
 
@@ -98,7 +75,7 @@ bool get_param(const XmlRpc::XmlRpcValue& val,
     return false;
   }
 
-  out_param = val[name];
+  out_param = static_cast<T>(val[name]);
   return true;
 }
 
@@ -122,9 +99,10 @@ class ORNode
 
   std::shared_ptr<ORProtocol> protocol;
 
-  std::vector<SubInfo> subscribers;
-  typedef std::pair<int, int> PubKey;
-  std::unordered_map<PubKey, PubInfo, PairHash, PairEqual> publishers;
+  std::unordered_map<int, SubInfo> subscribers;
+  std::unordered_map<int, PubInfo> publishers;
+
+  std::vector<int> dest_ids;
 };
 
 

@@ -110,7 +110,6 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
   // for later retransmission of reliable messages (i.e. reimplement
   // ros::serialization::serializMessage but around buffer_ptr instead of
   // SerializedMessage)
-  // TODO check if message needs to be chunked
   uint32_t len = ros::serialization::serializationLength(msg) + 4;
   buffer_ptr buff_ptr(new char[len]);
   ros::serialization::OStream s(reinterpret_cast<uint8_t*>(buff_ptr.get()), len);

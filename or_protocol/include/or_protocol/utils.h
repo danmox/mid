@@ -7,6 +7,7 @@
 
 #include <or_protocol/types.h>
 #include <ros/console.h>
+#include <ros/message_traits.h>
 #include <topic_tools/shape_shifter.h>
 
 
@@ -44,7 +45,8 @@ std::string packet_action_string(const PacketAction action);
 
 // returns a ShapeShifter with message info filled in given a message type
 // NOTE this is used to avoid having to pass TopicInfo messages around
-topic_tools::ShapeShifter get_msg_info(const std::string& type);
+topic_tools::ShapeShifter get_msg_info(const std::string& type,
+                                       const std::string& latch);
 
 
 // serializes a ROS message and inserts it into the payload of an
@@ -66,6 +68,14 @@ void deserialize(M& msg, uint8_t* buff, int size, bool size_prefix = true)
   int offset = size_prefix ? 4 : 0;
   ros::serialization::IStream s(buff + offset, size - offset);
   ros::serialization::deserialize(s, msg);
+}
+
+
+template <typename M>
+void morph_shape_shifter(topic_tools::ShapeShifter& ss, const std::string& latch)
+{
+  namespace mt = ros::message_traits;
+  ss.morph(mt::md5sum<M>(), mt::datatype<M>(), mt::definition<M>(), latch);
 }
 
 

@@ -2,8 +2,8 @@
 
 #include <frontier_exploration/Goal.h>
 #include <frontier_exploration/FrontierGoals.h>
-#include <ros/message_traits.h>
 #include <std_msgs/UInt32.h>
+#include <std_msgs/Int64.h>
 
 
 namespace or_protocol {
@@ -98,15 +98,19 @@ std::string packet_action_string(const PacketAction action)
 }
 
 
-topic_tools::ShapeShifter get_msg_info(const std::string& type)
+topic_tools::ShapeShifter get_msg_info(const std::string& type,
+                                       const std::string& latch)
 {
   topic_tools::ShapeShifter ss;
 
-  if (type == "frontier_exploration/FrontierGoals") {
-  } else if (type == "frontier_exploration/Goal") {
-  } else {
+  if (type == "frontier_exploration/FrontierGoals")
+    morph_shape_shifter<frontier_exploration::FrontierGoals>(ss, latch);
+  else if (type == "frontier_exploration/Goal")
+    morph_shape_shifter<frontier_exploration::Goal>(ss, latch);
+  else if (type == "std_msgs/Int64")
+    morph_shape_shifter<std_msgs::Int64>(ss, latch);
+  else
     OR_ERROR("get_msg_info not implemented for type %s!", type.c_str());
-  }
 
   return ss;
 }
