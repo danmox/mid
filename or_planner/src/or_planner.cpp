@@ -45,7 +45,7 @@ Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 
 ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false),
-  hfn("move", true)
+  found_goal(false), hfn("move", true)
 {
   table_sub = nh.subscribe("routing_table", 1, &ORPlanner::table_cb, this);
   status_sub = nh.subscribe("status", 1, &ORPlanner::status_cb, this);
@@ -347,23 +347,31 @@ void ORPlanner::run()
         step_size *= 0.5;
       }
     }
-    Eigen::MatrixXd goal_pos = next_config.col(root_idx);
+    Eigen::Array2d new_goal_pos = next_config.col(root_idx).array();
 
-    // send goal to HFN
+    if (found_goal && (new_goal_pos - goal_pos).matrix().norm() < goal_threshold) {
+      OP_INFO("new_goal (%.2f, %.2f) near previous goal (%.2f, %.2f): not sending HFN command", new_goal_pos(0), new_goal_pos(1), goal_pos(0), goal_pos(1));
+    } else {
 
-    geometry_msgs::PoseStamped goal_pose;
-    goal_pose.header.frame_id = nav_frame;
-    goal_pose.header.stamp = ros::Time::now();
-    goal_pose.pose.position.x = goal_pos(0);
-    goal_pose.pose.position.y = goal_pos(1);
-    goal_pose.pose.orientation.w = 1.0;
+      goal_pos = new_goal_pos;
+      found_goal = true;
 
-    scarab_msgs::MoveGoal goal;
-    goal.target_poses.push_back(goal_pose);
+      // send goal to HFN
 
-    OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
+      geometry_msgs::PoseStamped goal_pose;
+      goal_pose.header.frame_id = nav_frame;
+      goal_pose.header.stamp = ros::Time::now();
+      goal_pose.pose.position.x = goal_pos(0);
+      goal_pose.pose.position.y = goal_pos(1);
+      goal_pose.pose.orientation.w = 1.0;
 
-    hfn.sendGoal(goal);
+      scarab_msgs::MoveGoal goal;
+      goal.target_poses.push_back(goal_pose);
+
+      OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
+
+      hfn.sendGoal(goal);
+    }
 
     // planner visualizations
 

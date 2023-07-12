@@ -92,6 +92,9 @@ class ORPlanner
 
   std::unique_ptr<LinearChannel> channel_model;
 
+  bool found_goal;
+  Eigen::Array2d goal_pos;
+
   actionlib::SimpleActionClient<scarab_msgs::MoveAction> hfn;
 
   double delivery_prob(const Eigen::MatrixXd& poses);
