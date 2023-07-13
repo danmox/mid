@@ -127,6 +127,9 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
 
 void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
 {
+  if (!status_ready)
+    return;
+
   typedef std::vector<int> int_vec;
   typedef or_protocol_msgs::Header::_relays_type RelayArray;
 
@@ -213,8 +216,41 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
 
 void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 {
-  // NOTE assuming positions is a complete set of the ids used in etx / routing tables
-  // TODO construct incrementally?
+  // NOTE msg->positions does not always contain position information for all
+  // the nodes represented in msg->etx_table and the routing table, primarily at
+  // startup; perform additional checks to ensure valid data before proceeding
+  // with calculations
+
+  std::unordered_set<int> etx_id_set;
+  for (const or_protocol_msgs::ETXList& table : msg->etx_table) {
+    etx_id_set.insert(table.node);
+    for (const or_protocol_msgs::ETXEntry& entry : table.etx_list) {
+      etx_id_set.insert(entry.node);
+    }
+  }
+
+  std::unordered_set<int> pos_id_set;
+  for (const or_protocol_msgs::Point& pt : msg->positions)
+    pos_id_set.insert(pt.node);
+
+  bool valid_set = true;
+  if (etx_id_set.size() != pos_id_set.size()) {
+    valid_set = false;
+  } else {
+    for (int id : etx_id_set) {
+      if (pos_id_set.count(id) == 0) {
+        valid_set = false;
+        break;
+      }
+    }
+  }
+  if (!valid_set) {
+    OP_WARN("NetworkStatus message does not contain valid set of positions and etx values");
+    status_ready = false;
+    return;
+  }
+
+  // data checks have passed, construct id to idx translations and etx table
 
   int idx = 0;
   id_to_idx.clear();
@@ -327,8 +363,12 @@ void ORPlanner::run()
       continue;
     }
 
-    if (!table_ready || !status_ready) {
-      ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for RoutingTable or NetworkStatus");
+    if (!status_ready) {
+      ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for NetworkStatus");
+      continue;
+    }
+    if (!table_ready) {
+      ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for RoutingTable");
       continue;
     }
 
