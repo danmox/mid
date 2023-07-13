@@ -10,6 +10,7 @@ set(BUILD_DEPS
   geometry_msgs
   nav_msgs
   or_protocol_msgs
+  rosbag
   roscpp
   scarab_msgs
   sensor_msgs
@@ -46,3 +47,6 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} Eigen3::Eigen fmt::fmt
 
 add_executable(or_planner_node src/or_planner_node.cpp)
 target_link_libraries(or_planner_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
+add_executable(or_planner_test src/or_planner_test.cpp)
+target_link_libraries(or_planner_test ${catkin_LIBRARIES} ${PROJECT_NAME} Eigen3::Eigen fmt::fmt)
