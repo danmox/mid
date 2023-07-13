@@ -47,8 +47,8 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
     return;
   }
 
-  status_pub = nh.advertise<or_protocol_msgs::NetworkStatus>("network_status", 1);
-  table_pub = nh.advertise<or_protocol_msgs::RoutingTable>("routing_table", 1);
+  status_pub = nh.advertise<or_protocol_msgs::NetworkStatus>("network_status", 5);
+  table_pub = nh.advertise<or_protocol_msgs::RoutingTable>("routing_table", 5);
 
   namespace ph = std::placeholders;
 
@@ -107,6 +107,9 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
 
   msg_recv_func cb = std::bind(&ORNode::recv_packet, this, ph::_1, ph::_2, ph::_3);
   protocol.reset(new ORProtocol(ip, cb));
+
+  // after protocol is initialized to get access to ORProtocol::update_pose
+  pose_sub = nh.subscribe("pose", 5, &ORProtocol::update_pose, protocol.get());
 
   run = protocol->is_running();
 }

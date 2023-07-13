@@ -12,6 +12,7 @@
 #include <or_protocol/types.h>
 #include <or_protocol/utils.h>
 
+#include <geometry_msgs/PoseStamped.h>
 #include <or_protocol_msgs/Header.h>
 #include <or_protocol_msgs/NetworkStatus.h>
 #include <or_protocol_msgs/RoutingTable.h>
@@ -106,6 +107,8 @@ const int MAX_RELAY_COUNT = RelayArray::max_size();
 class NetworkState
 {
   public:
+    NetworkState() : new_pose(false) {}
+
     // update the received message queue for the given node
     MsgStatus update_queue(const PacketQueueItemPtr& item);
 
@@ -138,7 +141,13 @@ class NetworkState
     // query the routing table for the relays to use for the given src, dest
     RelayArray relays(const or_protocol_msgs::Header& header, const int node_id);
 
+    // update this node's position estimate to be shared in the status beacon
+    void update_pose(const geometry_msgs::PoseStampedConstPtr& msg, const int id);
+
   private:
+    // indicating the received pose is the first since the last beacon was sent
+    volatile bool new_pose;
+
     // the message history of each node in the network used for determining
     // if/when to relay received messages
     std::unordered_map<int, NodeState> node_states;
@@ -150,7 +159,7 @@ class NetworkState
     // estimated ETX for each node in the network computed via beaconing
     ETXEntryMap link_etx_table;
 
-    // positions of each robot in the network
+    // positions of each robot in the network in a common reference frame
     std::unordered_map<int, or_protocol_msgs::Point> node_positions;
 
     // path for each node in the network

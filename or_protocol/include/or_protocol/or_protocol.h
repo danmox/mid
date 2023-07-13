@@ -15,6 +15,8 @@
 #include <or_protocol/network_state.h>
 #include <or_protocol/utils.h>
 
+#include <geometry_msgs/PoseStamped.h>
+
 
 namespace or_protocol {
 
@@ -41,6 +43,8 @@ class ORProtocol
     bool is_running() const { return run && bcast_socket->is_running(); }
 
     int get_node_id() const { return node_id; }
+
+    void update_pose(const geometry_msgs::PoseStampedConstPtr& msg);
 
     friend class ORProtocolTest;
 

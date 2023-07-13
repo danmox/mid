@@ -91,6 +91,12 @@ ros::Duration compute_retry_delay(const PacketQueueItemPtr &item) {
 }
 
 
+void ORProtocol::update_pose(const geometry_msgs::PoseStampedConstPtr& msg)
+{
+  network_state.update_pose(msg, node_id);
+}
+
+
 // assuming node specific message header information has not been completed
 bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {

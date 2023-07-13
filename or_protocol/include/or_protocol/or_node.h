@@ -10,6 +10,7 @@
 #include <topic_tools/shape_shifter.h>
 
 #include <or_protocol_msgs/Packet.h>
+#include <geometry_msgs/PoseStamped.h>
 
 
 namespace or_protocol {
@@ -86,7 +87,6 @@ class ORNode
   ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh);
 
   void recv_packet(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, int size);
-
   void ros_msg_cb(const topic_tools::ShapeShifter::ConstPtr& msg, int idx);
 
   bool running() { return run; }
@@ -96,6 +96,7 @@ class ORNode
 
   ros::NodeHandle nh, pnh;
   ros::Publisher status_pub, table_pub;
+  ros::Subscriber pose_sub;
 
   std::shared_ptr<ORProtocol> protocol;
 

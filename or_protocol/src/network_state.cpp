@@ -488,6 +488,20 @@ void NetworkState::process_beacon_queue(const int root)
 }
 
 
+void NetworkState::update_pose(const geometry_msgs::PoseStampedConstPtr& msg,
+                               const int id)
+{
+  std::lock_guard<std::mutex> lock(status_mutex);
+  node_positions[id].node = id;
+  node_positions[id].x = msg->pose.position.x;
+  node_positions[id].y = msg->pose.position.y;
+  if (new_pose) {
+    node_positions[id].seq++;
+    new_pose = false;
+  }
+}
+
+
 or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
 {
   ETXEntryMap link_etx;
@@ -496,6 +510,7 @@ or_protocol_msgs::NetworkStatus::Ptr NetworkState::generate_beacon()
     std::lock_guard<std::mutex> lock(status_mutex);
     link_etx = link_etx_table;
     positions = node_positions;
+    new_pose = true;
   }
 
   or_protocol_msgs::NetworkStatus::Ptr msg(new or_protocol_msgs::NetworkStatus());
