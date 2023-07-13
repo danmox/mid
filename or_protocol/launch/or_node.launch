@@ -7,17 +7,17 @@
   <arg name="prefix_args" unless="$(arg gdb)" value=""/>
 
   <rosparam param="/task_agent_ids">[101, 40]</rosparam>
+  <rosparam param="/sync_topics">
+    - /node42/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 42}
+    - /node40/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 40}
+    - /node101/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 101}
+    - /node9/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 9}
+  </rosparam>
 
   <group ns="node$(arg id)">
     <node name="or_node" pkg="or_protocol" type="or_node" output="screen"
           launch-prefix="$(arg prefix_args)">
       <param name="~IP" value="192.168.0.$(arg id)"/>
-      <rosparam param="sync_topics">
-        - /node42/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 42}
-        - /node40/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 40}
-        - /node101/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 101}
-        - /node9/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 9}
-      </rosparam>
     </node>
   </group>
 

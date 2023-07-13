@@ -37,8 +37,8 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
   ORN_INFO("destination ids:%s", dest_id_str.c_str());
 
   XmlRpc::XmlRpcValue topics_param;
-  if (!pnh.getParam("sync_topics", topics_param)) {
-    ORN_FATAL("unable to fetch required param 'sync_topics'");
+  if (!nh.getParam("/sync_topics", topics_param)) {
+    ORN_FATAL("unable to fetch required param '/sync_topics'");
     return;
   }
 
