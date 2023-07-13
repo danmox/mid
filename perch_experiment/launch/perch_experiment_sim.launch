@@ -9,8 +9,8 @@
   <arg name="rviz"         default="true"/>
   <arg name="max_range"    default="30.0"/>
 
-  <rosparam param="/task_agent_ids">[41, 42]</rosparam>
-  <rosparam param="/mid_agent_ids">[40, 43]</rosparam>
+  <rosparam param="/task_agent_ids">[40, 41]</rosparam>
+  <rosparam param="/mid_agent_ids">[42]</rosparam>
   <param name="/max_range" value="$(arg max_range)"/>
 
   <!-- SIMULATION -->
@@ -36,54 +36,41 @@
   <!-- SWRI console -->
   <node pkg="swri_console" name="swri_console" type="swri_console"/>
 
-  <!-- fake comms
+  <!-- fake comms -->
   <node pkg="or_protocol" name="sim_routing" type="sim_routing_node" output="screen"/>
- -->
+
+  <!-- network visualization -->
+  <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer" output="screen">
+    <remap from="state" to="/network_state"/>
+    <remap from="table" to="/scarab42/routing_table"/>
+    <param name="offset" value="0.5"/>
+    <param name="stride" value="0.1"/>
+  </node>
+
   <!-- ROBOTS -->
 
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="40"/>
-    <arg name="spawn_x" value="0.0"/>
+    <arg name="spawn_x" value="-9.0"/>
     <arg name="spawn_y" value="0.0"/>
     <arg name="type"    value="task"/>
     <arg name="gdb"     value="false"/>
   </include>
 
-  <!--
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="41"/>
-    <arg name="spawn_x" value="10.0"/>
-    <arg name="type"    value="none"/>
+    <arg name="spawn_x" value="15.0"/>
+    <arg name="spawn_y" value="0.0"/>
+    <arg name="type"    value="task"/>
     <arg name="gdb"     value="false"/>
   </include>
 
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
     <arg name="id"      value="42"/>
-    <arg name="spawn_x" value="-10.0"/>
-    <arg name="type"    value="none"/>
+    <arg name="spawn_x" value="3.6"/>
+    <arg name="spawn_y" value="-7.0"/>
+    <arg name="type"    value="mid"/>
     <arg name="gdb"     value="false"/>
   </include>
-
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="43"/>
-    <arg name="spawn_x" value="-4.0"/>
-    <arg name="spawn_y" value="-3.0"/>
-    <arg name="type"    value="mid"/>
-  </include>
-
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="44"/>
-    <arg name="spawn_x" value="15.0"/>
-    <arg name="spawn_y" value="-2.0"/>
-    <arg name="type"    value="none"/>
-  </include>
-
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="45"/>
-    <arg name="spawn_x" value="3.0"/>
-    <arg name="spawn_y" value="-4.0"/>
-    <arg name="type"    value="none"/>
-  </include>
-  -->
 
 </launch>
