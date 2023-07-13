@@ -44,7 +44,7 @@
     <remap from="state" to="/network_state"/>
     <remap from="table" to="/scarab42/routing_table"/>
     <param name="offset" value="0.5"/>
-    <param name="stride" value="0.1"/>
+    <param name="stride" value="0.15"/>
   </node>
 
   <!-- ROBOTS -->
