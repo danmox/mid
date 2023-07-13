@@ -66,7 +66,6 @@ class ORPlanner
   ORPlanner() {}  // for testing only
   ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh);
 
-  void pose_cb(const geometry_msgs::PoseStampedConstPtr& msg);
   void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg);
   void status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg);
 
@@ -89,8 +88,6 @@ class ORPlanner
   std::unordered_set<int> task_ids, mid_ids;
   std::unordered_set<int> task_idxs, mid_idxs;
   std::unordered_map<unsigned int, int> id_to_idx;
-
-  geometry_msgs::Pose2DPtr pose_ptr;
 
   Eigen::MatrixXd poses;
   Eigen::MatrixXd link_probs;

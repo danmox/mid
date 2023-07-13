@@ -52,7 +52,6 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
 
   table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
   status_sub = nh->subscribe("status", 1, &ORPlanner::status_cb, this);
-  pose_sub = nh->subscribe("pose", 1, &ORPlanner::pose_cb, this);
 
   viz_pub = nh->advertise<visualization_msgs::Marker>("planner", 1);
 
@@ -287,16 +286,6 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 }
 
 
-void ORPlanner::pose_cb(const geometry_msgs::PoseStampedConstPtr& msg)
-{
-  if (!pose_ptr)
-    pose_ptr.reset(new geometry_msgs::Pose2D);
-  pose_ptr->x = msg->pose.position.x;
-  pose_ptr->y = msg->pose.position.y;
-  pose_ptr->theta = tf2::getYaw(msg->pose.orientation);
-}
-
-
 // TODO numerical issues? switch to log prob?
 double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
 {
@@ -357,11 +346,6 @@ void ORPlanner::run()
   while (run_node && ros::ok()) {
     rate.sleep();
     ros::spinOnce();
-
-    if (!pose_ptr) {
-      ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for robot pose");
-      continue;
-    }
 
     if (!status_ready) {
       ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for NetworkStatus");

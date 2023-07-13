@@ -5,7 +5,6 @@
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
-#include <geometry_msgs/PoseStamped.h>
 #include <or_protocol_msgs/NetworkStatus.h>
 #include <or_protocol_msgs/RoutingTable.h>
 
@@ -34,9 +33,7 @@ int main(int argc, char** argv)
   or_protocol_msgs::NetworkStatusConstPtr network_msg;
   or_protocol_msgs::RoutingTableConstPtr routing_msg;
   for (const rosbag::MessageInstance& m : rosbag::View(bag)) {
-    if (m.getDataType() == "geometry_msgs/PoseStamped")
-      pose_msg =  m.instantiate<geometry_msgs::PoseStamped>();
-    else if (m.getDataType() == "or_protocol_msgs/NetworkStatus")
+    if (m.getDataType() == "or_protocol_msgs/NetworkStatus")
       network_msg = m.instantiate<or_protocol_msgs::NetworkStatus>();
     else if (m.getDataType() == "or_protocol_msgs/RoutingTable")
       routing_msg = m.instantiate<or_protocol_msgs::RoutingTable>();
@@ -48,7 +45,6 @@ int main(int argc, char** argv)
   or_planner::ORPlannerTest tester;
   tester.initializeORPlanner(planner, 42, 30.0, {40, 41}, {42});
 
-  planner.pose_cb(pose_msg);
   planner.status_cb(network_msg);
   planner.table_cb(routing_msg);
 
