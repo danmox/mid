@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <or_protocol/network_state.h>
+#include <or_protocol/constants.h>
 #include <ros/ros.h>
 
 #include <geometry_msgs/PoseStamped.h>
@@ -55,7 +56,7 @@ int main(int argc, char** argv)
 
   std::regex topic_re("^/([a-z]+)([0-9]+)/pose$");
 
-  ros::Rate loop_rate(2.0);
+  ros::Rate loop_rate(or_protocol::BEACON_INTERVAL / 1000.0);
   while (ros::ok()) {
 
     ros::spinOnce();
