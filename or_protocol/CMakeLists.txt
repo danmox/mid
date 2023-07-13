@@ -16,7 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   roscpp
   std_msgs
+  visualization_msgs
 )
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(fmt REQUIRED)
@@ -30,6 +32,7 @@ catkin_package(
     rosbag
     roscpp
     std_msgs
+    visualization_msgs
 )
 
 include_directories(
@@ -67,6 +70,9 @@ target_link_libraries(fragment_test ${catkin_LIBRARIES} ${PROJECT_NAME})
 
 add_executable(sim_routing_node src/sim_routing_node.cpp)
 target_link_libraries(sim_routing_node ${catkin_LIBRARIES} ${PROJECT_NAME})
+
+add_executable(routing_visualizer src/routing_visualizer.cpp)
+target_link_libraries(routing_visualizer ${catkin_LIBRARIES} Eigen3::Eigen)
 
 catkin_add_gtest(${PROJECT_NAME}-test test/test.cpp)
 if (TARGET ${PROJECT_NAME}-test)
