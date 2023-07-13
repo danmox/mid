@@ -47,7 +47,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false),
   found_goal(false), hfn("move", true)
 {
-  table_sub = nh.subscribe("routing_table", 1, &ORPlanner::table_cb, this);
+  table_sub = nh.subscribe("table", 1, &ORPlanner::table_cb, this);
   status_sub = nh.subscribe("status", 1, &ORPlanner::status_cb, this);
   pose_sub = nh.subscribe("pose", 1, &ORPlanner::pose_cb, this);
 

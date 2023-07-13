@@ -46,10 +46,11 @@
     <param name="node_id"    value="$(arg id)"/>
     <param name="nav_frame"  value="$(arg map_frame)"/>
     <rosparam>
-      goal_threshold:      1.5
+      goal_threshold:      0.5
       gradient_threshold: 1e-8
     </rosparam>
     <remap from="status" to="/network_state"/>
+    <remap from="table"  to="routing_table"/>
   </node>
 
 </launch>
