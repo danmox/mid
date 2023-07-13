@@ -44,28 +44,31 @@ Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 
 
 ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
-  nh(_nh), pnh(_pnh), run_node(false), table_ready(false), status_ready(false),
-  found_goal(false), hfn("move", true)
+  run_node(false), table_ready(false), status_ready(false), found_goal(false)
 {
-  table_sub = nh.subscribe("table", 1, &ORPlanner::table_cb, this);
-  status_sub = nh.subscribe("status", 1, &ORPlanner::status_cb, this);
-  pose_sub = nh.subscribe("pose", 1, &ORPlanner::pose_cb, this);
+  nh.reset(new ros::NodeHandle(_nh));
+  pnh.reset(new ros::NodeHandle(_pnh));
+  hfn.reset(new ScarabMoveClient("move", true));
 
-  viz_pub = nh.advertise<visualization_msgs::Marker>("planner", 1);
+  table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
+  status_sub = nh->subscribe("status", 1, &ORPlanner::status_cb, this);
+  pose_sub = nh->subscribe("pose", 1, &ORPlanner::pose_cb, this);
 
-  if (!pnh.getParam("node_id", node_id)) {
+  viz_pub = nh->advertise<visualization_msgs::Marker>("planner", 1);
+
+  if (!pnh->getParam("node_id", node_id)) {
     OP_FATAL("failed to fetch required param 'node_id'");
     return;
   }
 
   std::string robot_type;
-  if (!pnh.getParam("robot_type", robot_type)) {
+  if (!pnh->getParam("robot_type", robot_type)) {
     OP_FATAL("failed to fetch required param 'node_id'");
     return;
   }
 
   double max_range;
-  if (!nh.getParam("/max_range", max_range)) {
+  if (!nh->getParam("/max_range", max_range)) {
     OP_FATAL("failed to fetch required param '/max_range'");
     return;
   } else {
@@ -73,7 +76,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   }
 
   XmlRpc::XmlRpcValue task_agent_ids_param;
-  if (!nh.getParam("/task_agent_ids", task_agent_ids_param)) {
+  if (!nh->getParam("/task_agent_ids", task_agent_ids_param)) {
     OP_FATAL("failed to fetch required param '/task_agent_ids'");
     return;
   } else {
@@ -82,7 +85,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   }
 
   XmlRpc::XmlRpcValue mid_agent_ids_param;
-  if (!nh.getParam("/mid_agent_ids", mid_agent_ids_param)) {
+  if (!nh->getParam("/mid_agent_ids", mid_agent_ids_param)) {
     OP_FATAL("failed to fetch required param '/mid_agent_ids'");
     return;
   } else {
@@ -101,18 +104,21 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
     return;
   }
 
-  if (!pnh.getParam("goal_threshold", goal_threshold)) {
-    goal_threshold = 1.5;
+  goal_threshold = 1.5;
+  if (!pnh->getParam("goal_threshold", goal_threshold))
     OP_WARN("failed to fetch param 'goal_threshold': using default value of %.2f m", goal_threshold);
-  }
 
-  if (!pnh.getParam("nav_frame", nav_frame)) {
+  gradient_threshold = 1e-8;
+  if (!pnh->getParam("gradient_threshold", gradient_threshold))
+    OP_WARN("failed to fetch param 'gradient_threshold': using default value of %f", gradient_threshold);
+
+  if (!pnh->getParam("nav_frame", nav_frame)) {
     OP_FATAL("failed to fetch required param 'nav_frame'");
     return;
   }
 
   OP_INFO("waiting for hfn action server to start");
-  hfn.waitForServer();
+  hfn->waitForServer();
   OP_INFO("hfn action server ready");
 
   run_node = true;
@@ -276,9 +282,41 @@ double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
 }
 
 
+Vec2d ORPlanner::compute_gradient()
+{
+  Vec2d gradient = Vec2d::Zero();
+
+  for (size_t j = 0; j < flows.size(); j++) {
+    const std::vector<std::vector<int>>& paths = flows[j];
+    const std::vector<double>& path_probs = flow_probs[j];
+
+    for (size_t i = 0; i < paths.size(); i++) {
+      const std::vector<int>& path = paths[i];
+
+      size_t j = 1;  // MID agents are never sources
+      while (path[j] != root_idx && j < path.size() - 2)
+        j++;
+
+      // some paths in the flow don't involve root_idx
+      if (path[j] != root_idx)
+        continue;
+
+      int prev_idx = path[j - 1];
+      int next_idx = path[j + 1];
+      double C1 = path_probs[i] / link_probs(prev_idx, root_idx);
+      double C2 = path_probs[i] / link_probs(root_idx, next_idx);
+      gradient += C1 * channel_model->derivative(poses.col(root_idx), poses.col(prev_idx)) +
+                  C2 * channel_model->derivative(poses.col(root_idx), poses.col(next_idx));
+    }
+  }
+
+  return gradient;
+}
+
+
 void ORPlanner::run()
 {
-  ros::Rate rate(10);
+  ros::Rate rate(5);
   while (run_node && ros::ok()) {
     rate.sleep();
     ros::spinOnce();
@@ -295,37 +333,15 @@ void ORPlanner::run()
 
     // compute gradient across flows
 
-    Vec2d gradient = Vec2d::Zero();
-    for (size_t j = 0; j < flows.size(); j++) {
-      const std::vector<std::vector<int>>& paths = flows[j];
-      const std::vector<double>& path_probs = flow_probs[j];
-
-      for (size_t i = 0; i < paths.size(); i++) {
-        const std::vector<int> &path = paths[i];
-
-        size_t j = 1; // MID agents are never sources
-        while (path[j] != root_idx && j < path.size() - 2)
-          j++;
-
-        // some paths in the flow don't involve root_idx
-        if (path[j] != root_idx)
-          continue;
-
-        int prev_idx = path[j - 1];
-        int next_idx = path[j + 1];
-        double C1 = path_probs[i] / link_probs(prev_idx, root_idx);
-        double C2 = path_probs[i] / link_probs(root_idx, next_idx);
-        gradient += C1 * channel_model->derivative(poses.col(root_idx), poses.col(prev_idx)) +
-                    C2 * channel_model->derivative(poses.col(root_idx), poses.col(next_idx));
-      }
-    }
+    Vec2d gradient = compute_gradient();
 
     // compute control actions
 
-    if (gradient.norm() < 1e-3) {
-      if (hfn.getState() == actionlib::SimpleClientGoalState::ACTIVE) {
-        OP_INFO("stopping robot");
-        hfn.cancelGoal();
+    // TODO just move to the centroid of the task agents instead?
+    if (gradient.norm() < gradient_threshold) {
+      OP_INFO("gradient norm %.3e below threshold %.3e: stopping robot", gradient.norm(), gradient_threshold);
+      if (hfn->getState() == actionlib::SimpleClientGoalState::ACTIVE) {
+        hfn->cancelGoal();
       }
       continue;
     }
@@ -370,7 +386,7 @@ void ORPlanner::run()
 
       OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
 
-      hfn.sendGoal(goal);
+      hfn->sendGoal(goal);
     }
 
     // planner visualizations

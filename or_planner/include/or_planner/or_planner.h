@@ -63,20 +63,27 @@ std::string set_to_str(const T& set)
 class ORPlanner
 {
  public:
+  ORPlanner() {}  // for testing only
   ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh);
 
+  void pose_cb(const geometry_msgs::PoseStampedConstPtr& msg);
+  void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg);
+  void status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg);
+
   void run();
+
+  friend class ORPlannerTest;
 
  private:
   ros::Subscriber map_sub, pose_sub, scan_sub, table_sub, status_sub;
   ros::Publisher viz_pub;
-  ros::NodeHandle nh, pnh;
+  std::unique_ptr<ros::NodeHandle> nh, pnh;
 
   volatile bool run_node, table_ready, status_ready;
 
   int node_id, num_agents, root_idx;
 
-  double goal_threshold;
+  double goal_threshold, gradient_threshold;
   std::string nav_frame;
 
   std::unordered_set<int> task_ids, mid_ids;
@@ -95,15 +102,28 @@ class ORPlanner
   bool found_goal;
   Eigen::Array2d goal_pos;
 
-  actionlib::SimpleActionClient<scarab_msgs::MoveAction> hfn;
+  typedef actionlib::SimpleActionClient<scarab_msgs::MoveAction> ScarabMoveClient;
+  std::unique_ptr<ScarabMoveClient> hfn;
 
   double delivery_prob(const Eigen::MatrixXd& poses);
 
-  void scan_cb(const sensor_msgs::LaserScanConstPtr& msg);
-  void pose_cb(const geometry_msgs::PoseStampedConstPtr& msg);
-  void map_cb(const nav_msgs::OccupancyGridConstPtr& msg);
-  void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg);
-  void status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg);
+  Vec2d compute_gradient();
+};
+
+
+class ORPlannerTest
+{
+  public:
+  void initializeORPlanner(ORPlanner& planner, const int node_id, const double max_range,
+                           const std::vector<int>& task_ids, const std::vector<int>& mid_ids)
+  {
+    planner.node_id = node_id;
+    planner.channel_model.reset(new LinearChannel(max_range));
+    planner.task_ids.insert(task_ids.begin(), task_ids.end());
+    planner.mid_ids.insert(mid_ids.begin(), mid_ids.end());
+  }
+
+  Vec2d compute_gradient(ORPlanner& planner) { return planner.compute_gradient(); }
 };
 
 
