@@ -141,6 +141,7 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
   // compute all routes and their probabilities
 
   flows.clear();
+  flow_probs.clear();
   for (const or_protocol_msgs::RoutingSrcEntry& src_entry : msg->entries) {
     const int src_idx = id_to_idx.at(src_entry.src_id);
 
