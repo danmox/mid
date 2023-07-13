@@ -40,9 +40,6 @@ class ORProtocol
     // checks if this node and the underlying socket is ready for use
     bool is_running() const { return run && bcast_socket->is_running(); }
 
-    // TODO implement: shut down the node
-    void shutdown();
-
     int get_node_id() const { return node_id; }
 
     friend class ORProtocolTest;
