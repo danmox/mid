@@ -29,133 +29,134 @@ typedef std::tuple<Header, PacketAction, int, ros::Time, std::string> LogQueueIt
 
 class ORProtocol
 {
-  public:
-    // initializes ORNode with a unique IPv4 address
-    ORProtocol(std::string _IP, msg_recv_func msg_cb = nullptr);
+ public:
+  // initializes ORNode with a unique IPv4 address
+  ORProtocol(std::string _IP, msg_recv_func msg_cb = nullptr);
 
-    // destructor required for thread cleanup logic
-    ~ORProtocol();
+  // destructor required for thread cleanup logic
+  ~ORProtocol();
 
-    // the send interface between higher level application nodes and ORNode
-    bool send(or_protocol_msgs::Packet& msg, const bool set_relays = true);
+  // the send interface between higher level application nodes and ORNode
+  bool send(or_protocol_msgs::Packet& msg, const bool set_relays = true);
 
-    // checks if this node and the underlying socket is ready for use
-    bool is_running() const { return run && bcast_socket->is_running(); }
+  // checks if this node and the underlying socket is ready for use
+  bool is_running() const { return run && bcast_socket->is_running(); }
 
-    int get_node_id() const { return node_id; }
+  int get_node_id() const { return node_id; }
 
-    void update_pose(const geometry_msgs::PoseStampedConstPtr& msg);
+  void update_pose(const geometry_msgs::PoseStampedConstPtr& msg);
 
-    friend class ORProtocolTest;
+  friend class ORProtocolTest;
 
-  private:
-    // socket used for broadcasting to peers, implementing the lower level
-    // broadcast socket setup / cleanup and usage
-    std::shared_ptr<BCastSocket> bcast_socket;
+ private:
+  // socket used for broadcasting to peers, implementing the lower level
+  // broadcast socket setup / cleanup and usage
+  std::shared_ptr<BCastSocket> bcast_socket;
 
-    // node id associated with the current instance, typically identifying the
-    // last digits of the corresponding IPv4 address identified by the subnet
-    // mask 0.0.0.255
-    int node_id;
+  // node id associated with the current instance, typically identifying the
+  // last digits of the corresponding IPv4 address identified by the subnet mask
+  // 0.0.0.255
+  int node_id;
 
-    // a sequence number uniquely identifying messages that originating from
-    // this node
-    volatile std::atomic<uint32_t> seq = 0;
+  // a sequence number uniquely identifying messages that originating from this
+  // node
+  volatile std::atomic<uint32_t> seq = 0;
 
-    // internal state used to gracefully signal a shutdown to running threads
-    volatile std::atomic<bool> run;
+  // internal state used to gracefully signal a shutdown to running threads
+  volatile std::atomic<bool> run;
 
-    // a function called by the process thread for messages for which the
-    // current node is the intended destination
-    msg_recv_func recv_handle;
+  // a function called by the process thread for messages for which the current
+  // node is the intended destination
+  msg_recv_func recv_handle;
 
-    // a class keeping track of the current state of the network, including
-    // received messages and estimated ETX values for each node
-    NetworkState network_state;
+  // a class keeping track of the current state of the network, including
+  // received messages and estimated ETX values for each node
+  NetworkState network_state;
 
-    // the main packet queue processed by this node; incoming messages are
-    // pushed onto this queue for processing by the process thread
-    // TODO check for overflow
-    SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
+  // the main packet queue processed by this node; incoming messages are pushed
+  // onto this queue for processing by the process thread
+  // TODO check for overflow
+  SafeFIFOQueue<PacketQueueItemPtr> packet_queue;
 
-    // logging, updating the retransmission set, and passing messages to the
-    // application occur across threads and must be protected
-    std::mutex log_mutex, retrans_mutex, app_mutex;
+  // logging, updating the retransmission set, and passing messages to the
+  // application occur across threads and must be protected
+  std::mutex log_mutex, retrans_mutex, app_mutex;
 
-    // packet processing thread
-    std::thread process_thread;
+  // packet processing thread
+  std::thread process_thread;
 
-    // threads for transmitting beacons frames at a regular interval and
-    // processing received beacon frames
-    std::thread beacon_tx_thread, beacon_rx_thread;
+  // threads for transmitting beacons frames at a regular interval and
+  // processing received beacon frames
+  std::thread beacon_tx_thread, beacon_rx_thread;
 
-    // thread for recomputing the routing table
-    std::thread routing_thread;
+  // thread for recomputing the routing table
+  std::thread routing_thread;
 
-    // safe queue for log information to be processed by logging thread
-    SafeFIFOQueue<LogQueueItem> log_queue;
+  // safe queue for log information to be processed by logging thread
+  SafeFIFOQueue<LogQueueItem> log_queue;
 
-    // thread for logging protocol decisions in plain text
-    std::thread log_thread;
+  // thread for logging protocol decisions in plain text
+  std::thread log_thread;
 
-    // file used for packet routing and transmission logging
-    std::FILE* log_file;
+  // file used for packet routing and transmission logging
+  std::FILE* log_file;
 
-    // a wrapper for BCastSocket::send(...)
-    bool send(const char* buff, size_t size);
+  // a wrapper for BCastSocket::send(...)
+  bool send(const char* buff, size_t size);
 
-    // a function called by the underlying BCastSocket instance for each
-    // incoming message
-    void recv(buffer_ptr& buff_ptr, size_t size);
+  // a function called by the underlying BCastSocket instance for each incoming
+  // message
+  void recv(buffer_ptr& buff_ptr, size_t size);
 
-    // main thread processing packet_queue and making forwarding decisions
-    void process_packets();
+  // main thread processing packet_queue and making forwarding decisions
+  void process_packets();
 
-    // all received beacon frames are pushed onto a queue for processing by a
-    // separate thread to avoid blocking in the main packet processing thread
-    void process_beacons();
+  // all received beacon frames are pushed onto a queue for processing by a
+  // separate thread to avoid blocking in the main packet processing thread
+  void process_beacons();
 
-    // thread for transmitting beacon frames at a regular interval
-    void transmit_beacons();
+  // thread for transmitting beacon frames at a regular interval
+  void transmit_beacons();
 
-    // thread for recomputing the routing table
-    void compute_routes();
+  // thread for recomputing the routing table
+  void compute_routes();
 
-    // thread for processing the log_queue
-    void process_log_queue();
+  // thread for processing the log_queue
+  void process_log_queue();
 
-    // helper functions for logging
-    void log_event(const Header& header,
-                   const PacketAction action,
-                   const int size,
-                   const ros::Time& time,
-                   const std::string& msg = "");
+  // helper functions for logging
+  void log_event(const Header& header,
+                 const PacketAction action,
+                 const int size,
+                 const ros::Time& time,
+                 const std::string& msg = "");
 
-    void log_event(const PacketQueueItemPtr& item,
-                   const PacketAction action,
-                   const ros::Time& time,
-                   const std::string& msg = "");
+  void log_event(const PacketQueueItemPtr& item,
+                 const PacketAction action,
+                 const ros::Time& time,
+                 const std::string& msg = "");
 
-    // helper function returning the unique message sequence number to be
-    // embedded in outgoing message headers
-    uint32_t getSeqNum() { return seq++; }
+  // helper function returning the unique message sequence number to be embedded
+  // in outgoing message headers
+  uint32_t getSeqNum() { return seq++; }
 
-    // helper function returning the priority of the most recent received
-    // message associated with header
-    int msg_priority(const Header& header)
-    {
-      return network_state.priority(header.src_id, header.seq);
-    };
+  // helper function returning the priority of the most recent received message
+  // associated with header
+  int msg_priority(const Header& header)
+  {
+    return network_state.priority(header.src_id, header.seq);
+  };
 };
 
 
 class ORProtocolTest
 {
   public:
-    void initializeORNode(ORProtocol& node, const ETXMap& etx_map) {
-      node.network_state.set_etx_map(etx_map);
-      node.network_state.update_routes(node.node_id);
-    }
+  void initializeORNode(ORProtocol& node, const ETXMap& etx_map)
+  {
+    node.network_state.set_etx_map(etx_map);
+    node.network_state.update_routes(node.node_id);
+  }
 };
 
 

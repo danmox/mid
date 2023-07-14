@@ -34,7 +34,7 @@ ORProtocol::ORProtocol(string _IP, msg_recv_func msg_cb) :
 
   run = bcast_socket->is_running();  // true if bcast_socket initialized successfully
 
-  ros::Time::init(); // enables ros::Time without an attached ROS node, master
+  ros::Time::init();  // enables ros::Time without an attached ROS node, master
 
   // set up log file
   std::filesystem::path log_dir;
@@ -79,7 +79,8 @@ ORProtocol::~ORProtocol()
 }
 
 
-ros::Duration compute_retry_delay(const PacketQueueItemPtr &item) {
+ros::Duration compute_retry_delay(const PacketQueueItemPtr& item)
+{
   // NOTE by convention, 0 is not a valid relay; the first occurence of 0 in the
   // fixed relay array signifies the number of relays for that packet
   int num_relays = relay_priority(0, item->header);
@@ -251,7 +252,7 @@ void ORProtocol::process_packets()
           send(item->buffer(), item->size);
           action = PacketAction::RETRY;
         } else {
-          send(item->buffer(), item->size); // TODO update relays here too?
+          send(item->buffer(), item->size);  // TODO update relays here too?
           action = PacketAction::RELAY;
           item->retransmission = true;
         }
