@@ -74,6 +74,9 @@ target_link_libraries(sim_routing_node ${catkin_LIBRARIES} ${PROJECT_NAME})
 add_executable(routing_visualizer src/routing_visualizer.cpp)
 target_link_libraries(routing_visualizer ${catkin_LIBRARIES} Eigen3::Eigen)
 
+add_executable(status_aggregator src/status_aggregator.cpp)
+target_link_libraries(status_aggregator ${catkin_LIBRARIES})
+
 catkin_add_gtest(${PROJECT_NAME}-test test/test.cpp)
 if (TARGET ${PROJECT_NAME}-test)
   target_link_libraries(${PROJECT_NAME}-test ${catkin_LIBRARIES} ${PROJECT_NAME} yaml-cpp)
