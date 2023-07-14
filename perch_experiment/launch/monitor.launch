@@ -1,0 +1,41 @@
+<launch>
+
+  <arg name="id"/>
+
+  <arg name="rviz"       default="true"/>
+  <arg name="show_flows" default="false"/>
+  <arg name="monitor"    default="true"/>
+
+  <!-- global parameters -->
+
+  <rosparam command="load"
+            file="$(find perch_experiment)/config/experiment.yaml"/>
+
+  <!-- nodes -->
+
+  <node name="rviz" pkg="rviz" type="rviz" if="$(arg rviz)"
+        args="-d $(find perch_experiment)/rviz/monitor.rviz"/>
+
+  <group ns="node$(arg id)">
+
+    <!-- network visualization -->
+    <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer"
+          output="screen">
+      <remap from="state" to="agg_status"/>
+      <param name="offset"     value="0.5"/>
+      <param name="stride"     value="0.15"/>
+      <param name="show_flows" value="$(arg show_flows)"/>
+    </node>
+
+    <node name="or_node" pkg="or_protocol" type="or_node" output="screen">
+      <param name="IP"     value="192.168.0.$(arg id)"/>
+      <param name="monitor" value="$(arg monitor)"/>
+    </node>
+
+    <node name="status_aggregator" pkg="or_protocol" type="status_aggregator"
+          output="screen">
+      <remap from="status" to="monitor/network_status"/>
+    </node>
+  </group>
+
+</launch>
