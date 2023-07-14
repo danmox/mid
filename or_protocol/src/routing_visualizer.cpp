@@ -77,15 +77,11 @@ route_colors = {
   RGBA{0.09019607843137255,  0.7450980392156863,   0.8117647058823529, 1.0}};
 
 
-ros::Publisher vis_pub;
 or_protocol_msgs::NetworkStatusConstPtr status_ptr;
 std::unordered_set<int> mid_ids;
 std::unordered_map<int, Point2d> node_points;
 std::unordered_map<int, std::unordered_map<int, double>> probs;
-
-double stride = 0.1;  // meters between lines in rviz
-double offset = 0.5;  // distance between robot and line
-double z_val  = 0.3;  // z coordinate to give to each line endpoint
+std::unordered_map<int, std::unordered_map<int, std::vector<int>>> flow_map;
 
 
 void state_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
@@ -111,7 +107,7 @@ void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
   }
 
   int flow_count = 0;
-  std::unordered_map<int, std::unordered_map<int, std::vector<int>>> flow_map;
+  flow_map.clear();
   for (const or_protocol_msgs::RoutingSrcEntry& src_entry : msg->entries) {
     const int src_id = src_entry.src_id;
 
@@ -143,48 +139,6 @@ void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
   if (flow_count > (int)route_colors.size()) {
     ROS_WARN("[network_viz] more flows than colors!");
   }
-
-  visualization_msgs::Marker flow_viz;
-  flow_viz.header.frame_id = "world";
-  flow_viz.action = visualization_msgs::Marker::ADD;
-  flow_viz.type = visualization_msgs::Marker::LINE_LIST;
-  flow_viz.pose.orientation.w = 1.0;
-  flow_viz.scale.x = 0.1;
-
-  for (const auto& src_pair : flow_map) {
-    int src = src_pair.first;
-    for (const auto& dst_pair : src_pair.second) {
-      int dst = dst_pair.first;
-      const std::vector<int>& line_colors = dst_pair.second;
-
-      double span = line_colors.size() * stride;
-      Point2d diff = (node_points[dst] - node_points[src]);
-      Point2d dir = diff.matrix().normalized();
-      Point2d perp = Point2d{-dir(1), dir(0)};
-      Point2d center = node_points[src] + offset* dir;
-      Point2d anchor = center - (span + stride) * perp;
-      double length = diff.matrix().norm() - 2.0 * offset;
-
-      // link prob
-      flow_viz.points.push_back(ros_point(center, z_val));
-      flow_viz.points.push_back(ros_point(center + length * dir, z_val));
-      int src_prob_idx = probs[src][dst] * (prob_colors.size() - 1);
-      int dst_prob_idx = probs[dst][src] * (prob_colors.size() - 1);
-      flow_viz.colors.push_back(ros_color(prob_colors[src_prob_idx]));
-      flow_viz.colors.push_back(ros_color(prob_colors[dst_prob_idx]));
-
-      for (int i = 0; i < (int)line_colors.size(); i++) {
-        Point2d line0 = anchor + i * stride * perp;
-        Point2d line1 = line0 + length * dir;
-        flow_viz.points.push_back(ros_point(line0, z_val));
-        flow_viz.points.push_back(ros_point(line1, z_val));
-        flow_viz.colors.push_back(ros_color(route_colors[line_colors[i]]));
-        flow_viz.colors.push_back(ros_color(route_colors[line_colors[i]]));
-      }
-    }
-  }
-
-  vis_pub.publish(flow_viz);
 }
 
 
@@ -203,18 +157,91 @@ int main(int argc, char** argv)
       mid_ids.insert(mid_agent_ids_param[i]);
   }
 
+  double stride = 0.1;     // meters between lines in rviz
+  double offset = 0.5;     // distance between robot and line
+  double z_val = 0.3;      // z coordinate to give to each line endpoint
+  bool show_flows = true;  // plot packet routes in addition to link prob
+
   if (!pnh.getParam("offset", offset))
     ROS_WARN("[network_viz] using default value of %.2f for 'offset'", offset);
   if (!pnh.getParam("stride", stride))
     ROS_WARN("[network_viz] using default value of %.2f for 'stride'", stride);
   if (!pnh.getParam("z_value", z_val))
     ROS_WARN("[network_viz] using default value of %.2f for 'z_value'", z_val);
+  if (!pnh.getParam("show_flows", show_flows))
+    ROS_WARN("[network_viz] using default value of %s for 'show_flows'", show_flows ? "TRUE" : "FALSE");
 
   ros::Subscriber state_sub = nh.subscribe("state", 10, state_cb);
   ros::Subscriber table_sub = nh.subscribe("table", 10, table_cb);
-  vis_pub = nh.advertise<visualization_msgs::Marker>("network_viz", 10);
+  ros::Publisher vis_pub = nh.advertise<visualization_msgs::Marker>("network_viz", 10);
 
-  ros::spin();
+  ros::Rate loop_rate(5);
+  while (ros::ok()) {
+
+    loop_rate.sleep();
+    ros::spinOnce();
+
+    if (!status_ptr) {
+      ROS_WARN_THROTTLE(1.0, "[network_viz] waiting for status message");
+      continue;
+    }
+
+    visualization_msgs::Marker flow_viz;
+    flow_viz.header.frame_id = "world";
+    flow_viz.action = visualization_msgs::Marker::ADD;
+    flow_viz.type = visualization_msgs::Marker::LINE_LIST;
+    flow_viz.pose.orientation.w = 1.0;
+    flow_viz.scale.x = 0.1;
+
+    for (const auto& src_pair : node_points) {
+      int src = src_pair.first;
+      for (const auto& dst_pair : node_points) {
+        int dst = dst_pair.first;
+
+        if (src == dst)
+          continue;
+
+        Point2d diff = (node_points[dst] - node_points[src]);
+        Point2d dir = diff.matrix().normalized();
+        Point2d center = node_points[src] + offset * dir;
+        double length = diff.matrix().norm() - 2.0 * offset;
+
+        if (probs[src][dst] < 1e-5 && probs[dst][src] < 1e-5)
+          continue;
+
+        // link prob
+        flow_viz.points.push_back(ros_point(center, z_val));
+        flow_viz.points.push_back(ros_point(center + length * dir, z_val));
+        flow_viz.colors.push_back(ros_color(RGBA{1, 0, 0, probs[src][dst]}));
+        flow_viz.colors.push_back(ros_color(RGBA{1, 0, 0, probs[dst][src]}));
+        //int src_prob_idx = probs[src][dst] * (prob_colors.size() - 1);
+        //int dst_prob_idx = probs[dst][src] * (prob_colors.size() - 1);
+        //flow_viz.colors.push_back(ros_color(prob_colors[src_prob_idx]));
+        //flow_viz.colors.push_back(ros_color(prob_colors[dst_prob_idx]));
+
+        // routes
+        if (show_flows && flow_map.count(src) != 0 && flow_map[src].count(dst) != 0) {
+          const std::vector<int>& line_colors = flow_map[src][dst];
+
+          double span = line_colors.size() * stride;
+          Point2d perp = Point2d{-dir(1), dir(0)};
+          Point2d anchor = center - (span + stride) * perp;
+
+          for (int i = 0; i < (int)line_colors.size(); i++) {
+            Point2d line0 = anchor + i * stride * perp;
+            Point2d line1 = line0 + length * dir;
+            flow_viz.points.push_back(ros_point(line0, z_val));
+            flow_viz.points.push_back(ros_point(line1, z_val));
+            flow_viz.colors.push_back(ros_color(route_colors[line_colors[i]]));
+            flow_viz.colors.push_back(ros_color(route_colors[line_colors[i]]));
+          }
+        }
+      }
+    }
+
+    if (flow_viz.points.size() > 0)
+      vis_pub.publish(flow_viz);
+  }
 
   return 0;
 }
