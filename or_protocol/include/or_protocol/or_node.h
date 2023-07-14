@@ -93,9 +93,10 @@ class ORNode
 
  private:
   volatile bool run;
+  bool monitor;
 
   ros::NodeHandle nh, pnh;
-  ros::Publisher status_pub, table_pub;
+  ros::Publisher status_pub, table_pub, monitor_pub;
   ros::Subscriber pose_sub;
 
   std::shared_ptr<ORProtocol> protocol;

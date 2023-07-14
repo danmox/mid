@@ -1,7 +1,7 @@
 #include <or_protocol/or_node.h>
 #include <ros/xmlrpc_manager.h>
 
-#include <or_protocol_msgs/TopicInfo.h>
+#include <or_protocol_msgs/Log.h>
 #include <std_msgs/UInt16.h>
 
 
@@ -12,12 +12,19 @@ using XmlRpc::XmlRpcValue;
 
 
 ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
-  run(false), nh(_nh), pnh(_pnh)
+  run(false), monitor(false), nh(_nh), pnh(_pnh)
 {
   std::string ip;
   if (!pnh.getParam("IP", ip)) {
     ORN_FATAL("unable to fetch required param 'IP'");
     return;
+  }
+
+  if (!pnh.getParam("monitor", monitor))
+    ORN_WARN("failed to fetch parameter 'monitor': using default value of %s", monitor ? "TRUE" : "FALSE");
+  if (monitor) {
+    ORN_INFO("configuring ORNode in monitor mode");
+    monitor_pub = nh.advertise<or_protocol_msgs::Log>("packet_info", 20);
   }
 
   int node_id = std::stoi(ip.substr(ip.find_last_of('.') + 1));
@@ -47,8 +54,9 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
     return;
   }
 
-  status_pub = nh.advertise<or_protocol_msgs::NetworkStatus>("network_status", 5);
-  table_pub = nh.advertise<or_protocol_msgs::RoutingTable>("routing_table", 5);
+  std::string prefix = monitor ? "monitor/" : "";
+  status_pub = nh.advertise<or_protocol_msgs::NetworkStatus>(prefix + "network_status", 5);
+  table_pub = nh.advertise<or_protocol_msgs::RoutingTable>(prefix + "routing_table", 5);
 
   namespace ph = std::placeholders;
 
@@ -84,6 +92,10 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
           // only subscribe to topics we don't publish and vice versa to prevent
           // infinite message loops
           if (source == node_id) {
+            if (monitor) {
+              ORN_INFO("local subscribers disabled in monitor mode");
+              continue;
+            }
             auto cb = std::bind(&ORNode::ros_msg_cb, this, ph::_1, array_idx);
             ros::Subscriber sub = nh.subscribe<topic_tools::ShapeShifter>(topic, queue_size, cb);
             std::unique_ptr<ros::Subscriber> ptr(new ros::Subscriber(sub));
@@ -106,7 +118,7 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
   }
 
   msg_recv_func cb = std::bind(&ORNode::recv_packet, this, ph::_1, ph::_2, ph::_3);
-  protocol.reset(new ORProtocol(ip, cb));
+  protocol.reset(new ORProtocol(ip, cb, monitor));
 
   // after protocol is initialized to get access to ORProtocol::update_pose
   pose_sub = nh.subscribe("pose", 5, &ORProtocol::update_pose, protocol.get());
@@ -146,6 +158,13 @@ void ORNode::ros_msg_cb(const topic_tools::ShapeShifter::ConstPtr& msg, int idx)
 void ORNode::recv_packet(ros::Time& recv_time, or_protocol_msgs::Packet& pkt, int size)
 {
   ORN_DEBUG("[%f] received pkt from %d via %d, type=%s, %d bytes", recv_time.toSec(), pkt.header.src_id, pkt.header.curr_id, packet_type_string(pkt.header).c_str(), size);
+
+  if (monitor) {
+    or_protocol_msgs::Log log_msg;
+    log_msg.header = pkt.header;
+    log_msg.size = size;
+    monitor_pub.publish(log_msg);
+  }
 
   uint8_t* buff = pkt.data.data();
   const int buff_size = pkt.data.size();

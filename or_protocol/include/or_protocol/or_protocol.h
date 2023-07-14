@@ -31,7 +31,7 @@ class ORProtocol
 {
  public:
   // initializes ORNode with a unique IPv4 address
-  ORProtocol(std::string _IP, msg_recv_func msg_cb = nullptr);
+  ORProtocol(std::string _IP, msg_recv_func msg_cb = nullptr, bool monitor = false);
 
   // destructor required for thread cleanup logic
   ~ORProtocol();
@@ -49,6 +49,10 @@ class ORProtocol
   friend class ORProtocolTest;
 
  private:
+  // run the node in monitor mode: don't send beacons, don't participate in
+  // routing, and deliver all traffic to the application
+  bool monitor;
+
   // socket used for broadcasting to peers, implementing the lower level
   // broadcast socket setup / cleanup and usage
   std::shared_ptr<BCastSocket> bcast_socket;

@@ -18,8 +18,8 @@ namespace or_protocol {
 using std::string;
 
 
-ORProtocol::ORProtocol(string _IP, msg_recv_func msg_cb) :
-  recv_handle(msg_cb)
+ORProtocol::ORProtocol(string _IP, msg_recv_func msg_cb, bool monitor) :
+  monitor(monitor), recv_handle(msg_cb)
 {
   // TODO use interface name instead? enabling automatic IP address fetching
 
@@ -60,9 +60,11 @@ ORProtocol::ORProtocol(string _IP, msg_recv_func msg_cb) :
 
   // start worker threads
   process_thread = std::thread(&ORProtocol::process_packets, this);
-  beacon_rx_thread = std::thread(&ORProtocol::process_beacons, this);
-  beacon_tx_thread = std::thread(&ORProtocol::transmit_beacons, this);
-  routing_thread = std::thread(&ORProtocol::compute_routes, this);
+  if (!monitor) {
+    beacon_rx_thread = std::thread(&ORProtocol::process_beacons, this);
+    beacon_tx_thread = std::thread(&ORProtocol::transmit_beacons, this);
+    routing_thread = std::thread(&ORProtocol::compute_routes, this);
+  }
   log_thread = std::thread(&ORProtocol::process_log_queue, this);
 }
 
@@ -71,9 +73,11 @@ ORProtocol::~ORProtocol()
 {
   run = false;
   process_thread.join();
-  beacon_rx_thread.join();
-  beacon_tx_thread.join();
-  routing_thread.join();
+  if (!monitor) {
+    beacon_rx_thread.join();
+    beacon_tx_thread.join();
+    routing_thread.join();
+  }
   log_thread.join();
   fclose(log_file);
 }
@@ -103,6 +107,11 @@ bool ORProtocol::send(or_protocol_msgs::Packet& msg, const bool set_relays)
 {
   if (msg.header.msg_type == 0) {
     OR_ERROR("cannot transmit packet without valid msg_type");
+    return false;
+  }
+
+  if (monitor) {
+    OR_ERROR("cannot transmit packets in monitor mode");
     return false;
   }
 
@@ -279,7 +288,7 @@ void ORProtocol::process_packets()
 
     // status messages are pushed onto a queue for processing by a separate
     // thread and are not routed / processed further in this thread
-    if (item->header.msg_type == or_protocol_msgs::Header::STATUS) {
+    if (item->header.msg_type == or_protocol_msgs::Header::STATUS && !monitor) {
       network_state.push_beacon_queue(item);
       continue;
     }
@@ -289,6 +298,18 @@ void ORProtocol::process_packets()
     MsgStatus ms = network_state.update_queue(item);
     if (!ms.is_new_msg) {
       log_event(item, PacketAction::DROP_DUP, ros::Time::now());
+      continue;
+    }
+
+    // short circuit normal processing logic if operating in monitor mode
+    if (monitor) {
+      if (recv_handle && ms.is_new_seq) {
+        or_protocol_msgs::Packet pkt;
+        deserialize(pkt, reinterpret_cast<uint8_t*>(item->buffer()), item->size);
+        log_event(item, PacketAction::DELIVER, ros::Time::now());
+        std::lock_guard<std::mutex> lock(app_mutex);
+        recv_handle(item->recv_time, pkt, item->size);
+      }
       continue;
     }
 
