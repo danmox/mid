@@ -1,7 +1,7 @@
 #include <or_protocol/utils.h>
 
-#include <frontier_exploration/Goal.h>
-#include <frontier_exploration/FrontierGoals.h>
+#include <exploration_msgs/Goal.h>
+#include <exploration_msgs/FrontierGoals.h>
 #include <std_msgs/UInt32.h>
 #include <std_msgs/Int64.h>
 
@@ -103,10 +103,10 @@ topic_tools::ShapeShifter get_msg_info(const std::string& type,
 {
   topic_tools::ShapeShifter ss;
 
-  if (type == "frontier_exploration/FrontierGoals")
-    morph_shape_shifter<frontier_exploration::FrontierGoals>(ss, latch);
-  else if (type == "frontier_exploration/Goal")
-    morph_shape_shifter<frontier_exploration::Goal>(ss, latch);
+  if (type == "exploration_msgs/FrontierGoals")
+    morph_shape_shifter<exploration_msgs::FrontierGoals>(ss, latch);
+  else if (type == "exploration_msgs/Goal")
+    morph_shape_shifter<exploration_msgs::Goal>(ss, latch);
   else if (type == "std_msgs/Int64")
     morph_shape_shifter<std_msgs::Int64>(ss, latch);
   else
