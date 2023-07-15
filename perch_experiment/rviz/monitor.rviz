@@ -3,10 +3,7 @@ Panels:
     Help Height: 138
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Global Options1
-        - /Status1
-        - /Network1/Status1
+      Expanded: ~
       Splitter Ratio: 0.5
     Tree Height: 1522
   - Class: rviz/Selection
@@ -57,7 +54,15 @@ Visualization Manager:
       Marker Topic: /node101/network_viz
       Name: Network
       Namespaces:
-        "": true
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /node101/exploration
+      Name: Exploration
+      Namespaces:
+        {}
       Queue Size: 100
       Value: true
   Enabled: true

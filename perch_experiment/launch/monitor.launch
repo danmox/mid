@@ -6,10 +6,12 @@
   <arg name="show_flows" default="false"/>
   <arg name="monitor"    default="true"/>
 
+  <arg name="scenario"   default="3task0mid.yaml"/>
+
   <!-- global parameters -->
 
   <rosparam command="load"
-            file="$(find perch_experiment)/config/experiment.yaml"/>
+            file="$(find perch_experiment)/config/$(arg scenario)"/>
 
   <!-- nodes -->
 
@@ -27,15 +29,25 @@
       <param name="show_flows" value="$(arg show_flows)"/>
     </node>
 
+    <!-- ORNode in monitoring mode -->
     <node name="or_node" pkg="or_protocol" type="or_node" output="screen">
       <param name="IP"     value="192.168.0.$(arg id)"/>
       <param name="monitor" value="$(arg monitor)"/>
     </node>
 
+    <!-- combine all overheard status messages -->
     <node name="status_aggregator" pkg="or_protocol" type="status_aggregator"
           output="screen">
       <remap from="status" to="monitor/network_status"/>
     </node>
+
+    <!-- visualize exploration process -->
+    <node pkg="perch_experiment" type="exploration_vis" name="exploration_vis"
+          output="screen">
+      <remap from="status" to="monitor/network_status"/>
+    </node>
+
+
   </group>
 
 </launch>

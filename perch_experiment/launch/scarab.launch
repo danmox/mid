@@ -16,6 +16,8 @@
   <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
   <arg name="world_frame"           default="world"/>
 
+  <arg name="scenario"              default="3task0mid.yaml"/>
+
   <!-- constructed args -->
 
   <arg name="id" value="$(eval arg('agent')[6:])"/>
@@ -25,7 +27,7 @@
   <rosparam command="load"
             file="$(find perch_experiment)/config/heading_calibration.yaml"/>
   <rosparam command="load"
-            file="$(find perch_experiment)/config/experiment.yaml"/>
+            file="$(find perch_experiment)/config/$(arg scenario)"/>
 
   <!-- nodes -->
 

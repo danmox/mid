@@ -1,8 +1,0 @@
-task_agent_ids: [40, 46]
-mid_agent_ids: []
-max_range: 30.0  # max communication range in meters
-sync_topics:
-  - /node40/goals: {type: exploration_msgs/Goal, reliable: true, queue_size: 4, source: 40}
-  - /node40/frontiers: {type: exploration_msgs/FrontierGoals, reliable: true, queue_size: 4, source: 40}
-  - /node46/goals: {type: exploration_msgs/Goal, reliable: true, queue_size: 4, source: 46}
-  - /node46/frontiers: {type: exploration_msgs/FrontierGoals, reliable: true, queue_size: 4, source: 46}
