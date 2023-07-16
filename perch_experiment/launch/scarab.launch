@@ -7,6 +7,7 @@
   <arg name="record"                default="false"/>
   <arg name="relative_localization" default="true"/>
   <arg name="camera"                default="true"/>
+  <arg name="move"                  default="true"/>
 
   <arg name="map_frame"             default="$(arg agent)/map"/>
   <arg name="base_frame"            default="$(arg agent)/base_link"/>
@@ -147,6 +148,7 @@
       <arg name="type"      value="$(arg type)"/>
       <arg name="map_frame" value="$(arg map_frame)"/>
       <arg name="gdb"       value="$(arg gdb)"/>
+      <arg name="move"      value="$(arg move)"/>
     </include>
 
     <!-- OR Protocol -->
