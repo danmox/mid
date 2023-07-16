@@ -10,13 +10,18 @@ if(OR_DEBUG_LOG)
   add_compile_definitions(OR_DEBUG_LOG)
 endif()
 
-find_package(catkin REQUIRED COMPONENTS
+SET(BUILD_DEPS
+  experiment_msgs
   exploration_msgs
   or_protocol_msgs
   rosbag
   roscpp
   std_msgs
   visualization_msgs
+)
+
+find_package(catkin REQUIRED COMPONENTS
+  ${BUILD_DEPS}
 )
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
@@ -27,12 +32,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES or_protocol
   CATKIN_DEPENDS
-    exploration_msgs
-    or_protocol_msgs
-    rosbag
-    roscpp
-    std_msgs
-    visualization_msgs
+    ${BUILD_DEPS}
 )
 
 include_directories(

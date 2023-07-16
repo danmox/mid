@@ -11,6 +11,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>eigen</depend>
   <depend>fmt</depend>
+  <depend>experiment_msgs</depend>
   <depend>exploration_msgs</depend>
   <depend>or_protocol_msgs</depend>
   <depend>roscpp</depend>
