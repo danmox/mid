@@ -10,6 +10,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <experiment_msgs/Command.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <or_protocol_msgs/NetworkStatus.h>
 #include <or_protocol_msgs/RoutingTable.h>
@@ -68,15 +69,18 @@ class ORPlanner
 
   void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg);
   void status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg);
+  void command_cb(const experiment_msgs::CommandConstPtr& msg);
 
   void run();
 
   friend class ORPlannerTest;
 
  private:
-  ros::Subscriber map_sub, pose_sub, scan_sub, table_sub, status_sub;
+  ros::Subscriber map_sub, pose_sub, scan_sub, table_sub, status_sub, command_sub;
   ros::Publisher viz_pub;
   std::unique_ptr<ros::NodeHandle> nh, pnh;
+
+  experiment_msgs::Command command;
 
   volatile bool run_node, table_ready, status_ready;
 
@@ -105,6 +109,8 @@ class ORPlanner
   double delivery_prob(const Eigen::MatrixXd& poses);
 
   Vec2d compute_gradient();
+
+  void send_hfn_goal(const Eigen::Array2d& new_goal_pos);
 };
 
 

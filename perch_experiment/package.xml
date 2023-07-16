@@ -8,6 +8,8 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <depend>experiment_msgs</depend>
+  <depend>libncurses-dev</depend>
   <depend>roscpp</depend>
   <depend>exploration_msgs</depend>
   <depend>geometry_msgs</depend>

@@ -30,6 +30,7 @@
       <arg name="type"      value="$(arg type)"/>
       <arg name="map_frame" value="$(arg agent)/map"/>
       <arg name="gdb"       value="$(arg gdb)"/>
+      <arg name="move"      value="true"/>
     </include>
   </group>
 

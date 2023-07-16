@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(perch_experiment)
 
 set(PKG_DEPENDS
+  experiment_msgs
   exploration_msgs
   geometry_msgs
   or_protocol_msgs
@@ -16,6 +17,7 @@ set(RUN_DEPENDS
 )
 
 find_package(catkin REQUIRED ${BUILD_DEPENDS})
+find_package(Curses REQUIRED)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
@@ -23,10 +25,11 @@ include_directories(
 
 catkin_package(
   CATKIN_DEPENDS ${RUN_DEPENDS}
-  DEPENDS
+  DEPENDS Curses
 )
 
 add_executable(exploration_vis src/exploration_visualizer.cpp)
 target_link_libraries(exploration_vis ${catkin_LIBRARIES})
 
-catkin_package()
+add_executable(commander src/commander.cpp)
+target_link_libraries(commander ${catkin_LIBRARIES} ${CURSES_LIBRARIES})

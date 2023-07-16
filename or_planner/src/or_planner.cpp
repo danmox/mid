@@ -46,12 +46,16 @@ Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   run_node(false), table_ready(false), status_ready(false), found_goal(false)
 {
+  // wait for a signal to start running
+  command.action = experiment_msgs::Command::STOP;
+
   nh.reset(new ros::NodeHandle(_nh));
   pnh.reset(new ros::NodeHandle(_pnh));
   hfn.reset(new ScarabMoveClient("move", true));
 
   table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
   status_sub = nh->subscribe("status", 1, &ORPlanner::status_cb, this);
+  command_sub = nh->subscribe("/command", 1, &ORPlanner::command_cb, this);
 
   viz_pub = nh->advertise<visualization_msgs::Marker>("planner", 1);
 
@@ -286,6 +290,12 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 }
 
 
+void ORPlanner::command_cb(const experiment_msgs::CommandConstPtr& msg)
+{
+  command = *msg;
+}
+
+
 // TODO numerical issues? switch to log prob?
 double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
 {
@@ -340,12 +350,74 @@ Vec2d ORPlanner::compute_gradient()
 }
 
 
+void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
+{
+  if (found_goal && (new_goal_pos - goal_pos).matrix().norm() < goal_threshold) {
+    OP_DEBUG("new_goal (%.2f, %.2f) near previous goal (%.2f, %.2f): not sending HFN command", new_goal_pos(0), new_goal_pos(1), goal_pos(0), goal_pos(1));
+  } else {
+
+    goal_pos = new_goal_pos;
+    found_goal = true;
+
+    // send goal to HFN
+
+    geometry_msgs::PoseStamped goal_pose;
+    goal_pose.header.frame_id = nav_frame;
+    goal_pose.header.stamp = ros::Time::now();
+    goal_pose.pose.position.x = goal_pos(0);
+    goal_pose.pose.position.y = goal_pos(1);
+    goal_pose.pose.orientation.w = 1.0;
+
+    scarab_msgs::MoveGoal goal;
+    goal.target_poses.push_back(goal_pose);
+
+    OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
+
+    hfn->sendGoal(goal);
+  }
+}
+
+
 void ORPlanner::run()
 {
   ros::Rate rate(5);
   while (run_node && ros::ok()) {
     rate.sleep();
     ros::spinOnce();
+
+    bool skip_loop = true;
+    if (command.action == experiment_msgs::Command::STOP) {
+      ROS_WARN_THROTTLE(5.0, "[ORPlanner] command action is: STOP");
+      if (hfn->getState() == actionlib::SimpleClientGoalState::ACTIVE) {
+        OP_INFO("cancelling current goal");
+        hfn->cancelGoal();
+      }
+    } else if (command.action == experiment_msgs::Command::RETURN) {
+      ROS_WARN_THROTTLE(5.0, "[ORPlanner] command action is: RETURN");
+      send_hfn_goal(Eigen::Array2d{0.0, 0.0});
+    } else {
+      skip_loop = false;
+    }
+
+    // clear visualizations if we're not running the planner this iteration
+    if (skip_loop) {
+      visualization_msgs::Marker grad_msg;
+      grad_msg.header.frame_id = "world";
+      grad_msg.ns = "grad";
+      grad_msg.id = 0;
+      grad_msg.action = visualization_msgs::Marker::DELETE;
+
+      visualization_msgs::Marker plan_msg;
+      plan_msg.header.frame_id = "world";
+      plan_msg.ns = "plan";
+      plan_msg.id = 0;
+      plan_msg.action = visualization_msgs::Marker::DELETE;
+
+      viz_pub.publish(grad_msg);
+      viz_pub.publish(plan_msg);
+
+      continue;
+    }
 
     if (!status_ready) {
       ROS_WARN_THROTTLE(1.0, "[ORPlanner] waiting for NetworkStatus");
@@ -388,31 +460,8 @@ void ORPlanner::run()
         step_size *= 0.5;
       }
     }
-    Eigen::Array2d new_goal_pos = next_config.col(root_idx).array();
 
-    if (found_goal && (new_goal_pos - goal_pos).matrix().norm() < goal_threshold) {
-      OP_INFO("new_goal (%.2f, %.2f) near previous goal (%.2f, %.2f): not sending HFN command", new_goal_pos(0), new_goal_pos(1), goal_pos(0), goal_pos(1));
-    } else {
-
-      goal_pos = new_goal_pos;
-      found_goal = true;
-
-      // send goal to HFN
-
-      geometry_msgs::PoseStamped goal_pose;
-      goal_pose.header.frame_id = nav_frame;
-      goal_pose.header.stamp = ros::Time::now();
-      goal_pose.pose.position.x = goal_pos(0);
-      goal_pose.pose.position.y = goal_pos(1);
-      goal_pose.pose.orientation.w = 1.0;
-
-      scarab_msgs::MoveGoal goal;
-      goal.target_poses.push_back(goal_pose);
-
-      OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
-
-      hfn->sendGoal(goal);
-    }
+    send_hfn_goal(next_config.col(root_idx).array());
 
     // planner visualizations
 
