@@ -34,7 +34,7 @@ else
 end
 
 catkin clean -y
-catkin build
+catkin build -j 4
 
 if set -q _flag_test
    catkin run_tests
