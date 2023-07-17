@@ -4,7 +4,7 @@
 
   <arg name="type"                  default="none"/>
   <arg name="gdb"                   default="false"/>
-  <arg name="record"                default="false"/>
+  <arg name="record"                default="true"/>
   <arg name="relative_localization" default="true"/>
   <arg name="camera"                default="true"/>
   <arg name="move"                  default="true"/>
@@ -17,7 +17,7 @@
   <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
   <arg name="world_frame"           default="world"/>
 
-  <arg name="scenario"              default="3task0mid.yaml"/>
+  <arg name="scenario"              default="3task0mid"/>
 
   <!-- constructed args -->
 
@@ -28,7 +28,7 @@
   <rosparam command="load"
             file="$(find perch_experiment)/config/heading_calibration.yaml"/>
   <rosparam command="load"
-            file="$(find perch_experiment)/config/$(arg scenario)"/>
+            file="$(find perch_experiment)/config/$(arg scenario).yaml"/>
 
   <!-- nodes -->
 
@@ -161,10 +161,16 @@
 
   <node name="recorder" pkg="rosbag" type="record" output="screen"
         if="$(arg record)"
-        args="record -o heading_calibration_$(arg id)
+        args="-o /home/scarab/$(arg scenario)_$(arg id)_$(arg type)
               /tf
+              /command
+              /scarab$(arg id)/frontiers
+              /scarab$(arg id)/frontier_exploration
+              /scarab$(arg id)/goals
               /scarab$(arg id)/map
+              /scarab$(arg id)/network_status
+              /scarab$(arg id)/routing_table
               /scarab$(arg id)/pose
-              /scarab$(arg id)/vicon/scarab$(arg id)/pose"/>
+              /scarab$(arg id)/world_pose"/>
 
 </launch>

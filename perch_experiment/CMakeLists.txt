@@ -25,7 +25,7 @@ include_directories(
 
 catkin_package(
   CATKIN_DEPENDS ${RUN_DEPENDS}
-  DEPENDS Curses
+  # DEPENDS Curses
 )
 
 add_executable(exploration_vis src/exploration_visualizer.cpp)
