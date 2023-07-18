@@ -87,6 +87,7 @@ int main(int argc, char** argv)
 
   int sent_msgs = 0;
   ros::Time start = ros::Time::now();
+  ros::Rate ping_rate(1);
   while (run && or_node->is_running()) {
     msg.data.clear();
     msg.header.hops = 0;
@@ -96,19 +97,25 @@ int main(int argc, char** argv)
     or_protocol::pack_msg(msg, now);
 
     // the ping sequence and message sequence may not correspond if there are
-    // more that 1 datastream originating from the sending node
+    // more that one stream of data originating from the sending node
     std_msgs::Int32 ping_seq;
     ping_seq.data = sent_msgs;
     or_protocol::pack_msg(msg, ping_seq);
 
     // pad the message to the desired size
     const int pad = pkt_size - ros::serialization::serializationLength(msg) - 4;
-    msg.data.insert(msg.data.end(), pad, 1);
+    if (pad >= 0) {
+      msg.data.insert(msg.data.end(), pad, 1);
+    } else {
+      fmt::print("[main] desired packet size of {} smaller than minimum packet size of {}\n", pkt_size, ros::serialization::serializationLength(msg) + 4);
+      break;
+    }
 
     bool set_relays = false;
     or_node->send(msg, set_relays);
     sent_msgs++;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+    ping_rate.sleep();
   }
 
   if (sent_msgs == 0)
