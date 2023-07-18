@@ -163,6 +163,7 @@
         if="$(arg record)"
         args="-o /home/scarab/$(arg scenario)_$(arg id)_$(arg type)
               /tf
+              /tf_static
               /command
               /scarab$(arg id)/frontiers
               /scarab$(arg id)/frontier_exploration
