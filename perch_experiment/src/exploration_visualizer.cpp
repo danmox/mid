@@ -181,7 +181,7 @@ int main(int argc, char** argv)
       }
 
       Marker text = create_marker("text", pair.first, Marker::TEXT_VIEW_FACING);
-      text.scale.z = 1.0;
+      text.scale.z = 2.0;
       text.color.r = 1.0;
       text.color.g = 1.0;
       text.color.b = 1.0;
