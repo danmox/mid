@@ -17,7 +17,7 @@
   <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
   <arg name="world_frame"           default="world"/>
 
-  <arg name="scenario"              default="3task0mid"/>
+  <arg name="scenario"              default="2task1mid"/>
 
   <!-- constructed args -->
 
@@ -144,11 +144,12 @@
 
     <!-- frontier exploration or mid planner -->
     <include file="$(find perch_experiment)/launch/planner.launch">
-      <arg name="id"        value="$(arg id)"/>
-      <arg name="type"      value="$(arg type)"/>
-      <arg name="map_frame" value="$(arg map_frame)"/>
-      <arg name="gdb"       value="$(arg gdb)"/>
-      <arg name="move"      value="$(arg move)"/>
+      <arg name="id"           value="$(arg id)"/>
+      <arg name="type"         value="$(arg type)"/>
+      <arg name="map_frame"    value="$(arg map_frame)"/>
+      <arg name="gdb"          value="$(arg gdb)"/>
+      <arg name="move"         value="$(arg move)"/>
+      <arg name="status_topic" value="/$(arg agent)/network_status"/>
     </include>
 
     <!-- OR Protocol -->
@@ -162,12 +163,14 @@
   <node name="recorder" pkg="rosbag" type="record" output="screen"
         if="$(arg record)"
         args="-o /home/scarab/$(arg scenario)_$(arg id)_$(arg type)
+              -e
               /tf
               /tf_static
               /command
-              /scarab$(arg id)/frontiers
+              /scarab(.*)/frontiers
+              /scarab(.*)/goals
+              /scarab$(arg id)/planner
               /scarab$(arg id)/frontier_exploration
-              /scarab$(arg id)/goals
               /scarab$(arg id)/map
               /scarab$(arg id)/network_status
               /scarab$(arg id)/routing_table

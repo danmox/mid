@@ -5,6 +5,7 @@
   <arg name="map_frame"/>
   <arg name="gdb"/>
   <arg name="move"/>
+  <arg name="status_topic" default="/network_state"/>
 
   <!-- constructed args -->
 
@@ -51,7 +52,7 @@
       goal_threshold:      0.5
       gradient_threshold: 1e-8
     </rosparam>
-    <remap from="status" to="/network_state"/>
+    <remap from="status" to="$(arg status_topic)"/>
     <remap from="table"  to="routing_table"/>
   </node>
 
