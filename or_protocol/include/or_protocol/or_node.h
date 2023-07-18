@@ -28,6 +28,7 @@ struct SubInfo
   std::string topic;
   int queue_size;
   bool reliable;
+  bool all;
   std::unique_ptr<ros::Subscriber> sub;
 };
 
@@ -47,7 +48,8 @@ template <typename T>
 bool get_param(const XmlRpc::XmlRpcValue& val,
                const XmlRpc::XmlRpcValue::Type type,
                std::string name,
-               T& out_param)
+               T& out_param,
+               bool verbose = false)
 {
   static std::unordered_map<XmlRpc::XmlRpcValue::Type, std::string>
     type_strings = {
@@ -64,7 +66,8 @@ bool get_param(const XmlRpc::XmlRpcValue& val,
   std::string val_str = val.toXml();
   const char* vcstr = val_str.c_str();
   if (!val.hasMember(name)) {
-    ORN_ERROR("val '%s' does not have member '%s'", vcstr, name.c_str());
+    if (verbose)
+      ORN_ERROR("val '%s' does not have member '%s'", vcstr, name.c_str());
     return false;
   }
   if (!val[name].valid()) {
@@ -104,7 +107,7 @@ class ORNode
   std::unordered_map<int, SubInfo> subscribers;
   std::unordered_map<int, PubInfo> publishers;
 
-  std::vector<int> dest_ids;
+  std::vector<int> task_ids, all_ids;
 };
 
 

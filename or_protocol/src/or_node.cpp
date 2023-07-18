@@ -36,12 +36,30 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
   } else {
     for (int i = 0; i < task_agent_ids_param.size(); i++)
       if ((int)task_agent_ids_param[i] != node_id)
-        dest_ids.push_back(task_agent_ids_param[i]);
+        task_ids.push_back(task_agent_ids_param[i]);
   }
-  std::string dest_id_str;
-  for (int d : dest_ids)
-    dest_id_str += " " + std::to_string(d);
-  ORN_INFO("destination ids:%s", dest_id_str.c_str());
+
+  std::vector<int> mid_ids;
+  XmlRpc::XmlRpcValue mid_agent_ids_param;
+  if (!nh.getParam("/mid_agent_ids", mid_agent_ids_param)) {
+    ORN_FATAL("failed to fetch required param '/mid_agent_ids'");
+    return;
+  } else {
+    for (int i = 0; i < mid_agent_ids_param.size(); i++)
+      if ((int)mid_agent_ids_param[i] != node_id)
+        mid_ids.push_back(mid_agent_ids_param[i]);
+  }
+
+  all_ids = task_ids;
+  all_ids.insert(all_ids.end(), mid_ids.begin(), mid_ids.end());
+
+  auto join = [&](const std::vector<int>& arr) {
+    std::string str;
+    if (arr.empty()) return str;
+    for (int i : arr) str += std::to_string(i) + " ";
+    return str.substr(0, str.size() - 1);  // remove trailing whitespace
+  };
+  ORN_INFO("destinations: task: {%s}, mid: {%s}", join(task_ids).c_str(), join(mid_ids).c_str());
 
   XmlRpc::XmlRpcValue topics_param;
   if (!nh.getParam("/sync_topics", topics_param)) {
@@ -66,28 +84,30 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
         for (auto& t : topics_param[array_idx]) {
 
           // NOTE topics_param[0] entries should be in the following format:
-          // - /topic/name: {type: string, reliable: bool, queue_size: int, source: int}
+          // - /topic/name: {type: string, reliable: bool, queue_size: int, source: int, all: bool}
 
           std::string topic(t.first);
 
-          int queue_size = 1;
-          bool reliable = false;
-          std::string latch = "false";  // TODO implement and make parameter
+          int queue_size{1};
+          bool reliable{false}, all{false};
+          std::string latch{"false"};  // TODO implement and make parameter
 
           std::string type;
           int source;
-          if (!get_param(t.second, XmlRpcValue::TypeString, "type", type)) {
+          if (!get_param(t.second, XmlRpcValue::TypeString, "type", type, true)) {
             ORN_ERROR("topic %s: unable to capture traffic without valid 'type'", topic.c_str());
             continue;
           }
-          if (!get_param(t.second, XmlRpcValue::TypeInt, "source", source)) {
+          if (!get_param(t.second, XmlRpcValue::TypeInt, "source", source, true)) {
             ORN_ERROR("topic %s: must contain source node", topic.c_str());
             continue;
           }
           if (!get_param(t.second, XmlRpcValue::TypeInt, "queue_size", queue_size))
             ORN_WARN("topic %s: using default value for 'queue_size' of %d", topic.c_str(), queue_size);
           if (!get_param(t.second, XmlRpcValue::TypeBoolean, "reliable", reliable))
-            ORN_WARN("topic %s: using default value for 'reliable' of '%s'", topic.c_str(), reliable ? "TRUE": "FALSE");
+            ORN_WARN("topic %s: using default value for 'reliable' of '%s'", topic.c_str(), reliable ? "TRUE" : "FALSE");
+          if (!get_param(t.second, XmlRpcValue::TypeBoolean, "all", all))
+            ORN_WARN("topic %s: using default value for 'all' of '%s'", topic.c_str(), all ? "TRUE": "FALSE");
 
           // only subscribe to topics we don't publish and vice versa to prevent
           // infinite message loops
@@ -99,8 +119,8 @@ ORNode::ORNode(const ros::NodeHandle& _nh, const ros::NodeHandle& _pnh) :
             auto cb = std::bind(&ORNode::ros_msg_cb, this, ph::_1, array_idx);
             ros::Subscriber sub = nh.subscribe<topic_tools::ShapeShifter>(topic, queue_size, cb);
             std::unique_ptr<ros::Subscriber> ptr(new ros::Subscriber(sub));
-            subscribers[array_idx] = SubInfo{topic, queue_size, reliable, std::move(ptr)};
-            ORN_INFO("adding subscriber: %s: {type: %s, queue_size: %d, reliable: %s}", topic.c_str(), type.c_str(), queue_size, reliable ? "true" : "false");
+            subscribers[array_idx] = SubInfo{topic, queue_size, reliable, all, std::move(ptr)};
+            ORN_INFO("adding subscriber: %s: {type: %s, queue_size: %d, reliable: %s, all: %s}", topic.c_str(), type.c_str(), queue_size, reliable ? "true" : "false", all ? "true" : "false");
           } else {
             topic_tools::ShapeShifter ss = get_msg_info(type, latch);
             std::unique_ptr<ros::Publisher> pub(new ros::Publisher(ss.advertise(nh, topic, queue_size)));
@@ -146,7 +166,8 @@ void ORNode::ros_msg_cb(const topic_tools::ShapeShifter::ConstPtr& msg, int idx)
 
   or_protocol::pack_msg(pkt, *msg);
 
-  for (const int& dest : dest_ids) {
+  const std::vector<int>& dest_ids = subscriber.all ? all_ids : task_ids;
+  for (const int dest : dest_ids) {
     ORN_DEBUG("sending packet to %d", dest);
     pkt.header.hops = 0;
     pkt.header.dest_id = dest;
