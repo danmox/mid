@@ -1,17 +1,16 @@
 <launch>
 
   <arg name="id"/>
+  <arg name="scenario"/>
 
   <arg name="rviz"       default="true"/>
   <arg name="show_flows" default="false"/>
   <arg name="monitor"    default="true"/>
 
-  <arg name="scenario"   default="3task0mid.yaml"/>
-
   <!-- global parameters -->
 
   <rosparam command="load"
-            file="$(find perch_experiment)/config/$(arg scenario)"/>
+            file="$(find perch_experiment)/config/$(arg scenario).yaml"/>
 
   <!-- nodes -->
 

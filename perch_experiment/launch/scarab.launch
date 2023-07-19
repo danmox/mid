@@ -18,7 +18,7 @@
   <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
   <arg name="world_frame"           default="world"/>
 
-  <arg name="scenario"              default="2task1mid"/>
+  <arg name="scenario"              default="3task3mid"/>
 
   <!-- constructed args -->
 
