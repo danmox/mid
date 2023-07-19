@@ -5,6 +5,7 @@
   <arg name="map_frame"/>
   <arg name="gdb"/>
   <arg name="move"/>
+  <arg name="sim_routing"/>
   <arg name="status_topic" default="/network_state"/>
 
   <!-- constructed args -->
@@ -45,9 +46,10 @@
         output="screen"
         launch-prefix="$(arg launch_prefix)"
         if="$(arg mid)">
-    <param name="robot_type" value="$(arg type)"/>
-    <param name="node_id"    value="$(arg id)"/>
-    <param name="nav_frame"  value="$(arg map_frame)"/>
+    <param name="robot_type"  value="$(arg type)"/>
+    <param name="node_id"     value="$(arg id)"/>
+    <param name="nav_frame"   value="$(arg map_frame)"/>
+    <param name="sim_routing" value="$(arg sim_routing)"/>
     <rosparam>
       goal_threshold:      0.5
       gradient_threshold: 1e-8

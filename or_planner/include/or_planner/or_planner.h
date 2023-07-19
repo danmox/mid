@@ -44,6 +44,9 @@ class LinearChannel
   // compute the probability of delivery between two nodes
   double predict(const Vec2d& x1, const Vec2d& x2);
 
+  // compute the ETX between two nodes
+  double etx(const Vec2d& x1, const Vec2d& x2);
+
   Eigen::MatrixXd predict(const Eigen::MatrixXd& poses);
 
  private:
@@ -100,7 +103,7 @@ class ORPlanner
 
   std::unique_ptr<LinearChannel> channel_model;
 
-  bool found_goal;
+  bool found_goal, use_sim_routing;
   Eigen::Array2d goal_pos;
 
   typedef actionlib::SimpleActionClient<scarab_msgs::MoveAction> ScarabMoveClient;

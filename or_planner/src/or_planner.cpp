@@ -2,6 +2,8 @@
 #include <unordered_set>
 
 #include <or_planner/or_planner.h>
+#include <or_protocol/constants.h>
+#include <or_protocol/network_state.h>
 #include <tf2/utils.h>
 
 #include <geometry_msgs/Twist.h>
@@ -29,6 +31,13 @@ double LinearChannel::predict(const Vec2d& x1, const Vec2d& x2)
 }
 
 
+double LinearChannel::etx(const Vec2d& x1, const Vec2d& x2)
+{
+  double prob = std::max(1.0 - (x1 - x2).norm() / max_range, 0.0);
+  return prob < 1.0 / or_protocol::ETX_MAX ? or_protocol::ETX_MAX : 1.0 / prob;
+}
+
+
 Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
 {
   Eigen::MatrixXd link_probs = Eigen::MatrixXd::Zero(poses.cols(), poses.cols());
@@ -53,7 +62,15 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   pnh.reset(new ros::NodeHandle(_pnh));
   hfn.reset(new ScarabMoveClient("move", true));
 
-  table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
+  use_sim_routing = false;
+  if (!pnh->getParam("sim_routing", use_sim_routing)) {
+    OP_WARN("failed to fetch param 'sim_routing', using default value %s", use_sim_routing ? "true" : "false");
+  } else {
+    OR_WARN("using simulated routing during planning");
+  }
+
+  if (!use_sim_routing)
+    table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
   status_sub = nh->subscribe("status", 1, &ORPlanner::status_cb, this);
   command_sub = nh->subscribe("/command", 1, &ORPlanner::command_cb, this);
 
@@ -277,13 +294,44 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 
   // compute link probabilities from ETX table
 
-  link_probs = Eigen::MatrixXd::Zero(num_agents, num_agents);
-  for (const or_protocol_msgs::ETXList& table : msg->etx_table) {
-    const int src_idx = id_to_idx.at(table.node);
-    for (const or_protocol_msgs::ETXEntry& entry : table.etx_list) {
-      const int dst_idx = id_to_idx.at(entry.node);
-      link_probs(src_idx, dst_idx) = 1.0 / entry.etx;
+  if (!use_sim_routing) {
+    link_probs = Eigen::MatrixXd::Zero(num_agents, num_agents);
+    for (const or_protocol_msgs::ETXList& table : msg->etx_table) {
+      const int src_idx = id_to_idx.at(table.node);
+      for (const or_protocol_msgs::ETXEntry& entry : table.etx_list) {
+        const int dst_idx = id_to_idx.at(entry.node);
+        link_probs(src_idx, dst_idx) = 1.0 / entry.etx;
+      }
     }
+  } else {
+    link_probs = channel_model->predict(poses);
+
+    std::unordered_set<int> node_ids = task_ids;
+    node_ids.insert(mid_ids.begin(), mid_ids.end());
+
+    // compute ETX map
+    or_protocol::ETXMap etx_map;
+    for (const int src : node_ids) {
+      std::unordered_map<int, double> inner_map;
+      for (const int dst : node_ids) {
+        if (src == dst)
+          continue;
+        double etx = channel_model->etx(poses.col(id_to_idx[src]), poses.col(id_to_idx[dst]));
+        inner_map.emplace(dst, etx);
+      }
+      etx_map.emplace(src, inner_map);
+    }
+
+    // compute routing table
+    or_protocol::NetworkState ns;
+    ns.set_etx_map(etx_map);
+    ns.update_routes(node_id);
+
+    // set status_ready
+    status_ready = true;
+
+    // compute flow probabilities
+    table_cb(ns.get_routing_table_msg());
   }
 
   status_ready = true;
@@ -322,6 +370,7 @@ Vec2d ORPlanner::compute_gradient()
 {
   Vec2d gradient = Vec2d::Zero();
 
+  OP_INFO("computing gradient with %ld flows", flows.size());
   for (size_t j = 0; j < flows.size(); j++) {
     const std::vector<std::vector<int>>& paths = flows[j];
     const std::vector<double>& path_probs = flow_probs[j];

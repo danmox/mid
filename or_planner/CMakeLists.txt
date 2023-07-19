@@ -10,6 +10,7 @@ set(BUILD_DEPS
   experiment_msgs
   geometry_msgs
   nav_msgs
+  or_protocol
   or_protocol_msgs
   rosbag
   roscpp

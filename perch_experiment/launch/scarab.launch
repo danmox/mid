@@ -8,6 +8,7 @@
   <arg name="relative_localization" default="true"/>
   <arg name="camera"                default="true"/>
   <arg name="move"                  default="true"/>
+  <arg name="sim_routing"           default="true"/>
 
   <arg name="map_frame"             default="$(arg agent)/map"/>
   <arg name="base_frame"            default="$(arg agent)/base_link"/>
@@ -150,6 +151,7 @@
       <arg name="gdb"          value="$(arg gdb)"/>
       <arg name="move"         value="$(arg move)"/>
       <arg name="status_topic" value="/$(arg agent)/network_status"/>
+      <arg name="sim_routing"  value="$(arg sim_routing)"/>
     </include>
 
     <!-- OR Protocol -->
