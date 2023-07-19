@@ -23,7 +23,8 @@
     <!-- network visualization -->
     <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer"
           output="screen">
-      <remap from="state" to="agg_status"/>
+      <remap from="state"       to="agg_status"/>
+      <remap from="network_viz" to="/network_viz"/>
       <param name="offset"     value="0.5"/>
       <param name="stride"     value="0.15"/>
       <param name="show_flows" value="$(arg show_flows)"/>
@@ -44,7 +45,8 @@
     <!-- visualize exploration process -->
     <node pkg="perch_experiment" type="exploration_vis" name="exploration_vis"
           output="screen">
-      <remap from="status" to="monitor/network_status"/>
+      <remap from="status"      to="monitor/network_status"/>
+      <remap from="exploration" to="/exploration"/>
     </node>
 
 

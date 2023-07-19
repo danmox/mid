@@ -52,23 +52,18 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /node101/network_viz
+      Marker Topic: /network_viz
       Name: Network
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /node101/exploration
+      Marker Topic: /exploration
       Name: Exploration
       Namespaces:
-        banned: true
-        frontiers: true
-        goals: true
-        lines: true
-        pos: true
-        text: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
