@@ -62,6 +62,8 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   pnh.reset(new ros::NodeHandle(_pnh));
   hfn.reset(new ScarabMoveClient("move", true));
 
+  tf_listener.reset(new tf2_ros::TransformListener(tf_buff));
+
   use_sim_routing = false;
   if (!pnh->getParam("sim_routing", use_sim_routing)) {
     OP_WARN("failed to fetch param 'sim_routing', using default value %s", use_sim_routing ? "true" : "false");
@@ -140,6 +142,13 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   OP_INFO("waiting for hfn action server to start");
   hfn->waitForServer();
   OP_INFO("hfn action server ready");
+
+  ros::Rate tf_rate(10);
+  while (!tf_buff.canTransform("world", nav_frame, ros::Time(0))) {
+    OP_INFO("waiting for transforms to be available");
+    tf_rate.sleep();
+  }
+  OP_INFO("transforms ready");
 
   run_node = true;
 }
@@ -408,19 +417,28 @@ void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
     goal_pos = new_goal_pos;
     found_goal = true;
 
-    // send goal to HFN
+    // send goal to HFN (must be transformed from world frame to navigation
+    // - i.e. map - frame)
 
-    geometry_msgs::PoseStamped goal_pose;
-    goal_pose.header.frame_id = nav_frame;
-    goal_pose.header.stamp = ros::Time::now();
-    goal_pose.pose.position.x = goal_pos(0);
-    goal_pose.pose.position.y = goal_pos(1);
-    goal_pose.pose.orientation.w = 1.0;
+    geometry_msgs::PoseStamped world_goal_pose;
+    world_goal_pose.header.frame_id = "world";
+    world_goal_pose.header.stamp = ros::Time::now();
+    world_goal_pose.pose.position.x = goal_pos(0);
+    world_goal_pose.pose.position.y = goal_pos(1);
+    world_goal_pose.pose.orientation.w = 1.0;
+
+    geometry_msgs::PoseStamped local_goal_pose;
+    try {
+      local_goal_pose = tf_buff.transform(world_goal_pose, nav_frame);
+    } catch (tf2::TransformException& ex) {
+      OP_ERROR("failed to transform nav goal: %s", ex.what());
+      return;
+    }
 
     scarab_msgs::MoveGoal goal;
-    goal.target_poses.push_back(goal_pose);
+    goal.target_poses.push_back(local_goal_pose);
 
-    OP_INFO("sending goal (%.2f, %.2f) to HFN", goal_pos(0), goal_pos(1));
+    OP_INFO("sending goal (%.2f, %.2f) to HFN", local_goal_pose.pose.position.x, local_goal_pose.pose.position.y);
 
     hfn->sendGoal(goal);
   }

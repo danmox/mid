@@ -17,6 +17,7 @@ set(BUILD_DEPS
   scarab_msgs
   sensor_msgs
   tf2
+  tf2_ros
   visualization_msgs
 )
 

@@ -1,16 +1,17 @@
 #ifndef OR_PLANNER_OR_PLANNER_H_
 #define OR_PLANNER_OR_PLANNER_H_
 
-
-#include <Eigen/Dense>
-#include <fmt/format.h>
-#include <ros/ros.h>
 #include <unordered_set>
 
+#include <Eigen/Dense>
 #include <actionlib/client/simple_action_client.h>
+#include <fmt/format.h>
+#include <ros/ros.h>
+#include <tf2_ros/transform_listener.h>
+
+#include <experiment_msgs/Command.h>
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <experiment_msgs/Command.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <or_protocol_msgs/NetworkStatus.h>
 #include <or_protocol_msgs/RoutingTable.h>
@@ -108,6 +109,11 @@ class ORPlanner
 
   typedef actionlib::SimpleActionClient<scarab_msgs::MoveAction> ScarabMoveClient;
   std::unique_ptr<ScarabMoveClient> hfn;
+
+  // planner goals are computed in the world frame but hfn goals must be sent in
+  // the map frame
+  tf2_ros::Buffer tf_buff;
+  std::unique_ptr<tf2_ros::TransformListener> tf_listener;
 
   double delivery_prob(const Eigen::MatrixXd& poses);
 
