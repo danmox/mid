@@ -48,7 +48,6 @@
       <remap from="exploration" to="/exploration"/>
     </node>
 
-
   </group>
 
 </launch>

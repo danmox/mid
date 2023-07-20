@@ -101,8 +101,13 @@ void state_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 
 void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
 {
+  static ros::Time last_warn(0);
+
   if (!status_ptr) {
-    ROS_WARN("[network_viz] waiting for status message");
+    if ((ros::Time::now() - last_warn).toSec() > 5.0) {
+      ROS_WARN("[network_viz] waiting for status message");
+      last_warn = ros::Time::now();
+    }
     return;
   }
 
@@ -182,7 +187,7 @@ int main(int argc, char** argv)
     ros::spinOnce();
 
     if (!status_ptr) {
-      ROS_WARN_THROTTLE(1.0, "[network_viz] waiting for status message");
+      ROS_WARN_THROTTLE(5.0, "[network_viz] waiting for status message");
       continue;
     }
 

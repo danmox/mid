@@ -51,8 +51,7 @@
     <param name="nav_frame"   value="$(arg map_frame)"/>
     <param name="sim_routing" value="$(arg sim_routing)"/>
     <rosparam>
-      goal_threshold:      0.5
-      gradient_threshold: 1e-8
+      goal_threshold:      1.0
       gradient_steps:       20
       gradient_step_size: 20.0
     </rosparam>

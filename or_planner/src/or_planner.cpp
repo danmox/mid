@@ -570,7 +570,7 @@ void ORPlanner::run()
     plan_msg.color.a = 1;
     plan_msg.points.push_back(p0);
     plan_msg.points.push_back(p1);
-    plan_msg.scale.x = 0.05;
+    plan_msg.scale.x = 0.1;
     plan_msg.pose.orientation.w = 1.0;  // avoid rviz warning
 
     visualization_msgs::Marker goal_msg;
@@ -582,7 +582,6 @@ void ORPlanner::run()
     goal_msg.lifetime = ros::Duration(1.0);
     goal_msg.color.b = 1;
     goal_msg.color.a = 1;
-    goal_msg.points.push_back(p0);
     goal_msg.points.push_back(p1);
     goal_msg.scale.x = 0.4;
     goal_msg.scale.y = 0.4;
