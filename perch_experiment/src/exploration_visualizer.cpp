@@ -69,7 +69,7 @@ int main(int argc, char** argv)
   ros::Subscriber status_sub = nh.subscribe<NetworkStatus>("status", 5, status_cb);
 
   ros::Time last_update(0);
-  int update_count = 0;
+  int update_count = 0, attempts = 4;
 
   ros::Rate loop_rate(10);
   while (ros::ok()) {
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
     // dynamically subscribe to all /*/goals /*/frontiers topics
 
-    if ((ros::Time::now() - last_update).toSec() > 2.0 && update_count < 4) {
+    if ((ros::Time::now() - last_update).toSec() > 1.0 && update_count < attempts) {
 
       ros::master::V_TopicInfo topic_infos;
       ros::master::getTopics(topic_infos);
@@ -136,6 +136,8 @@ int main(int argc, char** argv)
       }
 
       update_count++;
+      last_update = ros::Time::now();
+      ROS_INFO("[exploration_vis] finished attempt %d/%d at adding new subscribers", update_count, attempts);
     }
 
     // visualizations
