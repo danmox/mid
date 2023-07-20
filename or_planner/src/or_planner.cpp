@@ -565,7 +565,23 @@ void ORPlanner::run()
     plan_msg.scale.x = 0.05;
     plan_msg.pose.orientation.w = 1.0;  // avoid rviz warning
 
+    visualization_msgs::Marker goal_msg;
+    goal_msg.header.frame_id = "world";
+    goal_msg.ns = "goal";
+    goal_msg.id = 0;
+    goal_msg.type = visualization_msgs::Marker::POINTS;
+    goal_msg.action = visualization_msgs::Marker::ADD;
+    goal_msg.lifetime = ros::Duration(1.0);
+    goal_msg.color.b = 1;
+    goal_msg.color.a = 1;
+    goal_msg.points.push_back(p0);
+    goal_msg.points.push_back(p1);
+    goal_msg.scale.x = 0.4;
+    goal_msg.scale.y = 0.4;
+    goal_msg.pose.orientation.w = 1.0;  // avoid rviz warning
+
     viz_pub.publish(plan_msg);
+    viz_pub.publish(goal_msg);
   }
 }
 
