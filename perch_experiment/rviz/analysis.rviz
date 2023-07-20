@@ -57,13 +57,86 @@ Visualization Manager:
       Marker Topic: /scarab42/frontier_exploration
       Name: "42: frontier"
       Namespaces:
+        all_goals: true
         banned: true
         frontiers: true
         goal: true
-        id: true
+        id: false
         paths: false
       Queue Size: 100
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab44/frontier_exploration
+      Name: "44: frontier"
+      Namespaces:
+        all_goals: true
+        banned: true
+        frontiers: true
+        goal: true
+        id: false
+        paths: false
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab46/frontier_exploration
+      Name: "46: frontier"
+      Namespaces:
+        all_goals: true
+        banned: true
+        frontiers: true
+        goal: true
+        id: false
+        paths: false
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab41/planner
+      Name: "41: planner"
+      Namespaces:
+        grad: true
+        plan: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab42/planner
+      Name: "42: planner"
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab45/planner
+      Name: "45: planner"
+      Namespaces:
+        grad: true
+        plan: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 0.30000001192092896
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: false
+      Name: "40: map"
+      Topic: /scarab40/map
+      Unreliable: false
+      Use Timestamp: false
+      Value: false
+    - Alpha: 0.30000001192092896
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: false
+      Name: "41: map"
+      Topic: /scarab41/map
+      Unreliable: false
+      Use Timestamp: false
+      Value: false
     - Alpha: 0.30000001192092896
       Class: rviz/Map
       Color Scheme: map
@@ -73,6 +146,95 @@ Visualization Manager:
       Topic: /scarab42/map
       Unreliable: false
       Use Timestamp: false
+      Value: true
+    - Alpha: 0.30000001192092896
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: "44: map"
+      Topic: /scarab44/map
+      Unreliable: false
+      Use Timestamp: false
+      Value: true
+    - Alpha: 0.30000001192092896
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: false
+      Name: "45: map"
+      Topic: /scarab45/map
+      Unreliable: false
+      Use Timestamp: false
+      Value: false
+    - Alpha: 0.30000001192092896
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: "46: map"
+      Topic: /scarab46/map
+      Unreliable: false
+      Use Timestamp: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab40/planner
+      Name: "40: planner"
+      Namespaces:
+        grad: true
+        plan: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab41/planner
+      Name: "41: planner"
+      Namespaces:
+        grad: true
+        plan: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /scarab45/planner
+      Name: "45: planner"
+      Namespaces:
+        grad: true
+        plan: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.20000000298023224
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: "40: pose"
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /scarab40/pose
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.20000000298023224
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: "41: pose"
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /scarab41/pose
+      Unreliable: false
       Value: true
     - Alpha: 1
       Axes Length: 1
@@ -90,28 +252,6 @@ Visualization Manager:
       Topic: /scarab42/pose
       Unreliable: false
       Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /scarab44/frontier_exploration
-      Name: "44: frontier"
-      Namespaces:
-        banned: true
-        frontiers: true
-        goal: true
-        id: true
-        paths: false
-      Queue Size: 100
-      Value: true
-    - Alpha: 0.30000001192092896
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: "44: map"
-      Topic: /scarab44/map
-      Unreliable: false
-      Use Timestamp: false
-      Value: true
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.20000000298023224
@@ -128,27 +268,21 @@ Visualization Manager:
       Topic: /scarab44/pose
       Unreliable: false
       Value: true
-    - Class: rviz/Marker
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.20000000298023224
+      Class: rviz/Pose
+      Color: 255; 25; 0
       Enabled: true
-      Marker Topic: /scarab46/frontier_exploration
-      Name: "46: frontier"
-      Namespaces:
-        banned: true
-        frontiers: true
-        goal: true
-        id: true
-        paths: false
-      Queue Size: 100
-      Value: true
-    - Alpha: 0.30000001192092896
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: "46: map"
-      Topic: /scarab46/map
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: "45: pose"
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /scarab45/pose
       Unreliable: false
-      Use Timestamp: false
       Value: true
     - Alpha: 1
       Axes Length: 1
@@ -165,6 +299,24 @@ Visualization Manager:
       Shape: Axes
       Topic: /scarab46/pose
       Unreliable: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /network_viz
+      Name: Network
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /experiment_vis
+      Name: Experiment
+      Namespaces:
+        goals: true
+        lines: true
+        text: true
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -203,10 +355,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 28.399887084960938
+      Scale: 32.718345642089844
       Target Frame: <Fixed Frame>
-      X: -1.0961511135101318
-      Y: -5.990440368652344
+      X: 4.6028642654418945
+      Y: -7.502294063568115
     Saved: ~
 Window Geometry:
   Displays:
@@ -225,4 +377,4 @@ Window Geometry:
     collapsed: false
   Width: 3840
   X: 0
-  Y: 961
+  Y: 945

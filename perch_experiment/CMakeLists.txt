@@ -31,5 +31,8 @@ catkin_package(
 add_executable(exploration_vis src/exploration_visualizer.cpp)
 target_link_libraries(exploration_vis ${catkin_LIBRARIES})
 
+add_executable(results_vis src/results_visualizer.cpp)
+target_link_libraries(results_vis ${catkin_LIBRARIES})
+
 add_executable(commander src/commander.cpp)
 target_link_libraries(commander ${catkin_LIBRARIES} ${CURSES_LIBRARIES})
