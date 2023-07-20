@@ -6,6 +6,7 @@
 #include <or_protocol/network_state.h>
 #include <tf2/utils.h>
 
+#include <exploration_msgs/Goal.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Point.h>
 #include <or_protocol_msgs/Header.h>
@@ -77,6 +78,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   command_sub = nh->subscribe("/command", 1, &ORPlanner::command_cb, this);
 
   viz_pub = nh->advertise<visualization_msgs::Marker>("planner", 1);
+  goal_pub = nh->advertise<exploration_msgs::Goal>("goals", 1);
 
   if (!pnh->getParam("node_id", node_id)) {
     OP_FATAL("failed to fetch required param 'node_id'");
@@ -441,6 +443,14 @@ void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
     OP_INFO("sending goal (%.2f, %.2f) to HFN", local_goal_pose.pose.position.x, local_goal_pose.pose.position.y);
 
     hfn->sendGoal(goal);
+
+    // publish world frame goal for eventual visualization
+
+    exploration_msgs::Goal vis_goal;
+    vis_goal.goal.x = goal_pos(0);
+    vis_goal.goal.y = goal_pos(1);
+    vis_goal.stamp = ros::Time::now();
+    goal_pub.publish(vis_goal);
   }
 }
 

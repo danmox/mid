@@ -12,6 +12,7 @@
   <depend>actionlib</depend>
   <depend>eigen</depend>
   <depend>experiment_msgs</depend>
+  <depend>exploration_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>or_protocol</depend>

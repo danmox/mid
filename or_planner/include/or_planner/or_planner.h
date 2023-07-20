@@ -81,7 +81,7 @@ class ORPlanner
 
  private:
   ros::Subscriber map_sub, pose_sub, scan_sub, table_sub, status_sub, command_sub;
-  ros::Publisher viz_pub;
+  ros::Publisher viz_pub, goal_pub;
   std::unique_ptr<ros::NodeHandle> nh, pnh;
 
   experiment_msgs::Command command;

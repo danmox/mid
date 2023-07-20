@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(BUILD_DEPS
   actionlib
   experiment_msgs
+  exploration_msgs
   geometry_msgs
   nav_msgs
   or_protocol
