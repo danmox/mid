@@ -520,8 +520,16 @@ void ORPlanner::run()
       continue;
     }
 
-    // TODO check if the robot is involved in any flows and move to the centroid
-    // if not
+    // TODO move to centroid of task agents?
+    if (flows.size() == 0) {
+      ROS_WARN_THROTTLE(1.0, "robot not involved in any flows: navigating to centroid of task team");
+      Vec2d centroid = Vec2d::Zero();
+      for (int i : task_idxs)
+        centroid += poses.col(i);
+      centroid /= task_idxs.size();
+      send_hfn_goal(centroid);
+      continue;
+    }
 
     // compute gradient across flows
 
