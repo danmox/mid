@@ -65,15 +65,16 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
 
   tf_listener.reset(new tf2_ros::TransformListener(tf_buff));
 
-  use_sim_routing = false;
-  if (!pnh->getParam("sim_routing", use_sim_routing)) {
-    OP_WARN("failed to fetch param 'sim_routing', using default value %s", use_sim_routing ? "true" : "false");
-  } else {
-    OR_WARN("using simulated routing during planning");
+  gradient_steps = 20;
+  if (!pnh->getParam("gradient_steps", gradient_steps)) {
+    OP_WARN("failed to fetch param 'gradient_steps', using default value %d", gradient_steps);
   }
 
-  if (!use_sim_routing)
-    table_sub = nh->subscribe("table", 1, &ORPlanner::table_cb, this);
+  gradient_step_size = 20.0;
+  if (!pnh->getParam("gradient_step_size", gradient_step_size)) {
+    OP_WARN("failed to fetch param 'gradient_step_size', using default value %.2f", gradient_step_size);
+  }
+
   status_sub = nh->subscribe("status", 1, &ORPlanner::status_cb, this);
   command_sub = nh->subscribe("/command", 1, &ORPlanner::command_cb, this);
 
@@ -132,10 +133,6 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
   if (!pnh->getParam("goal_threshold", goal_threshold))
     OP_WARN("failed to fetch param 'goal_threshold': using default value of %.2f m", goal_threshold);
 
-  gradient_threshold = 1e-8;
-  if (!pnh->getParam("gradient_threshold", gradient_threshold))
-    OP_WARN("failed to fetch param 'gradient_threshold': using default value of %f", gradient_threshold);
-
   if (!pnh->getParam("nav_frame", nav_frame)) {
     OP_FATAL("failed to fetch required param 'nav_frame'");
     return;
@@ -172,10 +169,10 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
     return relay_vec;
   };
 
-  // compute all routes and their probabilities
+  // compute all possible packet paths through the network with the given
+  // routing table
 
   flows.clear();
-  flow_probs.clear();
   for (const or_protocol_msgs::RoutingSrcEntry& src_entry : msg->entries) {
     const int src_idx = id_to_idx.at(src_entry.src_id);
 
@@ -197,7 +194,6 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
       // compute all paths for the given flow
 
       std::vector<int_vec> paths{int_vec{src_idx}};
-      std::vector<double> path_probs{1.0};
       std::stack<int> incomplete({static_cast<int>(paths.size() - 1)});
       while (!incomplete.empty()) {
         int idx = incomplete.top();
@@ -222,22 +218,18 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
         const int_vec& relays = relay_map[last_node];
 
         const int_vec path_so_far = paths[idx];
-        const int prob_so_far = path_probs[idx];
 
         paths[idx].push_back(relays[0]);
-        path_probs[idx] *= link_probs(last_node, relays[0]);
         incomplete.push(idx);
 
         for (size_t i = 1; i < relays.size(); i++) {
           paths.push_back(path_so_far);
           paths.back().push_back(relays[i]);
-          path_probs.push_back(prob_so_far * link_probs(last_node, relays[i]));
           incomplete.push(paths.size()-1);
         }
       }
 
       flows.push_back(paths);
-      flow_probs.push_back(path_probs);
     }
   }
 
@@ -305,45 +297,34 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 
   // compute link probabilities from ETX table
 
-  if (!use_sim_routing) {
-    link_probs = Eigen::MatrixXd::Zero(num_agents, num_agents);
-    for (const or_protocol_msgs::ETXList& table : msg->etx_table) {
-      const int src_idx = id_to_idx.at(table.node);
-      for (const or_protocol_msgs::ETXEntry& entry : table.etx_list) {
-        const int dst_idx = id_to_idx.at(entry.node);
-        link_probs(src_idx, dst_idx) = 1.0 / entry.etx;
-      }
+  Eigen::MatrixXd link_probs = channel_model->predict(poses);
+
+  std::unordered_set<int> node_ids = task_ids;
+  node_ids.insert(mid_ids.begin(), mid_ids.end());
+
+  // compute ETX map for NetworkState (must be in id space)
+  or_protocol::ETXMap etx_map;
+  for (const int src : node_ids) {
+    std::unordered_map<int, double> inner_map;
+    for (const int dst : node_ids) {
+      if (src == dst)
+        continue;
+      double etx = channel_model->etx(poses.col(id_to_idx[src]), poses.col(id_to_idx[dst]));
+      inner_map.emplace(dst, etx);
     }
-  } else {
-    link_probs = channel_model->predict(poses);
-
-    std::unordered_set<int> node_ids = task_ids;
-    node_ids.insert(mid_ids.begin(), mid_ids.end());
-
-    // compute ETX map
-    or_protocol::ETXMap etx_map;
-    for (const int src : node_ids) {
-      std::unordered_map<int, double> inner_map;
-      for (const int dst : node_ids) {
-        if (src == dst)
-          continue;
-        double etx = channel_model->etx(poses.col(id_to_idx[src]), poses.col(id_to_idx[dst]));
-        inner_map.emplace(dst, etx);
-      }
-      etx_map.emplace(src, inner_map);
-    }
-
-    // compute routing table
-    or_protocol::NetworkState ns;
-    ns.set_etx_map(etx_map);
-    ns.update_routes(node_id);
-
-    // set status_ready
-    status_ready = true;
-
-    // compute flow probabilities
-    table_cb(ns.get_routing_table_msg());
+    etx_map.emplace(src, inner_map);
   }
+
+  // compute routing table
+  or_protocol::NetworkState ns;
+  ns.set_etx_map(etx_map);
+  ns.update_routes(node_id);
+
+  // set status_ready
+  status_ready = true;
+
+  // compute flow probabilities
+  table_cb(ns.get_routing_table_msg());
 
   status_ready = true;
 }
@@ -377,11 +358,33 @@ double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
 }
 
 
-Vec2d ORPlanner::compute_gradient()
+std::vector<std::vector<double>>
+ORPlanner::compute_flow_probs(const Eigen::MatrixXd& links)
 {
+  std::vector<std::vector<double>> flow_probs;
+  for (const std::vector<std::vector<int>>& flow : flows) {
+    std::vector<double> path_probs;
+    for (const std::vector<int>& path : flow) {
+      double path_prob{1.0};
+      for (size_t i = 1; i < path.size(); i++) {
+        path_prob *= links(path[i - 1], path[i]);
+      }
+      path_probs.push_back(path_prob);
+    }
+    flow_probs.push_back(path_probs);
+  }
+
+  return flow_probs;
+}
+
+
+Vec2d ORPlanner::compute_gradient(const Eigen::MatrixXd& team_config)
+{
+  Eigen::MatrixXd link_probs = channel_model->predict(team_config);
+  std::vector<std::vector<double>> flow_probs = compute_flow_probs(link_probs);
+
   Vec2d gradient = Vec2d::Zero();
 
-  OP_INFO("computing gradient with %ld flows", flows.size());
   for (size_t j = 0; j < flows.size(); j++) {
     const std::vector<std::vector<int>>& paths = flows[j];
     const std::vector<double>& path_probs = flow_probs[j];
@@ -401,12 +404,24 @@ Vec2d ORPlanner::compute_gradient()
       int next_idx = path[j + 1];
       double C1 = path_probs[i] / link_probs(prev_idx, root_idx);
       double C2 = path_probs[i] / link_probs(root_idx, next_idx);
-      gradient += C1 * channel_model->derivative(poses.col(root_idx), poses.col(prev_idx)) +
-                  C2 * channel_model->derivative(poses.col(root_idx), poses.col(next_idx));
+      gradient += C1 * channel_model->derivative(team_config.col(root_idx), team_config.col(prev_idx)) +
+                  C2 * channel_model->derivative(team_config.col(root_idx), team_config.col(next_idx));
     }
   }
 
   return gradient;
+}
+
+
+Vec2d ORPlanner::compute_goal()
+{
+  Vec2d goal;
+
+  int max_steps = 20;
+  for (int i = 0; i < max_steps; ++i) {
+  }
+
+  return goal;
 }
 
 
@@ -505,38 +520,22 @@ void ORPlanner::run()
       continue;
     }
 
+    // TODO check if the robot is involved in any flows and move to the centroid
+    // if not
+
     // compute gradient across flows
 
-    Vec2d gradient = compute_gradient();
+    Eigen::MatrixXd next_config = poses;
+    for (int step = 0; step < gradient_steps; step++) {
+      Vec2d gradient = compute_gradient(next_config);
+      next_config.col(root_idx) += gradient_step_size * gradient;
+    }
 
     // compute control actions
 
-    // TODO just move to the centroid of the task agents instead?
-    if (gradient.norm() < gradient_threshold) {
-      OP_INFO("gradient norm %.3e below threshold %.3e: stopping robot", gradient.norm(), gradient_threshold);
-      if (hfn->getState() == actionlib::SimpleClientGoalState::ACTIVE) {
-        hfn->cancelGoal();
-      }
-      continue;
-    }
-    gradient.normalize();
-
-    double current_prob = delivery_prob(poses);
+    double current_prob = delivery_prob(next_config);
     if (current_prob < 1e-5)
       OP_WARN("low delivery probability %f", current_prob);
-
-    // search for local optimum along gradient direction
-    // TODO check for obstacles?
-    double step_size = 0.5;
-    Eigen::MatrixXd next_config = poses;
-    for (int steps = 0; steps < 10; steps++) {
-      next_config.col(root_idx) += step_size * gradient;
-      double next_prob = delivery_prob(next_config);
-      if (next_prob < current_prob) {
-        next_config.col(root_idx) -= step_size * gradient;
-        step_size *= 0.5;
-      }
-    }
 
     send_hfn_goal(next_config.col(root_idx).array());
 
@@ -545,34 +544,12 @@ void ORPlanner::run()
     geometry_msgs::Point p0;
     p0.x = poses(0, root_idx);
     p0.y = poses(1, root_idx);
-    p0.z = 0.2;
-
-    geometry_msgs::Point p1 = p0;
-    p1.x += gradient(0);
-    p1.y += gradient(1);
-
-    visualization_msgs::Marker grad_msg;
-    grad_msg.header.frame_id = "world";
-    grad_msg.ns = "grad";
-    grad_msg.id = 0;
-    grad_msg.type = visualization_msgs::Marker::ARROW;
-    grad_msg.action = visualization_msgs::Marker::ADD;
-    grad_msg.lifetime = ros::Duration(1.0);
-    grad_msg.color.r = 1;
-    grad_msg.color.a = 1;
-    grad_msg.points.push_back(p0);
-    grad_msg.points.push_back(p1);
-    grad_msg.scale.x = 0.1;
-    grad_msg.scale.y = 0.2;
-    grad_msg.scale.z = 0.25;
-    grad_msg.pose.orientation.w = 1.0; // avoid rviz warning
-
     p0.z = 0.1;
 
-    geometry_msgs::Point p2;
-    p2.x = goal_pos(0);
-    p2.y = goal_pos(1);
-    p2.z = 0.1;
+    geometry_msgs::Point p1;
+    p1.x = goal_pos(0);
+    p1.y = goal_pos(1);
+    p1.z = 0.1;
 
     visualization_msgs::Marker plan_msg;
     plan_msg.header.frame_id = "world";
@@ -584,11 +561,10 @@ void ORPlanner::run()
     plan_msg.color.b = 1;
     plan_msg.color.a = 1;
     plan_msg.points.push_back(p0);
-    plan_msg.points.push_back(p2);
+    plan_msg.points.push_back(p1);
     plan_msg.scale.x = 0.05;
     plan_msg.pose.orientation.w = 1.0;  // avoid rviz warning
 
-    viz_pub.publish(grad_msg);
     viz_pub.publish(plan_msg);
   }
 }

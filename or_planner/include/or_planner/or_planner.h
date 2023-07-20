@@ -88,9 +88,9 @@ class ORPlanner
 
   volatile bool run_node, table_ready, status_ready;
 
-  int node_id, num_agents, root_idx;
+  int node_id, num_agents, root_idx, gradient_steps;
 
-  double goal_threshold, gradient_threshold;
+  double goal_threshold, gradient_step_size;
   std::string nav_frame;
 
   std::unordered_set<int> task_ids, mid_ids;
@@ -98,13 +98,11 @@ class ORPlanner
   std::unordered_map<unsigned int, int> id_to_idx;
 
   Eigen::MatrixXd poses;
-  Eigen::MatrixXd link_probs;
   std::vector<std::vector<std::vector<int>>> flows;
-  std::vector<std::vector<double>> flow_probs;
 
   std::unique_ptr<LinearChannel> channel_model;
 
-  bool found_goal, use_sim_routing;
+  bool found_goal;
   Eigen::Array2d goal_pos;
 
   typedef actionlib::SimpleActionClient<scarab_msgs::MoveAction> ScarabMoveClient;
@@ -117,7 +115,9 @@ class ORPlanner
 
   double delivery_prob(const Eigen::MatrixXd& poses);
 
-  Vec2d compute_gradient();
+  Vec2d compute_gradient(const Eigen::MatrixXd& team_config);
+  Vec2d compute_goal();
+  std::vector<std::vector<double>> compute_flow_probs(const Eigen::MatrixXd& links);
 
   void send_hfn_goal(const Eigen::Array2d& new_goal_pos);
 };
@@ -135,7 +135,7 @@ class ORPlannerTest
     planner.mid_ids.insert(mid_ids.begin(), mid_ids.end());
   }
 
-  Vec2d compute_gradient(ORPlanner& planner) { return planner.compute_gradient(); }
+  Vec2d compute_gradient(ORPlanner& planner) { return planner.compute_gradient(planner.poses); }
 };
 
 

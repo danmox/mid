@@ -53,6 +53,8 @@
     <rosparam>
       goal_threshold:      0.5
       gradient_threshold: 1e-8
+      gradient_steps:       20
+      gradient_step_size: 20.0
     </rosparam>
     <remap from="status" to="$(arg status_topic)"/>
     <remap from="table"  to="routing_table"/>
