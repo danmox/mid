@@ -86,7 +86,7 @@ class ORPlanner
 
   experiment_msgs::Command command;
 
-  volatile bool run_node, table_ready, status_ready;
+  bool run_node, table_ready, status_ready, offline;
 
   int node_id, num_agents, root_idx, gradient_steps;
 

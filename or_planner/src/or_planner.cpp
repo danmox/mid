@@ -138,9 +138,16 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
     return;
   }
 
-  OP_INFO("waiting for hfn action server to start");
-  hfn->waitForServer();
-  OP_INFO("hfn action server ready");
+  offline = false;
+  if (!pnh->getParam("offline", offline)) {
+    OP_WARN("failed to fetch param 'offline': using default value of %s", offline ? "TRUE" : "FALSE");
+  }
+
+  if (!offline) {
+    OP_INFO("waiting for hfn action server to start");
+    hfn->waitForServer();
+    OP_INFO("hfn action server ready");
+  }
 
   ros::Rate tf_rate(10);
   while (!tf_buff.canTransform("world", nav_frame, ros::Time(0))) {
@@ -455,9 +462,12 @@ void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
     scarab_msgs::MoveGoal goal;
     goal.target_poses.push_back(local_goal_pose);
 
-    OP_INFO("sending goal (%.2f, %.2f) to HFN", local_goal_pose.pose.position.x, local_goal_pose.pose.position.y);
-
-    hfn->sendGoal(goal);
+    if (!offline) {
+      OP_INFO("sending goal (%.2f, %.2f) to HFN", local_goal_pose.pose.position.x, local_goal_pose.pose.position.y);
+      hfn->sendGoal(goal);
+    } else {
+      OP_INFO("in offline mode: not sending goal to HFN");
+    }
 
     // publish world frame goal for eventual visualization
 
@@ -472,6 +482,8 @@ void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
 
 void ORPlanner::run()
 {
+  bool cleared_visualization = false;
+
   ros::Rate rate(5);
   while (run_node && ros::ok()) {
     rate.sleep();
@@ -493,21 +505,23 @@ void ORPlanner::run()
 
     // clear visualizations if we're not running the planner this iteration
     if (skip_loop) {
-      visualization_msgs::Marker grad_msg;
-      grad_msg.header.frame_id = "world";
-      grad_msg.ns = "grad";
-      grad_msg.id = 0;
-      grad_msg.action = visualization_msgs::Marker::DELETE;
+      if (!cleared_visualization) {
+        visualization_msgs::Marker grad_msg;
+        grad_msg.header.frame_id = "world";
+        grad_msg.ns = "grad";
+        grad_msg.id = 0;
+        grad_msg.action = visualization_msgs::Marker::DELETE;
 
-      visualization_msgs::Marker plan_msg;
-      plan_msg.header.frame_id = "world";
-      plan_msg.ns = "plan";
-      plan_msg.id = 0;
-      plan_msg.action = visualization_msgs::Marker::DELETE;
+        visualization_msgs::Marker plan_msg;
+        plan_msg.header.frame_id = "world";
+        plan_msg.ns = "plan";
+        plan_msg.id = 0;
+        plan_msg.action = visualization_msgs::Marker::DELETE;
 
-      viz_pub.publish(grad_msg);
-      viz_pub.publish(plan_msg);
-
+        viz_pub.publish(grad_msg);
+        viz_pub.publish(plan_msg);
+        cleared_visualization = true;
+      }
       continue;
     }
 
@@ -589,6 +603,8 @@ void ORPlanner::run()
 
     viz_pub.publish(plan_msg);
     viz_pub.publish(goal_msg);
+
+    cleared_visualization = false;
   }
 }
 
