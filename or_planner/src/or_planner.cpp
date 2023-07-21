@@ -547,11 +547,24 @@ void ORPlanner::run()
 
     // compute gradient across flows
 
+    bool valid_goal = true;
     Eigen::MatrixXd next_config = poses;
     for (int step = 0; step < gradient_steps; step++) {
       Vec2d gradient = compute_gradient(next_config);
+      if (std::isnan(gradient(0)) || std::isnan(gradient(1))) {
+        OP_ERROR("NANs in gradient!");
+        valid_goal = false;
+        break;
+      }
+      if (gradient.norm() < 1e-4) {
+        OP_WARN("gradient.norm() = %.f < 1e-4, not normalizing", gradient.norm());
+      } else {
+        gradient.normalize();
+      }
       next_config.col(root_idx) += gradient_step_size * gradient;
     }
+    if (!valid_goal)
+      continue;
 
     // compute control actions
 
