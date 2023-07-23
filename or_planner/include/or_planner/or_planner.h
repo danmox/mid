@@ -29,7 +29,10 @@ namespace or_planner {
 #define OP_FATAL(fmt, ...) ROS_FATAL("[ORPlanner] " fmt, ##__VA_ARGS__)
 
 
-typedef Eigen::Vector2d Vec2d;
+typedef Eigen::Vector2d Point;
+typedef Eigen::MatrixXd Matrix;
+
+using std::vector;
 
 
 class LinearChannel
@@ -40,15 +43,15 @@ class LinearChannel
 
   // compute the derivative of the channel probability function w.r.t x1
   // TODO what if channel state information does not agree?
-  Vec2d derivative(const Vec2d& x1, const Vec2d& x2);
+  Point derivative(const Point& x1, const Point& x2);
 
   // compute the probability of delivery between two nodes
-  double predict(const Vec2d& x1, const Vec2d& x2);
+  double predict(const Point& x1, const Point& x2);
 
   // compute the ETX between two nodes
-  double etx(const Vec2d& x1, const Vec2d& x2);
+  double etx(const Point& x1, const Point& x2);
 
-  Eigen::MatrixXd predict(const Eigen::MatrixXd& poses);
+  Matrix predict(const Matrix& poses);
 
  private:
   double max_range;
@@ -97,13 +100,13 @@ class ORPlanner
   std::unordered_set<int> task_idxs, mid_idxs;
   std::unordered_map<unsigned int, int> id_to_idx;
 
-  Eigen::MatrixXd poses;
-  std::vector<std::vector<std::vector<int>>> flows;
+  Matrix poses;
+  vector<vector<vector<int>>> flows;
 
   std::unique_ptr<LinearChannel> channel_model;
 
   bool found_goal;
-  Eigen::Array2d goal_pos;
+  Point goal_pos;
 
   typedef actionlib::SimpleActionClient<scarab_msgs::MoveAction> ScarabMoveClient;
   std::unique_ptr<ScarabMoveClient> hfn;
@@ -113,13 +116,13 @@ class ORPlanner
   tf2_ros::Buffer tf_buff;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener;
 
-  double delivery_prob(const Eigen::MatrixXd& poses);
+  double delivery_prob(const Matrix& poses);
 
-  Vec2d compute_gradient(const Eigen::MatrixXd& team_config);
-  Vec2d compute_goal();
-  std::vector<std::vector<double>> compute_flow_probs(const Eigen::MatrixXd& links);
+  Point compute_gradient(const Matrix& team_config);
+  Point compute_goal();
+  vector<vector<double>> compute_flow_probs(const Matrix& links);
 
-  void send_hfn_goal(const Eigen::Array2d& new_goal_pos);
+  void send_hfn_goal(const Point& new_goal_pos);
 };
 
 
@@ -127,7 +130,7 @@ class ORPlannerTest
 {
   public:
   void initializeORPlanner(ORPlanner& planner, const int node_id, const double max_range,
-                           const std::vector<int>& task_ids, const std::vector<int>& mid_ids)
+                           const vector<int>& task_ids, const vector<int>& mid_ids)
   {
     planner.node_id = node_id;
     planner.channel_model.reset(new LinearChannel(max_range));
@@ -135,7 +138,7 @@ class ORPlannerTest
     planner.mid_ids.insert(mid_ids.begin(), mid_ids.end());
   }
 
-  Vec2d compute_gradient(ORPlanner& planner) { return planner.compute_gradient(planner.poses); }
+  Point compute_gradient(ORPlanner& planner) { return planner.compute_gradient(planner.poses); }
 };
 
 

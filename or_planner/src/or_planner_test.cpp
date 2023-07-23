@@ -48,7 +48,7 @@ int main(int argc, char** argv)
   planner.status_cb(network_msg);
   planner.table_cb(routing_msg);
 
-  or_planner::Vec2d grad = tester.compute_gradient(planner);
+  or_planner::Point grad = tester.compute_gradient(planner);
 
   fmt::print("grad: ({}, {})\n", grad(0), grad(1));
 

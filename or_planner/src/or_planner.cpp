@@ -16,32 +16,32 @@
 namespace or_planner {
 
 
-Vec2d LinearChannel::derivative(const Vec2d& x1, const Vec2d& x2)
+Point LinearChannel::derivative(const Point& x1, const Point& x2)
 {
-  Vec2d diff = x1 - x2;
+  Point diff = x1 - x2;
   double dist = diff.norm();
   if (dist > max_range)
-    return Vec2d::Zero();
+    return Point::Zero();
   return - diff / dist / max_range;
 }
 
 
-double LinearChannel::predict(const Vec2d& x1, const Vec2d& x2)
+double LinearChannel::predict(const Point& x1, const Point& x2)
 {
   return std::max(1.0 - (x1 - x2).norm() / max_range, 0.0);
 }
 
 
-double LinearChannel::etx(const Vec2d& x1, const Vec2d& x2)
+double LinearChannel::etx(const Point& x1, const Point& x2)
 {
   double prob = std::max(1.0 - (x1 - x2).norm() / max_range, 0.0);
   return prob < 1.0 / or_protocol::ETX_MAX ? or_protocol::ETX_MAX : 1.0 / prob;
 }
 
 
-Eigen::MatrixXd LinearChannel::predict(const Eigen::MatrixXd& poses)
+Matrix LinearChannel::predict(const Matrix& poses)
 {
-  Eigen::MatrixXd link_probs = Eigen::MatrixXd::Zero(poses.cols(), poses.cols());
+  Matrix link_probs = Matrix::Zero(poses.cols(), poses.cols());
   for (int i = 0; i < poses.cols(); i++) {
     for (int j = 0; j < poses.cols(); j++) {
       if (i == j)
@@ -165,11 +165,10 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
   if (!status_ready)
     return;
 
-  typedef std::vector<int> int_vec;
   typedef or_protocol_msgs::Header::_relays_type RelayArray;
 
   auto id_arr_to_idx_vec = [&](const RelayArray& arr) {
-    int_vec relay_vec;
+    vector<int> relay_vec;
     size_t i = 0;
     while (i < arr.size() && arr[i] != 0)
       relay_vec.push_back(id_to_idx.at(arr[i++]));
@@ -194,13 +193,13 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
       if (mid_idxs.count(dst_idx) != 0)
         continue;
 
-      std::unordered_map<int, int_vec> relay_map;
+      std::unordered_map<int, vector<int>> relay_map;
       for (const or_protocol_msgs::RoutingRule& rule : dst_entry.rules)
         relay_map[id_to_idx.at(rule.relay_id)] = id_arr_to_idx_vec(rule.relays);
 
       // compute all paths for the given flow
 
-      std::vector<int_vec> paths{int_vec{src_idx}};
+      vector<vector<int>> paths{vector<int>{src_idx}};
       std::stack<int> incomplete({static_cast<int>(paths.size() - 1)});
       while (!incomplete.empty()) {
         int idx = incomplete.top();
@@ -222,9 +221,9 @@ void ORPlanner::table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
           table_ready = run_node = false;
           return;
         }
-        const int_vec& relays = relay_map[last_node];
+        const vector<int>& relays = relay_map[last_node];
 
-        const int_vec path_so_far = paths[idx];
+        const vector<int> path_so_far = paths[idx];
 
         paths[idx].push_back(relays[0]);
         incomplete.push(idx);
@@ -295,7 +294,7 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
   num_agents = id_to_idx.size();
   root_idx = id_to_idx.at(node_id);
 
-  poses = Eigen::MatrixXd(2, num_agents);
+  poses = Matrix(2, num_agents);
   for (const or_protocol_msgs::Point& pt : msg->positions) {
     const int idx = id_to_idx[pt.node];
     poses(0, idx) = pt.x;
@@ -304,7 +303,7 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 
   // compute link probabilities from ETX table
 
-  Eigen::MatrixXd link_probs = channel_model->predict(poses);
+  Matrix link_probs = channel_model->predict(poses);
 
   std::unordered_set<int> node_ids = task_ids;
   node_ids.insert(mid_ids.begin(), mid_ids.end());
@@ -344,14 +343,14 @@ void ORPlanner::command_cb(const experiment_msgs::CommandConstPtr& msg)
 
 
 // TODO numerical issues? switch to log prob?
-double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
+double ORPlanner::delivery_prob(const Matrix& poses)
 {
-  Eigen::MatrixXd links = channel_model->predict(poses);
+  Matrix links = channel_model->predict(poses);
 
   double prob{1.0};
-  for (const std::vector<std::vector<int>>& flow : flows) {
+  for (const vector<vector<int>>& flow : flows) {
     double flow_prob{1.0};
-    for (const std::vector<int>& path : flow) {
+    for (const vector<int>& path : flow) {
       double path_prob{1.0};
       for (size_t i = 1; i < path.size(); i++) {
         path_prob *= links(path[i-1], path[i]);
@@ -365,13 +364,13 @@ double ORPlanner::delivery_prob(const Eigen::MatrixXd& poses)
 }
 
 
-std::vector<std::vector<double>>
-ORPlanner::compute_flow_probs(const Eigen::MatrixXd& links)
+vector<vector<double>>
+ORPlanner::compute_flow_probs(const Matrix& links)
 {
-  std::vector<std::vector<double>> flow_probs;
-  for (const std::vector<std::vector<int>>& flow : flows) {
-    std::vector<double> path_probs;
-    for (const std::vector<int>& path : flow) {
+  vector<vector<double>> flow_probs;
+  for (const vector<vector<int>>& flow : flows) {
+    vector<double> path_probs;
+    for (const vector<int>& path : flow) {
       double path_prob{1.0};
       for (size_t i = 1; i < path.size(); i++) {
         path_prob *= links(path[i - 1], path[i]);
@@ -385,19 +384,19 @@ ORPlanner::compute_flow_probs(const Eigen::MatrixXd& links)
 }
 
 
-Vec2d ORPlanner::compute_gradient(const Eigen::MatrixXd& team_config)
+Point ORPlanner::compute_gradient(const Matrix& team_config)
 {
-  Eigen::MatrixXd link_probs = channel_model->predict(team_config);
-  std::vector<std::vector<double>> flow_probs = compute_flow_probs(link_probs);
+  Matrix link_probs = channel_model->predict(team_config);
+  vector<vector<double>> flow_probs = compute_flow_probs(link_probs);
 
-  Vec2d gradient = Vec2d::Zero();
+  Point gradient = Point::Zero();
 
   for (size_t j = 0; j < flows.size(); j++) {
-    const std::vector<std::vector<int>>& paths = flows[j];
-    const std::vector<double>& path_probs = flow_probs[j];
+    const vector<vector<int>>& paths = flows[j];
+    const vector<double>& path_probs = flow_probs[j];
 
     for (size_t i = 0; i < paths.size(); i++) {
-      const std::vector<int>& path = paths[i];
+      const vector<int>& path = paths[i];
 
       size_t j = 1;  // MID agents are never sources
       while (path[j] != root_idx && j < path.size() - 2)
@@ -420,9 +419,9 @@ Vec2d ORPlanner::compute_gradient(const Eigen::MatrixXd& team_config)
 }
 
 
-Vec2d ORPlanner::compute_goal()
+Point ORPlanner::compute_goal()
 {
-  Vec2d goal;
+  Point goal;
 
   int max_steps = 20;
   for (int i = 0; i < max_steps; ++i) {
@@ -432,7 +431,7 @@ Vec2d ORPlanner::compute_goal()
 }
 
 
-void ORPlanner::send_hfn_goal(const Eigen::Array2d& new_goal_pos)
+void ORPlanner::send_hfn_goal(const Point& new_goal_pos)
 {
   if (found_goal && (new_goal_pos - goal_pos).matrix().norm() < goal_threshold) {
     OP_DEBUG("new_goal (%.2f, %.2f) near previous goal (%.2f, %.2f): not sending HFN command", new_goal_pos(0), new_goal_pos(1), goal_pos(0), goal_pos(1));
@@ -498,7 +497,7 @@ void ORPlanner::run()
       }
     } else if (command.action == experiment_msgs::Command::RETURN) {
       ROS_WARN_THROTTLE(5.0, "[ORPlanner] command action is: RETURN");
-      send_hfn_goal(Eigen::Array2d{0.0, 0.0});
+      send_hfn_goal(Point{0.0, 0.0});
     } else {
       skip_loop = false;
     }
@@ -537,7 +536,7 @@ void ORPlanner::run()
     // TODO move to centroid of task agents?
     if (flows.size() == 0) {
       ROS_WARN_THROTTLE(1.0, "robot not involved in any flows: navigating to centroid of task team");
-      Vec2d centroid = Vec2d::Zero();
+      Point centroid = Point::Zero();
       for (int i : task_idxs)
         centroid += poses.col(i);
       centroid /= task_idxs.size();
@@ -548,9 +547,9 @@ void ORPlanner::run()
     // compute gradient across flows
 
     bool valid_goal = true;
-    Eigen::MatrixXd next_config = poses;
+    Matrix next_config = poses;
     for (int step = 0; step < gradient_steps; step++) {
-      Vec2d gradient = compute_gradient(next_config);
+      Point gradient = compute_gradient(next_config);
       if (std::isnan(gradient(0)) || std::isnan(gradient(1))) {
         OP_ERROR("NANs in gradient!");
         valid_goal = false;
