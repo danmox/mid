@@ -46,8 +46,13 @@ int main(int argc, char** argv)
 
   ros::Rate loop_rate(send_rate);
   while (ros::ok()) {
-    payload_pub.publish(msg);
-    msg.seq++;
+    ros::spinOnce();
+    if (cmd.action == experiment_msgs::Command::START) {
+      payload_pub.publish(msg);
+      msg.seq++;
+    } else {
+      ROS_WARN_THROTTLE(5.0, "[fake_traffic] waiting for start command");
+    }
     loop_rate.sleep();
   }
 
