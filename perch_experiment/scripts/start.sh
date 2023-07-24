@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-TYPE=task
-if [[ "$#" -eq 1 ]]; then
-  TYPE="$1"
-fi
-
 if tmux has-session -t ros &>/dev/null; then
   echo "tmux session 'ros' already running!"
   exit
@@ -26,8 +21,8 @@ MID_ID=${AGENT:(-2)}
 ROS_IP=192.168.0.$MID_ID
 ROS_MASTER_URI=http://$ROS_IP:11311
 
-echo "starting robot $MID_ID with type: $TYPE"
-tmux set -g history-limit 50000 \; new-session -d -s ros -n mid "source ~/mid_ws/devel/setup.bash; export ROS_IP=$ROS_IP; export ROS_MASTER_URI=http://$ROS_IP:11311; roslaunch perch_experiment scarab.launch type:=$TYPE"
+echo "starting robot $MID_ID with args: $*"
+tmux set -g history-limit 50000 \; set -g remain-on-exit on \; new-session -d -s ros -n mid "source ~/mid_ws/devel/setup.bash; export ROS_IP=$ROS_IP; export ROS_MASTER_URI=http://$ROS_IP:11311; roslaunch perch_experiment scarab.launch $*"
 
 source ~/mid_ws/devel/setup.bash
 export ROS_IP=$ROS_IP
