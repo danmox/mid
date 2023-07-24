@@ -24,6 +24,7 @@ add_message_files(
     msg
   FILES
     Command.msg
+    Payload.msg
 )
 
 generate_messages()

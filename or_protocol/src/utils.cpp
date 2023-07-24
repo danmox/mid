@@ -1,6 +1,7 @@
 #include <or_protocol/utils.h>
 
 #include <experiment_msgs/Command.h>
+#include <experiment_msgs/Payload.h>
 #include <exploration_msgs/Goal.h>
 #include <exploration_msgs/FrontierGoals.h>
 #include <std_msgs/UInt32.h>
@@ -112,6 +113,8 @@ topic_tools::ShapeShifter get_msg_info(const std::string& type,
     morph_shape_shifter<std_msgs::Int64>(ss, latch);
   else if (type == "experiment_msgs/Command")
     morph_shape_shifter<experiment_msgs::Command>(ss, latch);
+  else if (type == "experiment_msgs/Payload")
+    morph_shape_shifter<experiment_msgs::Payload>(ss, latch);
   else
     OR_ERROR("get_msg_info not implemented for type %s!", type.c_str());
 

@@ -36,3 +36,6 @@ target_link_libraries(results_vis ${catkin_LIBRARIES})
 
 add_executable(commander src/commander.cpp)
 target_link_libraries(commander ${catkin_LIBRARIES} ${CURSES_LIBRARIES})
+
+add_executable(fake_traffic src/fake_traffic_node.cpp)
+target_link_libraries(fake_traffic ${catkin_LIBRARIES})
