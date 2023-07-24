@@ -118,8 +118,7 @@ class ORPlanner
 
   double delivery_prob(const Matrix& poses);
 
-  Point compute_gradient(const Matrix& team_config);
-  Point compute_goal();
+  Point compute_gradient(const Matrix& config);
   vector<vector<double>> compute_flow_probs(const Matrix& links);
 
   void send_hfn_goal(const Point& new_goal_pos);

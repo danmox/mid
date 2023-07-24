@@ -384,50 +384,45 @@ ORPlanner::compute_flow_probs(const Matrix& links)
 }
 
 
-Point ORPlanner::compute_gradient(const Matrix& team_config)
+Point ORPlanner::compute_gradient(const Matrix& config)
 {
-  Matrix link_probs = channel_model->predict(team_config);
+  Matrix link_probs = channel_model->predict(config);
   vector<vector<double>> flow_probs = compute_flow_probs(link_probs);
 
   Point gradient = Point::Zero();
+  const int root = root_idx;
 
-  for (size_t j = 0; j < flows.size(); j++) {
-    const vector<vector<int>>& paths = flows[j];
-    const vector<double>& path_probs = flow_probs[j];
+  for (size_t k = 0; k < flows.size(); k++) {
+    const vector<vector<int>>& paths = flows[k];
+    const vector<double>& path_probs = flow_probs[k];
+
+    double flow_fail_prob = 1.0;
+    for (const double p : path_probs)
+      flow_fail_prob *= 1.0 - p;
 
     for (size_t i = 0; i < paths.size(); i++) {
       const vector<int>& path = paths[i];
 
       size_t j = 1;  // MID agents are never sources
-      while (path[j] != root_idx && j < path.size() - 2)
+      while (path[j] != root && j < path.size() - 2)  // 2 b/c check below
         j++;
 
-      // some paths in the flow don't involve root_idx
-      if (path[j] != root_idx)
+      // some paths in the flow don't involve root
+      if (path[j] != root)
         continue;
 
-      int prev_idx = path[j - 1];
-      int next_idx = path[j + 1];
-      double C1 = path_probs[i] / link_probs(prev_idx, root_idx);
-      double C2 = path_probs[i] / link_probs(root_idx, next_idx);
-      gradient += C1 * channel_model->derivative(team_config.col(root_idx), team_config.col(prev_idx)) +
-                  C2 * channel_model->derivative(team_config.col(root_idx), team_config.col(next_idx));
+      int prev = path[j - 1];
+      int next = path[j + 1];
+      double C1 = path_probs[i] / link_probs(prev, root);
+      double C2 = path_probs[i] / link_probs(root, next);
+      Point dl_ds = channel_model->derivative(config.col(root), config.col(prev));
+      Point dl_dd = channel_model->derivative(config.col(root), config.col(next));
+      gradient += (C1 * dl_ds + C2 * dl_dd) * flow_fail_prob / (1.0 - path_probs[i]);
     }
   }
 
-  return gradient;
-}
-
-
-Point ORPlanner::compute_goal()
-{
-  Point goal;
-
-  int max_steps = 20;
-  for (int i = 0; i < max_steps; ++i) {
-  }
-
-  return goal;
+  // normalize by number of flows
+  return gradient / flows.size();
 }
 
 
@@ -555,9 +550,7 @@ void ORPlanner::run()
         valid_goal = false;
         break;
       }
-      if (gradient.norm() < 1e-4) {
-        OP_WARN("gradient.norm() = %.f < 1e-4, not normalizing", gradient.norm());
-      } else {
+      if (gradient.norm() > 1e-4) {
         gradient.normalize();
       }
       next_config.col(root_idx) += gradient_step_size * gradient;
