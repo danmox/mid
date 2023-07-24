@@ -10,12 +10,14 @@
 
   <!-- constructed args -->
 
-  <arg name="task" value="true" if="$(eval arg('type') == 'task')"/>
-  <arg name="task" value="false" unless="$(eval arg('type') == 'task')"/>
-  <arg name="mid"  value="true" if="$(eval arg('type') == 'mid')"/>
-  <arg name="mid"  value="false" unless="$(eval arg('type') == 'mid')"/>
+  <arg name="task"  value="true" if="$(eval arg('type') == 'task')"/>
+  <arg name="task"  value="false" unless="$(eval arg('type') == 'task')"/>
+  <arg name="mid"   value="true" if="$(eval arg('type') == 'mid')"/>
+  <arg name="mid"   value="false" unless="$(eval arg('type') == 'mid')"/>
+  <arg name="relay" value="true" if="$(eval arg('type') == 'relay')"/>
+  <arg name="relay" value="false" unless="$(eval arg('type') == 'relay')"/>
 
-  <arg name="launch_prefix" value="alacritty -e gdb -q -ex run --args" if="$(arg gdb)"/>
+  <arg name="launch_prefix" value="alacritty -e gdb -q --args" if="$(arg gdb)"/>
   <arg name="launch_prefix" value="" unless="$(arg gdb)"/>
 
   <!-- nodes -->
@@ -57,6 +59,15 @@
     </rosparam>
     <remap from="status" to="$(arg status_topic)"/>
     <remap from="table"  to="routing_table"/>
+  </node>
+
+  <node name="goal_sender_node"
+        pkg="perch_experiment"
+        type="goal_sender"
+        output="screen"
+        if="$(arg relay)">
+    <param name="nav_frame" value="$(arg map_frame)"/>
+    <param name="goal_param" value="/scarab$(arg id)/goal"/>
   </node>
 
 </launch>
