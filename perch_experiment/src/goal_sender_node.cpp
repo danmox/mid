@@ -87,10 +87,14 @@ int main(int argc, char** argv)
   while (ros::ok()) {
     ros::spinOnce();
 
-    if (new_command && cmd.action == experiment_msgs::Command::START) {
-      ROS_INFO("[goal_sender] sending goal to HFN");
-      hfn.sendGoal(goal);
-      new_command = false;
+    if (cmd.action == experiment_msgs::Command::START) {
+      if (new_command ||
+          (hfn.getState() != actionlib::SimpleClientGoalState::ACTIVE &&
+           hfn.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)) {
+        ROS_INFO("[goal_sender] sending goal to HFN");
+        hfn.sendGoal(goal);
+        new_command = false;
+      }
     } else if (new_command && cmd.action == experiment_msgs::Command::RETURN) {
       geometry_msgs::PoseStamped return_goal;
       return_goal.header.frame_id = nav_frame;
