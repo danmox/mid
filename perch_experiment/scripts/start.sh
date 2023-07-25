@@ -5,6 +5,18 @@ if tmux has-session -t ros &>/dev/null; then
   exit
 fi
 
+if [[ ! -d /home/scarab/dan_bags ]]; then
+  mkdir /home/scarab/dan_bags
+fi
+if ls -1 /home/scarab | grep -qE ".*\.bag$"; then
+  echo "archiving old bags"
+  mv /home/scarab/*.bag dan_bags
+else
+  echo "no bags to archive"
+fi
+
+exit
+
 if [[ -z "$AGENT" ]]; then
   echo "AGENT environment variable not set"
   exit
