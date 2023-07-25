@@ -3,6 +3,7 @@
   <arg name="agent"                 default="$(env AGENT)"/>
 
   <arg name="type"                  default="none"/>
+  <arg name="fake_traffic"          default="false"/>
   <arg name="gdb"                   default="false"/>
   <arg name="record"                default="true"/>
   <arg name="relative_localization" default="true"/>
@@ -18,7 +19,7 @@
   <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
   <arg name="world_frame"           default="world"/>
 
-  <arg name="scenario"              default="3task3mid"/>
+  <arg name="scenario"/>
 
   <!-- constructed args -->
 
@@ -42,10 +43,10 @@
     <arg name="base_frame"     value="$(arg base_frame)"/>
     <arg name="odom_frame"     value="$(arg odom_frame)"/>
     <arg name="nav_scan_topic" value="scan_merged"/>
-    <arg name="map_xmin"       value="-20.0"/>
-    <arg name="map_xmax"       value="20.0"/>
-    <arg name="map_ymin"       value="-20.0"/>
-    <arg name="map_ymax"       value="50.0"/>
+    <arg name="map_xmin"       value="-40.0"/>
+    <arg name="map_xmax"       value="40.0"/>
+    <arg name="map_ymin"       value="-40.0"/>
+    <arg name="map_ymax"       value="40.0"/>
     <arg name="hfn_config"     value="$(find perch_experiment)/config/hfn.yaml"/>
     <arg name="map_res"        value="0.1"/>
   </include>
@@ -160,6 +161,13 @@
       <remap from="pose" to="world_pose"/>
     </node>
 
+    <!-- network traffic generator -->
+    <node name="fake_traffic" pkg="perch_experiment" type="fake_traffic"
+          output="screen" if="$(arg fake_traffic)">
+      <param name="payload_size" value="100"/>  <!-- bytes -->
+      <param name="send_rate"    value="10"/>   <!-- Hz -->
+    </node>
+
   </group>
 
   <node name="recorder" pkg="rosbag" type="record" output="screen"
@@ -169,6 +177,7 @@
               /tf
               /tf_static
               /command
+              /scarab(.*)/traffic
               /scarab(.*)/frontiers
               /scarab(.*)/goals
               /scarab$(arg id)/planner

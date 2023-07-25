@@ -1,0 +1,18 @@
+task_agent_ids: [42, 44, 46]
+mid_agent_ids: []
+max_range: 25.0  # max communication range in meters
+sync_topics:
+  - /scarab46/traffic: {type: experiment_msgs/Payload, reliable: false, queue_size: 4, source: 46}
+  - /command: {type: experiment_msgs/Command, reliable: true, queue_size: 4, source: 46, all: true}
+scarab42:
+  goal:
+    x: -8.4
+    y: 17.5
+scarab44:
+  goal:
+    x:  7.8
+    y: 17.5
+scarab46:
+  goal:
+    x:   6.0
+    y: -28.0
