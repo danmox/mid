@@ -15,8 +15,6 @@ else
   echo "no bags to archive"
 fi
 
-exit
-
 if [[ -z "$AGENT" ]]; then
   echo "AGENT environment variable not set"
   exit
