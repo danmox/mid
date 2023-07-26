@@ -82,6 +82,8 @@ std::unordered_set<int> mid_ids;
 std::unordered_map<int, Point2d> node_points;
 std::unordered_map<int, std::unordered_map<int, double>> probs;
 std::unordered_map<int, std::unordered_map<int, std::vector<int>>> flow_map;
+std::unordered_set<int> dst_nodes;
+int src_node;
 
 
 void state_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
@@ -116,15 +118,13 @@ void table_cb(const or_protocol_msgs::RoutingTableConstPtr& msg)
   for (const or_protocol_msgs::RoutingSrcEntry& src_entry : msg->entries) {
     const int src_id = src_entry.src_id;
 
-    // we only care about flows between task agents
-    if (mid_ids.count(src_id) != 0)
+    if (src_id != src_node)
       continue;
 
     for (const or_protocol_msgs::RoutingDestEntry& dst_entry : src_entry.entries) {
       const int dst_id = dst_entry.dest_id;
 
-      // we only care about flows between task agents
-      if (mid_ids.count(dst_id) != 0)
+      if (dst_nodes.count(dst_id) == 0)
         continue;
 
       for (const or_protocol_msgs::RoutingRule& rule : dst_entry.rules) {
@@ -165,7 +165,6 @@ int main(int argc, char** argv)
   double stride = 0.1;     // meters between lines in rviz
   double offset = 0.5;     // distance between robot and line
   double z_val = 0.3;      // z coordinate to give to each line endpoint
-  bool show_flows = true;  // plot packet routes in addition to link prob
 
   if (!pnh.getParam("offset", offset))
     ROS_WARN("[network_viz] using default value of %.2f for 'offset'", offset);
@@ -173,8 +172,20 @@ int main(int argc, char** argv)
     ROS_WARN("[network_viz] using default value of %.2f for 'stride'", stride);
   if (!pnh.getParam("z_value", z_val))
     ROS_WARN("[network_viz] using default value of %.2f for 'z_value'", z_val);
-  if (!pnh.getParam("show_flows", show_flows))
-    ROS_WARN("[network_viz] using default value of %s for 'show_flows'", show_flows ? "TRUE" : "FALSE");
+
+  bool show_flows = true;  // plot packet routes in addition to link prob
+  if (!pnh.getParam("source", src_node)) {
+    ROS_WARN("[network_viz] failed to fetch 'source' param: not showing flows");
+    show_flows = false;
+  }
+  XmlRpc::XmlRpcValue dst_agent_ids_param;
+  if (!pnh.getParam("dests", dst_agent_ids_param)) {
+    ROS_WARN("[network_viz] failed to fetch 'dests' param: not showing flows");
+    show_flows = false;
+  } else {
+    for (int i = 0; i < dst_agent_ids_param.size(); i++)
+      dst_nodes.insert(dst_agent_ids_param[i]);
+  }
 
   ros::Subscriber state_sub = nh.subscribe("state", 10, state_cb);
   ros::Subscriber table_sub = nh.subscribe("table", 10, table_cb);
