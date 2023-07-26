@@ -5,13 +5,14 @@
 
   <arg name="scenario"/>
   <arg name="bag"/>
+  <arg name="bag_args" default=""/>
 
   <arg name="prefix" value="alacritty -o window.dimensions.columns=100
                                       -o window.dimensions.lines=20
                                       -o window.startup_mode=Windowed
                                       -e"/>
   <node name="player" pkg="rosbag" type="play" output="screen"
-        args="--pause $(arg bag)" launch-prefix="$(arg prefix)"/>
+        args="--pause $(arg bag) $(arg bag_args)" launch-prefix="$(arg prefix)"/>
 
   <rosparam command="load"
             file="$(find perch_experiment)/config/$(arg scenario).yaml"/>
@@ -27,10 +28,12 @@
   <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer"
         output="screen">
     <remap from="state"       to="/agg_status"/>
+    <remap from="table"       to="/scarab46/routing_table"/>
     <remap from="network_viz" to="/network_viz"/>
     <param name="offset"     value="0.5"/>
     <param name="stride"     value="0.15"/>
-    <param name="show_flows" value="false"/>
+    <param name="source"     value="46"/>
+    <rosparam param="dests">[42, 44]</rosparam>
   </node>
 
   <!-- experiment visualization -->
