@@ -49,7 +49,7 @@
 
   <node name="recorder" pkg="rosbag" type="record" output="screen"
         if="$(arg record)"
-        args="record -o heading_calibration_$(arg id)
+        args="record -o /home/scarab/heading_calibration_$(arg id)
               /tf
               /scarab$(arg id)/map
               /scarab$(arg id)/pose
