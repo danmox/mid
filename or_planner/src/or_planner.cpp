@@ -80,6 +80,7 @@ ORPlanner::ORPlanner(ros::NodeHandle& _nh, ros::NodeHandle& _pnh) :
 
   viz_pub = nh->advertise<visualization_msgs::Marker>("planner", 1);
   goal_pub = nh->advertise<exploration_msgs::Goal>("goals", 1);
+  routes_pub = nh->advertise<or_protocol_msgs::RoutingTable>("planner_routes", 1);
 
   if (!pnh->getParam("node_id", node_id)) {
     OP_FATAL("failed to fetch required param 'node_id'");
@@ -331,6 +332,7 @@ void ORPlanner::status_cb(const or_protocol_msgs::NetworkStatusConstPtr& msg)
 
   // compute flow probabilities
   table_cb(ns.get_routing_table_msg());
+  routes_pub.publish(ns.get_routing_table_msg());
 
   status_ready = true;
 }
