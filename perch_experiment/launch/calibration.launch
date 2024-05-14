@@ -1,0 +1,58 @@
+<launch>
+
+  <arg name="agent"                 default="$(env AGENT)"/>
+
+  <arg name="record"                default="false"/>
+
+  <arg name="map_frame"             default="$(arg agent)/map"/>
+  <arg name="base_frame"            default="$(arg agent)/base_link"/>
+  <arg name="odom_frame"            default="$(arg agent)/odom"/>
+  <arg name="heading_frame"         default="$(arg agent)/heading_correction"/>
+  <arg name="laser_frame"           default="$(arg agent)/laser"/>
+  <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
+  <arg name="world_frame"           default="world"/>
+
+  <!-- constructed args -->
+
+  <arg name="id" value="$(eval arg('agent')[6:])"/>
+
+  <!-- nodes -->
+
+  <include file="$(find perch_experiment)/launch/navigation.launch">
+    <arg name="agent"      value="$(arg agent)"/>
+    <arg name="map_frame"  value="$(arg map_frame)"/>
+    <arg name="base_frame" value="$(arg base_frame)"/>
+    <arg name="odom_frame" value="$(arg odom_frame)"/>
+    <arg name="nav_scan_topic" value="scan"/>
+    <arg name="map_xmin"   value="-20.0"/>
+    <arg name="map_xmax"   value="20.0"/>
+    <arg name="map_ymin"   value="-20.0"/>
+    <arg name="map_ymax"   value="50.0"/>
+    <arg name="hfn_config" value="$(find perch_experiment)/config/hfn.yaml"/>
+  </include>
+
+  <group ns="$(arg agent)">
+
+    <!-- vicon node to provide initial estimate of robot's position relative to
+         the vicon world frame -->
+    <arg name="model_list" value="['$(arg agent)']"/>
+    <node pkg="mocap_vicon" type="mocap_vicon_node" name="vicon" output="screen">
+      <param name="server_address" value="mocap.perch"/>
+      <param name="frame_rate"     value="100"/>
+      <param name="max_accel"      value="10.0"/>
+      <param name="publish_tf"     value="true"/>
+      <param name="fixed_frame_id" value="$(arg world_frame)"/>
+      <rosparam param="model_list" subst_value="True">$(arg model_list)</rosparam>
+    </node>
+
+  </group>
+
+  <node name="recorder" pkg="rosbag" type="record" output="screen"
+        if="$(arg record)"
+        args="record -o /home/scarab/heading_calibration_$(arg id)
+              /tf
+              /scarab$(arg id)/map
+              /scarab$(arg id)/pose
+              /scarab$(arg id)/vicon/scarab$(arg id)/pose"/>
+
+</launch>

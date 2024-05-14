@@ -1,0 +1,57 @@
+<launch>
+
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find perch_experiment)/rviz/analysis.rviz"/>
+
+  <arg name="scenario"/>
+  <arg name="bag"/>
+  <arg name="bag_args" default=""/>
+
+  <arg name="prefix" value="alacritty -o window.dimensions.columns=100
+                                      -o window.dimensions.lines=20
+                                      -o window.startup_mode=Windowed
+                                      -e"/>
+  <node name="player" pkg="rosbag" type="play" output="screen"
+        args="--pause $(arg bag) $(arg bag_args)" launch-prefix="$(arg prefix)"/>
+
+  <rosparam command="load"
+            file="$(find perch_experiment)/config/$(arg scenario).yaml"/>
+
+  <!-- combine all status messages for network visualization -->
+  <node name="status_aggregator" pkg="or_protocol" type="status_aggregator"
+        output="screen">
+    <remap from="status"     to="/status_messages"/>
+    <remap from="agg_status" to="/agg_status"/>
+  </node>
+
+  <!-- network visualization -->
+  <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer"
+        output="screen">
+    <remap from="state"       to="/agg_status"/>
+    <remap from="table"       to="/scarab46/routing_table"/>
+    <remap from="network_viz" to="/network_viz"/>
+    <param name="offset"     value="0.5"/>
+    <param name="stride"     value="0.15"/>
+    <param name="source"     value="46"/>
+    <rosparam param="dests">[42, 44]</rosparam>
+  </node>
+
+  <!-- experiment visualization -->
+  <node pkg="perch_experiment" name="results_visualizer" type="results_vis"
+        output="screen"/>
+
+  <!-- republish all status messages on /agg_status for status aggregator -->
+  <node name="status_relay_40" pkg="topic_tools" type="relay"
+        args="/scarab40/network_status /status_messages"/>
+  <node name="status_relay_41" pkg="topic_tools" type="relay"
+        args="/scarab41/network_status /status_messages"/>
+  <node name="status_relay_42" pkg="topic_tools" type="relay"
+        args="/scarab42/network_status /status_messages"/>
+  <node name="status_relay_44" pkg="topic_tools" type="relay"
+        args="/scarab44/network_status /status_messages"/>
+  <node name="status_relay_45" pkg="topic_tools" type="relay"
+        args="/scarab45/network_status /status_messages"/>
+  <node name="status_relay_46" pkg="topic_tools" type="relay"
+        args="/scarab46/network_status /status_messages"/>
+
+</launch>

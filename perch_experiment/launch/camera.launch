@@ -1,0 +1,57 @@
+<launch>
+
+  <arg name="agent"                 default="$(env AGENT)"/>
+
+  <arg name="laser_frame"           default="$(arg agent)/laser"/>
+  <arg name="camera_frame"          default="$(arg agent)/camera_link"/>
+
+  <!-- constructed args -->
+
+  <arg name="id" value="$(eval arg('agent')[6:])"/>
+
+  <!-- nodes -->
+
+  <group ns="$(arg agent)">
+
+    <!-- asus xtion nodes -->
+    <include file="$(find scarab)/launch/openni2_tf_prefix.launch">
+      <arg name="camera"          value="camera"/>
+      <arg name="tf_prefix"       value="$(arg agent)"/>
+	    <arg name="id_manufacturer" value="1d27"/>
+    </include>
+
+    <!-- convert xtion camera pointcloud to laserscan to avoid obstacles the
+         hokuyo misses -->
+    <node pkg="nodelet" type="nodelet" name="pointcloud_to_laserscan_nodelet"
+          args="load pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet
+                /$(arg agent)/camera/camera_nodelet_manager"
+          output="screen">
+      <param name="target_frame"    value="$(arg laser_frame)"/>
+      <param name="min_height"      value="-0.20"/> <!-- base_link coincident with laser, thus heights -->
+      <param name="max_height"      value="1.0"/>   <!-- depend on laser's position relative to ground -->
+      <param name="range_max"       value="4.0"/>   <!-- return Inf beyond this value -->
+      <param name="use_inf"         value="true"/>
+      <param name="angle_min"       value="-2.0987584590911865"/>  <!-- to match hokuyo: -120.25 deg -->
+      <param name="angle_max"       value="2.0987584590911865"/>   <!-- to match hokuyo:  120.25 deg -->
+      <param name="angle_increment" value="0.004363323096185923"/> <!-- to match hokuyo:    0.25 deg -->
+      <remap from="cloud_in" to="camera/depth/points"/>
+      <remap from="scan"     to="scan_xtion"/>
+    </node>
+
+    <!-- static transform between camera frame and laser frame -->
+    <node pkg="tf2_ros"
+          type="static_transform_publisher"
+          name="camera_laser_static_tf_broadcaster"
+          args="-0.1 0 0.11 0 0 0 $(arg laser_frame) $(arg camera_frame)"/>
+
+    <!-- merge the laserscan coming from the hokuyo and xtion -->
+    <node pkg="laserscan_merger" type="laserscan_merger" name="scan_merger"
+          output="screen">
+      <remap from="scan1"       to="scan_xtion"/>
+      <remap from="scan2"       to="scan"/>
+      <remap from="merged_scan" to="scan_merged"/>
+    </node>
+
+  </group>
+
+</launch>

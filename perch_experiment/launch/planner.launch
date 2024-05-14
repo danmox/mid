@@ -1,0 +1,73 @@
+<launch>
+
+  <arg name="id"/>
+  <arg name="type"/>
+  <arg name="map_frame"/>
+  <arg name="gdb"/>
+  <arg name="move"/>
+  <arg name="sim_routing"/>
+  <arg name="status_topic" default="/network_state"/>
+
+  <!-- constructed args -->
+
+  <arg name="task"  value="true" if="$(eval arg('type') == 'task')"/>
+  <arg name="task"  value="false" unless="$(eval arg('type') == 'task')"/>
+  <arg name="mid"   value="true" if="$(eval arg('type') == 'mid')"/>
+  <arg name="mid"   value="false" unless="$(eval arg('type') == 'mid')"/>
+  <arg name="relay" value="true" if="$(eval arg('type') == 'relay')"/>
+  <arg name="relay" value="false" unless="$(eval arg('type') == 'relay')"/>
+
+  <arg name="launch_prefix" value="alacritty -e gdb -q --args" if="$(arg gdb)"/>
+  <arg name="launch_prefix" value="" unless="$(arg gdb)"/>
+
+  <!-- nodes -->
+
+  <node name="frontier_exploration_node"
+        pkg="frontier_exploration"
+        type="frontier_exploration"
+        output="screen"
+        launch-prefix="$(arg launch_prefix)"
+        if="$(arg task)">
+    <param name="node_id"        value="$(arg id)"/>
+    <param name="map_frame_id"   value="$(arg map_frame)"/>
+    <param name="frontier_topic" value="/scarab*/frontiers"/>
+    <param name="goal_topic"     value="/scarab*/goals"/>
+    <param name="move"           value="$(arg move)"/>
+    <rosparam>
+      frontier_threshold:   15
+      free_dilation_steps:   2
+      occ_dilation_steps:    2
+      banned_threshold:    0.5
+      goal_threshold:      5.0
+    </rosparam>
+  </node>
+
+  <node name="mid_planner"
+        pkg="or_planner"
+        type="or_planner_node"
+        output="screen"
+        launch-prefix="$(arg launch_prefix)"
+        if="$(arg mid)">
+    <param name="robot_type"  value="$(arg type)"/>
+    <param name="node_id"     value="$(arg id)"/>
+    <param name="nav_frame"   value="$(arg map_frame)"/>
+    <param name="sim_routing" value="$(arg sim_routing)"/>
+    <rosparam>
+      goal_threshold:      1.0
+      gradient_steps:       20
+      gradient_step_size:  0.5
+    </rosparam>
+    <remap from="status" to="$(arg status_topic)"/>
+    <remap from="table"  to="routing_table"/>
+  </node>
+
+  <node name="goal_sender_node"
+        pkg="perch_experiment"
+        type="goal_sender"
+        output="screen"
+        if="$(arg relay)">
+    <param name="nav_frame" value="$(arg map_frame)"/>
+    <param name="goal_param" value="/scarab$(arg id)/goal"/>
+  </node>
+
+</launch>

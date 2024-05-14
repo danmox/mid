@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>or_planner</name>
+  <version>0.0.0</version>
+  <description>MID planner based on the opportunistic routing protocol</description>
+
+  <maintainer email="mox@seas.upenn.edu">Daniel Mox</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>actionlib</depend>
+  <depend>eigen</depend>
+  <depend>experiment_msgs</depend>
+  <depend>exploration_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>or_protocol</depend>
+  <depend>or_protocol_msgs</depend>
+  <depend>rosbag</depend>
+  <depend>roscpp</depend>
+  <depend>scarab_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+
+</package>

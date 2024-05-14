@@ -1,17 +1,15 @@
 <launch>
 
   <!-- gazebo args -->
-  <arg name="world_name" default="$(find scarab_gazebo)/worlds/perch.world"/>
-  <arg name="verbose"    default="false"/>
-  <arg name="debug"      default="false"/>
-  <arg name="gazebo_gui" default="false"/>
+  <arg name="world_name"  default="$(find scarab_gazebo)/worlds/perch.world"/>
+  <arg name="verbose"     default="false"/>
+  <arg name="debug"       default="false"/>
+  <arg name="gazebo_gui"  default="false"/>
 
-  <arg name="rviz"       default="true"/>
-  <arg name="show_flows" default="false"/>
-  <arg name="max_range"  default="30.0"/>
+  <arg name="rviz"         default="true"/>
+  <arg name="max_range"    default="30.0"/>
 
-  <rosparam param="/task_agent_ids">[40, 41]</rosparam>
-  <rosparam param="/mid_agent_ids">[42]</rosparam>
+  <rosparam param="/task_agent_ids">[40, 41, 42]</rosparam>
   <param name="/max_range" value="$(arg max_range)"/>
 
   <!-- SIMULATION -->
@@ -28,7 +26,7 @@
 
   <!-- start rviz -->
   <node name="rviz" pkg="rviz" type="rviz" if="$(arg rviz)"
-        args="-d $(find perch_experiment)/rviz/perch_experiment_sim.rviz"/>
+        args="-d $(find perch_experiment)/rviz/perch_exploration_sim.rviz"/>
 
   <!-- load perch world -->
   <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
@@ -40,13 +38,10 @@
   <!-- fake comms -->
   <node pkg="or_protocol" name="sim_routing" type="sim_routing_node" output="screen"/>
 
-  <!-- network visualization -->
-  <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer" output="screen">
-    <remap from="state" to="/network_state"/>
-    <remap from="table" to="/scarab42/routing_table"/>
-    <param name="offset"     value="0.5"/>
-    <param name="stride"     value="0.15"/>
-    <param name="show_flows" value="$(arg show_flows)"/>
+  <!-- exploration visualization -->
+  <node pkg="perch_experiment" type="exploration_vis" name="exploration_vis"
+        output="screen">
+    <remap from="status" to="/network_state"/>
   </node>
 
   <!-- ROBOTS -->
@@ -71,7 +66,7 @@
     <arg name="id"      value="42"/>
     <arg name="spawn_x" value="3.6"/>
     <arg name="spawn_y" value="-7.0"/>
-    <arg name="type"    value="mid"/>
+    <arg name="type"    value="task"/>
     <arg name="gdb"     value="false"/>
   </include>
 

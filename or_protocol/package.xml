@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>or_protocol</name>
+  <version>0.0.0</version>
+  <description>Opportunistic routing protocol for ROS networks</description>
+
+  <maintainer email="mox@seas.upenn.edu">Daniel Mox</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>eigen</depend>
+  <depend>fmt</depend>
+  <depend>experiment_msgs</depend>
+  <depend>exploration_msgs</depend>
+  <depend>or_protocol_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>rosbag</depend>
+  <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>yaml-cpp</depend>
+
+</package>

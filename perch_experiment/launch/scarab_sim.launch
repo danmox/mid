@@ -1,0 +1,39 @@
+<launch>
+
+  <arg name="id"/>
+  <arg name="spawn_x"     default="0.0"/>
+  <arg name="spawn_y"     default="0.0"/>
+  <arg name="spawn_z"     default="0.0"/>
+  <arg name="camera"      default="false"/>
+  <arg name="hokuyo"      default="true"/>
+  <arg name="type"        default="none"/>
+  <arg name="agent"       default="scarab$(arg id)"/>
+  <arg name="gdb"         default="false"/>
+  <arg name="sim_routing" default="true"/>
+
+  <include file="$(find scarab)/launch/scarab_sim.launch">
+    <arg name="agent"     value="$(arg agent)"/>
+    <arg name="spawn_x"   value="$(arg spawn_x)"/>
+    <arg name="spawn_y"   value="$(arg spawn_y)"/>
+    <arg name="spawn_z"   value="$(arg spawn_z)"/>
+    <arg name="camera"    value="$(arg camera)"/>
+    <arg name="hokuyo"    value="$(arg hokuyo)"/>
+    <arg name="map_xmin"  value="-40.0"/>
+    <arg name="map_xmax"  value="40.0"/>
+    <arg name="map_ymin"  value="-20.0"/>
+    <arg name="map_ymax"  value="20.0"/>
+    <arg name="delta"     value="0.1"/>
+  </include>
+
+  <group ns="$(arg agent)">
+    <include file="$(find perch_experiment)/launch/planner.launch">
+      <arg name="id"          value="$(arg id)"/>
+      <arg name="type"        value="$(arg type)"/>
+      <arg name="map_frame"   value="$(arg agent)/map"/>
+      <arg name="gdb"         value="$(arg gdb)"/>
+      <arg name="move"        value="true"/>
+      <arg name="sim_routing" value="$(arg sim_routing)"/>
+    </include>
+  </group>
+
+</launch>

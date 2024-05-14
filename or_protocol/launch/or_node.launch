@@ -1,0 +1,24 @@
+<launch>
+
+  <arg name="id"/>
+  <arg name="monitor" default="false"/>
+  <arg name="gdb"     default="false"/>
+
+  <arg name="prefix_args" if="$(arg gdb)"     value="gdb --args"/>
+  <arg name="prefix_args" unless="$(arg gdb)" value=""/>
+
+  <rosparam param="/task_agent_ids">[]</rosparam>
+  <rosparam param="/mid_agent_ids">[]</rosparam>
+  <rosparam param="/sync_topics">
+    - /node42/int: {type: std_msgs/Int64, reliable: true, queue_size: 1, source: 42}
+  </rosparam>
+
+  <group ns="node$(arg id)">
+    <node name="or_node" pkg="or_protocol" type="or_node" output="screen"
+          launch-prefix="$(arg prefix_args)">
+      <param name="IP"     value="192.168.0.$(arg id)"/>
+      <param name="monitor" value="$(arg monitor)"/>
+    </node>
+  </group>
+
+</launch>

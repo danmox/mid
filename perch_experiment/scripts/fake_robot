@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import rospy
+from geometry_msgs.msg import PoseStamped
+from experiment_msgs.msg import Command
+
+
+cmd = Command()
+
+
+def cmd_cb(msg):
+    global cmd
+    cmd = msg
+
+
+def main():
+    global cmd
+
+    rospy.init_node('rake_robot_node')
+
+    required_params = ['~x_start', '~y_start', '~x_end', '~y_end', '~speed']
+    params = {}
+    for param in required_params:
+        if rospy.has_param(param):
+            params[param[1:]] = rospy.get_param(param)
+        else:
+            rospy.logfatal(f'failed to fetch required param: {param}')
+            return
+
+    pose_pub = rospy.Publisher('pose', PoseStamped, queue_size=1)
+    cmd_sub = rospy.Subscriber('/command', Command, cmd_cb, queue_size=1)
+
+    publish_rate = 10
+
+    x_start = np.asarray((params['x_start'], params['y_start'], 0.0))
+    x_end = np.asarray((params['x_end'], params['y_end'], 0.0))
+    total_dist = np.linalg.norm(x_end - x_start)
+    inc_dist = params['speed'] / publish_rate
+    inc = (x_end - x_start) / total_dist * inc_dist
+
+    msg = PoseStamped()
+    msg.header.frame_id = 'world'
+    msg.pose.orientation.w = 1.0
+
+    loop_rate = rospy.Rate(publish_rate)
+    traveled_dist = 0
+    pos = x_start
+    while not rospy.is_shutdown():
+
+        if cmd.action == Command.START:
+            if traveled_dist < total_dist:
+                pos += inc
+                traveled_dist += inc_dist
+
+        msg.header.stamp = rospy.get_rostime()
+        msg.pose.position.x = pos[0]
+        msg.pose.position.y = pos[1]
+        msg.pose.position.z = pos[2]
+
+        pose_pub.publish(msg)
+        loop_rate.sleep()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass

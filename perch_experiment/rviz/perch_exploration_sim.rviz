@@ -223,17 +223,13 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /scarab40/frontier_exploration
       Name: scarab40/frontier
       Namespaces:
-        all_goals: true
-        frontiers: true
-        goal: true
-        id: true
-        paths: false
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -406,18 +402,13 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /scarab41/frontier_exploration
       Name: scarab41/frontier
       Namespaces:
-        all_goals: true
-        banned: true
-        frontiers: true
-        goal: true
-        id: true
-        paths: false
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -586,24 +577,26 @@ Visualization Manager:
       Marker Topic: /scarab42/planner
       Name: scarab42/planner
       Namespaces:
-        grad: true
-        plan: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /scarab42/frontier_exploration
       Name: scarab42/frontier
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /network_viz
-      Name: Network
+      Marker Topic: /exploration
+      Name: Exploration
       Namespaces:
-        "": true
+        banned: true
+        frontiers: true
+        goals: true
+        labels: true
       Queue Size: 100
       Value: true
   Enabled: true

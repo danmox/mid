@@ -10,8 +10,8 @@
   <arg name="show_flows" default="false"/>
   <arg name="max_range"  default="30.0"/>
 
-  <rosparam param="/task_agent_ids">[40, 41]</rosparam>
-  <rosparam param="/mid_agent_ids">[42]</rosparam>
+  <rosparam param="/task_agent_ids">[40, 41, 42]</rosparam>
+  <rosparam param="/mid_agent_ids">[43, 44]</rosparam>
   <param name="/max_range" value="$(arg max_range)"/>
 
   <!-- SIMULATION -->
@@ -28,7 +28,7 @@
 
   <!-- start rviz -->
   <node name="rviz" pkg="rviz" type="rviz" if="$(arg rviz)"
-        args="-d $(find perch_experiment)/rviz/perch_experiment_sim.rviz"/>
+        args="-d $(find perch_experiment)/rviz/perch_relay_sim.rviz"/>
 
   <!-- load perch world -->
   <node name="perch_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
@@ -43,36 +43,64 @@
   <!-- network visualization -->
   <node pkg="or_protocol" name="routing_visualizer" type="routing_visualizer" output="screen">
     <remap from="state" to="/network_state"/>
-    <remap from="table" to="/scarab42/routing_table"/>
+    <remap from="table" to="/scarab43/routing_table"/>
     <param name="offset"     value="0.5"/>
     <param name="stride"     value="0.15"/>
     <param name="show_flows" value="$(arg show_flows)"/>
   </node>
 
-  <!-- ROBOTS -->
+  <!-- fake robots -->
+
+  <node pkg="perch_experiment" name="static_pose_publisher_40"
+        type="static_pose_publisher" output="screen">
+    <param name="x" value="26.0"/>
+    <param name="y" value="9.0"/>
+    <remap from="pose" to="/scarab40/pose"/>
+  </node>
+
+  <node pkg="perch_experiment" name="static_pose_publisher_41"
+        type="static_pose_publisher" output="screen">
+    <param name="x" value="26.0"/>
+    <param name="y" value="-9.0"/>
+    <remap from="pose" to="/scarab41/pose"/>
+  </node>
+
+  <node pkg="perch_experiment" name="fake_robot_42"
+        type="fake_robot" output="screen">
+    <param name="x_start" value="15.0"/>
+    <param name="y_start" value="0.0"/>
+    <param name="x_end"   value="-21.5"/>
+    <param name="y_end"   value="-6.0"/>
+    <param name="speed"   value="0.25"/>
+    <remap from="pose" to="/scarab42/pose"/>
+  </node>
+
+  <!-- MID robots -->
 
   <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="40"/>
-    <arg name="spawn_x" value="-9.0"/>
-    <arg name="spawn_y" value="0.0"/>
-    <arg name="type"    value="task"/>
-    <arg name="gdb"     value="false"/>
-  </include>
-
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="41"/>
-    <arg name="spawn_x" value="15.0"/>
-    <arg name="spawn_y" value="0.0"/>
-    <arg name="type"    value="task"/>
-    <arg name="gdb"     value="false"/>
-  </include>
-
-  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
-    <arg name="id"      value="42"/>
-    <arg name="spawn_x" value="3.6"/>
-    <arg name="spawn_y" value="-7.0"/>
+    <arg name="id"      value="43"/>
+    <arg name="spawn_x" value="17.0"/>
+    <arg name="spawn_y" value="2.0"/>
     <arg name="type"    value="mid"/>
     <arg name="gdb"     value="false"/>
   </include>
+
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="id"      value="44"/>
+    <arg name="spawn_x" value="18.0"/>
+    <arg name="spawn_y" value="-2.0"/>
+    <arg name="type"    value="mid"/>
+    <arg name="gdb"     value="false"/>
+  </include>
+
+  <!--
+  <include file="$(find perch_experiment)/launch/scarab_sim.launch">
+    <arg name="id"      value="45"/>
+    <arg name="spawn_x" value="17.0"/>
+    <arg name="spawn_y" value="-2.0"/>
+    <arg name="type"    value="mid"/>
+    <arg name="gdb"     value="false"/>
+  </include>
+  -->
 
 </launch>
